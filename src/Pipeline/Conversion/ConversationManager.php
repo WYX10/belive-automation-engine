@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Pipeline\Conversion;
 
 use App\AI\Memory\EpisodicLogger;
+use App\AI\Memory\FeedbackCollector;
 use App\AI\Memory\LeadMemoryProfile;
+use App\AI\Memory\LearningEngine;
 use App\AI\Memory\MemoryRetriever;
 use App\AI\Skills\AutomateSkill;
 use App\AI\Skills\CreateSkill;
@@ -62,6 +64,18 @@ final class ConversationManager
             Lead::update($leadId, ['tenant_profile' => $understanding['tenant_profile']]);
         }
         $lead = Lead::find($leadId) + ['is_returning' => $lead['is_returning'] ?? false];
+
+        // 1b. Implicit feedback — customer corrections and repeated questions.
+        // Corrections are distilled into learned rules SYNCHRONOUSLY, before
+        // memory retrieval below, so even this very reply already honours the
+        // correction the customer just made.
+        foreach (FeedbackCollector::detectImplicit($leadId, $understanding, $history) as $feedbackId) {
+            try {
+                LearningEngine::processFeedback($feedbackId);
+            } catch (\Throwable $e) {
+                EpisodicLogger::activity('rule_learning_failed', 'conversion', null, $leadId, $e->getMessage());
+            }
+        }
 
         // 2. Retrieve learned rules for this context (area first, else general).
         $contextTag = $understanding['entities']['location'] ?? $lead['location'] ?? null;
