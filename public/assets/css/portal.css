@@ -1,0 +1,80 @@
+/* Tenant/Owner portal overrides — layout only, all colours from theme tokens.
+   Tenant pages lead with teal (trust/comfort), owner pages with orange
+   (yield/control), mirroring the live site's two-audience split. */
+
+.portal-nav {
+  background: var(--belive-white);
+  border-bottom: 1px solid var(--belive-line);
+  padding: 14px 22px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.portal-nav .links { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+.portal-nav a.nav-link {
+  padding: 7px 13px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--belive-ink);
+  text-decoration: none !important;
+}
+.portal-nav a.nav-link:hover { background: var(--belive-cream); }
+
+body.portal-tenant .portal-nav a.nav-link.active { background: var(--belive-teal-soft); color: var(--belive-teal-dark); font-weight: 600; }
+body.portal-owner  .portal-nav a.nav-link.active { background: var(--belive-orange-soft); color: var(--belive-orange-dark); font-weight: 600; }
+
+.portal-main { max-width: 980px; margin: 0 auto; padding: 28px 20px 70px; }
+
+.portal-hero { margin-bottom: 22px; }
+.portal-hero h1 { font-size: 24px; }
+.portal-hero p { color: var(--belive-muted); margin-top: 4px; font-size: 14.5px; }
+
+body.portal-tenant .portal-hero .tagline { color: var(--belive-teal-dark); font-weight: 600; }
+body.portal-owner  .portal-hero .tagline { color: var(--belive-orange-dark); font-weight: 600; }
+
+/* Centered login card shared by both portals */
+body.portal-login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.portal-login-card { width: 400px; max-width: 92vw; }
+
+/* Verified listing badge */
+.verified-badge-big {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 999px;
+  background: var(--belive-teal-soft); color: var(--belive-teal-dark);
+  font-family: var(--font-head); font-weight: 600;
+}
+.verified-badge-big.unverified { background: rgba(107,114,128,.12); color: var(--belive-muted); }
+
+/* Move-in photo timeline */
+.movein-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.movein-item img { width: 100%; border-radius: 10px; display: block; }
+.movein-item .stamp { font-size: 12px; color: var(--belive-muted); margin-top: 6px; }
+
+/* Agreement text block */
+.agreement-text {
+  background: var(--belive-cream);
+  border-radius: 12px;
+  padding: 20px;
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.7;
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+/* Integration-ready sample panel (owner IoT) — visually distinct so sample
+   data can never be mistaken for a live feed. */
+.sample-panel { position: relative; border: 1.5px dashed var(--belive-line); border-radius: var(--belive-radius); padding: 18px; }
+.sample-panel::before {
+  content: 'SAMPLE DATA — integration-ready, not a live feed';
+  display: inline-block;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .6px;
+  color: var(--belive-orange-dark);
+  background: var(--belive-orange-soft);
+  border-radius: 6px; padding: 3px 8px; margin-bottom: 10px;
+}

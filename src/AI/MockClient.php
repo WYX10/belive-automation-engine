@@ -42,6 +42,8 @@ final class MockClient implements LlmClient
             'learn'      => $this->mockLearn($system . ' ' . $lastUser),
             'caption'    => "[MOCK] Fully furnished room, ready when you are. Just bring your bag — we handle the rest.",
             'time_parse' => $this->mockTimeParse($lastUser),
+            'scam'       => $this->mockScam($lastUser),
+            'agreement'  => $this->mockAgreement($lastUser),
             default      => "[MOCK REPLY — offline stub, not an AI model] Received: " . mb_substr($lastUser, 0, 120),
         };
 
@@ -160,6 +162,46 @@ final class MockClient implements LlmClient
                 : "Corrected fact for $tag enquiries (see source feedback for detail).",
             'reasoning'    => '[MOCK] Pattern keywords only — offline stub, not a real model.',
         ], JSON_UNESCAPED_UNICODE);
+    }
+
+    private function mockScam(string $prompt): string
+    {
+        // Flag only what the provided market stats justify: strongly-negative
+        // deviation = suspicious-cheap; otherwise clean.
+        $flags = [];
+        if (preg_match('/"deviation_pct":\s*(-\d+(?:\.\d+)?)/', $prompt, $m) && (float) $m[1] < -25) {
+            $flags[] = [
+                'pattern'  => 'price_far_below_market',
+                'severity' => 'high',
+                'detail'   => "[MOCK] Listed {$m[1]}% below comparable average — classic bait-listing signal.",
+            ];
+        }
+        if (str_contains($prompt, '"address":"(none given)"')) {
+            $flags[] = [
+                'pattern'  => 'missing_fixed_address',
+                'severity' => 'low',
+                'detail'   => '[MOCK] No concrete address on the listing.',
+            ];
+        }
+
+        return json_encode(['flags' => $flags, 'reasoning' => '[MOCK] Heuristic screen — offline stub, not a real model.'], JSON_UNESCAPED_UNICODE);
+    }
+
+    private function mockAgreement(string $prompt): string
+    {
+        $get = function (string $key) use ($prompt): string {
+            return preg_match('/"' . $key . '":"([^"]*)"/', $prompt, $m) ? $m[1] : '—';
+        };
+        $rm = preg_match('/"monthly_rm":(\d+(?:\.\d+)?)/', $prompt, $m) ? $m[1] : '—';
+
+        return "[MOCK AGREEMENT — offline stub]\n\n1. Parties: BeLive (landlord's agent) and {$get('tenant_name')} ({$get('tenant_phone')}).\n"
+            . "2. The room: {$get('room')}, {$get('area')} ({$get('room_type')} room).\n"
+            . "3. Monthly rental: RM $rm, including furnishings, WiFi and weekly cleaning.\n"
+            . "4. Deposit: zero deposit — BeLive standard.\n"
+            . "5. House rules: no smoking indoors; respect quiet hours 11pm–7am.\n"
+            . "6. Cleaning: weekly common-area cleaning included.\n"
+            . "7. Notice period: 30 days written notice either side.\n"
+            . "8. This document is acknowledged digitally with a typed name and timestamp.";
     }
 
     /** True iff the prompt carries an injected LEARNED RULES block with a photos-before-price rule. */

@@ -28,6 +28,10 @@ INSERT INTO rooms (name, area, room_type, price, photos, features, available) VA
 ('Austin Suites 15-3',      'Johor',          'medium', 620.00, '["https://picsum.photos/seed/belive-johor1/800/600"]', '["Fully furnished","Near AEON","Weekly cleaning"]', 1),
 ('D''Summit Residences 9-9','Johor',          'studio', 880.00, '["https://picsum.photos/seed/belive-johor2/800/600"]', '["Private kitchenette","Fully furnished","Near Setia Tropika"]', 1);
 
+-- Phase 9 (bonus): owner accounts for the owner portal + demo addresses.
+UPDATE rooms SET owner_name = 'Encik Rahman',  address = CONCAT(name, ', ', area) WHERE area IN ('Setapak', 'Sentul');
+UPDATE rooms SET owner_name = 'Ms Tan Li Hua', address = CONCAT(name, ', ', area) WHERE area IN ('Cheras', 'Johor');
+
 -- --------------------------------------------- per-phase model assignments
 INSERT INTO ai_model_config (phase, model_key) VALUES
 ('lead_gen',         'gemini-3.5-flash'),

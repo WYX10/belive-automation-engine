@@ -94,6 +94,30 @@ $router->post('/webhook/whatsapp', "$pages/webhook/whatsapp.php");
 $router->get('/webhook/verify', "$pages/webhook/verify.php");
 $router->any('/webhook/tiktok_fallback', "$pages/webhook/tiktok_fallback.php");
 
+// --- Tenant portal (Phase 9 bonus) ----------------------------------------------
+$router->any('/tenant/login', "$pages/tenant/login.php");
+$router->get('/tenant/logout', function () {
+    unset($_SESSION['tenant_lead_id']);
+    header('Location: /tenant/login');
+});
+$router->get('/tenant/dashboard', "$pages/tenant/dashboard.php");
+$router->get('/tenant/listing_verification', "$pages/tenant/listing_verification.php");
+$router->get('/tenant/move_in_log', "$pages/tenant/move_in_log.php");
+$router->any('/tenant/agreement', "$pages/tenant/agreement.php");
+$router->get('/tenant/fair_pricing', "$pages/tenant/fair_pricing.php");
+
+// --- Owner portal (Phase 9 bonus) -------------------------------------------------
+$router->any('/owner/login', "$pages/owner/login.php");
+$router->get('/owner/logout', function () {
+    unset($_SESSION['owner_name']);
+    header('Location: /owner/login');
+});
+$router->get('/owner/dashboard', "$pages/owner/dashboard.php");
+$router->any('/owner/listings', "$pages/owner/listings/index.php");
+$router->any('/owner/listings/verify', "$pages/owner/listings/verify.php");
+$router->any('/owner/agreements', "$pages/owner/agreements.php");
+$router->get('/owner/pricing_guard', "$pages/owner/pricing_guard.php");
+
 // --- Public lead-capture endpoints ----------------------------------------------
 $router->any('/enquiry', "$pages/enquiry.php");           // website smart enquiry form
 $router->get('/r/{code}', function () {                    // Refer & Earn share link
