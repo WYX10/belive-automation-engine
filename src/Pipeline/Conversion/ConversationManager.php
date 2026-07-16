@@ -121,16 +121,53 @@ final class ConversationManager
         }
     }
 
-    /** Booking flow — implemented in Phase 7 (Pipeline/Booking). */
+    /**
+     * Zero-touch booking: parse the natural-language time, cross-check the
+     * live schedule, create + confirm, or propose the nearest free slot.
+     */
     private function handleBookingIntent(array $lead, array $understanding, array $decision, string $rawText): void
     {
-        EpisodicLogger::activity(
-            'booking_intent_detected',
-            'conversion',
+        $leadId = (int) $lead['id'];
+
+        $parsed = \App\Pipeline\Booking\AvailabilityChecker::parseRequestedTime($rawText);
+        if ($parsed['datetime'] === null) {
+            // No concrete time proposed — CreateSkill's reply already asked
+            // for one; nothing to book yet.
+            EpisodicLogger::activity('booking_intent_detected', 'conversion', $decision['model'], $leadId, 'No concrete time yet — asked customer.');
+            return;
+        }
+
+        $roomId = $decision['recommended_room_ids'][0] ?? ($decision['rooms'][0]['id'] ?? null);
+        $roomId = $roomId !== null ? (int) $roomId : null;
+
+        if (!\App\Pipeline\Booking\AvailabilityChecker::isSlotFree($roomId, $parsed['datetime'])) {
+            $alternative = \App\Pipeline\Booking\AvailabilityChecker::suggestAlternative($roomId, $parsed['datetime']);
+            $friendly = date('l, j M \a\t g:ia', strtotime($alternative));
+            $reply = "That slot's just been taken — closest free one is $friendly. Shall I lock it in?";
+            $sent = $this->wa->sendText($lead['wa_phone'], $reply);
+            EpisodicLogger::log([
+                'lead_id'      => $leadId,
+                'phase'        => 'conversion',
+                'skill'        => 'automate',
+                'model_used'   => $decision['model'],
+                'direction'    => 'outbound',
+                'message_out'  => $reply,
+                'message_kind' => 'question',
+                'reasoning'    => 'Requested slot clashed with an existing booking; suggested nearest free slot.'
+                    . ($sent['dry_run'] ? ' (dry-run)' : ''),
+            ]);
+            return;
+        }
+
+        $booking = \App\Pipeline\Booking\BookingCreator::create(
+            $leadId,
+            $roomId,
+            $parsed['datetime'],
             $decision['model'],
-            (int) $lead['id'],
-            'Booking pipeline arrives in Phase 7 — intent recorded.'
+            'Auto-booked from conversation. Time parse: ' . $parsed['reasoning']
         );
+
+        \App\Pipeline\Booking\ConfirmationSender::send($booking, $decision['model'], $this->wa);
     }
 
     private function quickReply(array $lead, string $text, string $pre): void

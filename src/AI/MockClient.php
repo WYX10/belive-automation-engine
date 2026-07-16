@@ -106,12 +106,13 @@ final class MockClient implements LlmClient
         // RULES block in the user prompt, never the static system prompt, so
         // behaviour visibly changes offline exactly when a rule was learned.
         $photosFirst = self::hasPhotosFirstRule($userPrompt);
+        $isBooking = str_contains($userPrompt, '"intent":"booking_request"');
 
         return json_encode([
             'qualified'           => true,
-            'closing_probability' => 62,
+            'closing_probability' => $isBooking ? 85 : 62,
             'lead_signals'        => ['asked about a specific area', 'gave a budget'],
-            'next_action'         => 'answer_directly',
+            'next_action'         => $isBooking ? 'book_viewing' : 'answer_directly',
             'send_photos_first'   => $photosFirst,
             'recommendation'      => $photosFirst
                 ? 'Send room photos before quoting the price (learned rule in effect).'
