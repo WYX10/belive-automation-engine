@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="portal-tenant portal-login">
 <div class="belive-card portal-login-card">
     <div style="text-align:center; margin-bottom:16px">
-        <img src="/assets/img/belive-logo.png" alt="beLive" style="height:38px; display:inline-block">
+        <img src="/assets/img/belive-logo.svg" alt="beLive" style="height:38px; display:inline-block">
         <h1 style="font-size:19px; margin-top:8px">The smarter way to rent</h1>
         <p class="belive-muted" style="font-size:13.5px; margin-top:4px">Your stay, your agreement, your peace of mind — all in one place.</p>
     </div>

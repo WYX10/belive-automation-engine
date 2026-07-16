@@ -66,6 +66,7 @@ final class RoomRepository
 
         $room = self::decorate($room);
         $room['images'] = Room::photoUrls($roomId);
+        $room['videos'] = Room::videoUrls($roomId);
 
         return $room;
     }

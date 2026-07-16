@@ -82,7 +82,7 @@ function site_header(string $title, string $active = ''): void
 </head>
 <body>
 <nav class="site-nav">
-    <a href="/" style="text-decoration:none"><img src="/assets/img/belive-logo.png" alt="beLive" style="height:32px; display:block"></a>
+    <a href="/" style="text-decoration:none"><img src="/assets/img/belive-logo.svg" alt="beLive" style="height:32px; display:block"></a>
     <div class="links">
         <a class="nav-link <?= $active === 'home' ? 'active' : '' ?>" href="/">Home</a>
         <a class="nav-link <?= $active === 'rooms' ? 'active' : '' ?>" href="/rooms">Find a room</a>
@@ -100,7 +100,7 @@ function site_footer(): void
     ?>
 </main>
 <footer class="site-footer">
-    <img src="/assets/img/belive-logo.png" alt="beLive" style="height:22px; display:inline-block; vertical-align:middle">
+    <img src="/assets/img/belive-logo.svg" alt="beLive" style="height:22px; display:inline-block; vertical-align:middle">
     &nbsp;·&nbsp; Live Smarter, Stay Better. &nbsp;·&nbsp; Demo build — GrenA · TAR UMT Johor · BeLive × TAR UMT AI Solopreneur Challenge 2026
 </footer>
 </body>

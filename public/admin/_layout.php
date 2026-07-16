@@ -55,7 +55,7 @@ function admin_header(string $title, string $active = ''): void
 <body class="admin">
 <aside class="admin-sidebar">
     <div class="admin-brand">
-        <img src="/assets/img/belive-logo.png" alt="beLive" style="height:28px; display:block">
+        <img src="/assets/img/belive-logo.svg" alt="beLive" style="height:28px; display:block">
         <div class="admin-brand-sub">Automation Engine · Eve</div>
     </div>
     <nav class="admin-nav">

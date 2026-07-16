@@ -69,7 +69,7 @@ function portal_header(string $audience, string $title, string $active = ''): vo
 </head>
 <body class="portal-<?= e($audience) ?>">
 <nav class="portal-nav">
-    <a href="/" style="text-decoration:none"><img src="/assets/img/belive-logo.png" alt="beLive" style="height:28px; display:block"></a>
+    <a href="/" style="text-decoration:none"><img src="/assets/img/belive-logo.svg" alt="beLive" style="height:28px; display:block"></a>
     <div class="links">
         <?php foreach ($nav as $key => [$href, $label]): ?>
             <a class="nav-link <?= $key === $active ? 'active' : '' ?>" href="<?= e($href) ?>"><?= e($label) ?></a>

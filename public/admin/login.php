@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="admin-login">
 <div class="belive-card login-card">
     <div style="text-align:center; margin-bottom:18px">
-        <img src="/assets/img/belive-logo.png" alt="beLive" style="height:40px; display:inline-block">
+        <img src="/assets/img/belive-logo.svg" alt="beLive" style="height:40px; display:inline-block">
         <div class="belive-muted" style="font-size:13px; margin-top:4px">Automation Engine — admin panel</div>
     </div>
 

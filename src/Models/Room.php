@@ -75,11 +75,30 @@ final class Room extends BaseModel
         return $out;
     }
 
-    /** @return string[] gallery URLs, sorted */
+    /**
+     * Gallery photo URLs, sorted. room_images holds all room media; .mp4
+     * entries are video tours (see videoUrls) and are excluded here so photo
+     * consumers (cards, galleries, WhatsApp image sends) never get a video.
+     *
+     * @return string[]
+     */
     public static function photoUrls(int $roomId): array
     {
         return Database::run(
-            'SELECT image_path FROM room_images WHERE room_id = ? ORDER BY sort_order, id',
+            "SELECT image_path FROM room_images
+             WHERE room_id = ? AND image_path NOT LIKE '%.mp4'
+             ORDER BY sort_order, id",
+            [$roomId]
+        )->fetchAll(\PDO::FETCH_COLUMN);
+    }
+
+    /** @return string[] video tour URLs (mp4), sorted */
+    public static function videoUrls(int $roomId): array
+    {
+        return Database::run(
+            "SELECT image_path FROM room_images
+             WHERE room_id = ? AND image_path LIKE '%.mp4'
+             ORDER BY sort_order, id",
             [$roomId]
         )->fetchAll(\PDO::FETCH_COLUMN);
     }

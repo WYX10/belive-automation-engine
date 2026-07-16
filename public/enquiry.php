@@ -41,7 +41,7 @@ $e = fn ($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
 <body>
 <div class="enquiry-wrap">
     <div style="text-align:center; margin-bottom:22px">
-        <img src="/assets/img/belive-logo.png" alt="beLive" style="height:42px; display:inline-block">
+        <img src="/assets/img/belive-logo.svg" alt="beLive" style="height:42px; display:inline-block">
         <h1 style="font-size:22px; margin-top:10px">The smarter way to rent</h1>
         <p class="belive-muted" style="margin-top:6px">Tell us what you need — Eve, our AI assistant, replies on WhatsApp within seconds.</p>
     </div>

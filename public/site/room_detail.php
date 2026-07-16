@@ -53,6 +53,17 @@ site_header($room['property_name'] ?: $room['name'], 'rooms');
     </div>
 <?php endif; ?>
 
+<?php if ($room['videos'] !== []): ?>
+    <div class="belive-card" style="margin-top:16px">
+        <div class="belive-card-title">🎥 Video tour</div>
+        <video controls muted playsinline preload="metadata"
+               poster="<?= e($images[0] ?? '') ?>"
+               style="width:100%; max-height:440px; border-radius:12px; background:var(--belive-ink)">
+            <source src="<?= e($room['videos'][0]) ?>" type="video/mp4">
+        </video>
+    </div>
+<?php endif; ?>
+
 <div class="belive-row" style="margin-top:22px">
     <div class="belive-col" style="flex:1.4">
         <div class="belive-card">
