@@ -31,10 +31,11 @@ require APP_ROOT . '/config/constants.php';
 
 date_default_timezone_set('Asia/Kuala_Lumpur');
 
-// Webhook endpoints are cookie-less server-to-server calls; sessions are for
-// the human-facing panels.
+// Meta's webhook endpoints are cookie-less server-to-server calls; sessions
+// are for the human-facing panels (including the manual-intake form, which
+// lives under /webhook/tiktok_fallback but is an admin page).
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-if (!str_starts_with($path, '/webhook/')) {
+if (!in_array($path, ['/webhook/whatsapp', '/webhook/verify'], true)) {
     session_start();
 }
 
