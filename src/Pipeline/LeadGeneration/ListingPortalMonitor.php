@@ -8,13 +8,20 @@ use App\AI\Memory\EpisodicLogger;
 use App\Models\Lead;
 
 /**
- * Proposal channel #3 — PropertyGuru & iProperty monitoring.
+ * Proposal channel #3 — listing portal monitoring.
  *
- * FEASIBILITY FINDING (documented, not silently skipped): neither
- * PropertyGuru nor iProperty exposes a public inbound-enquiry webhook or API
- * for third-party agents — enquiries arrive only inside their own agent
- * portals/apps. Automated capture is therefore not buildable honestly within
- * competition scope.
+ * RETARGETED (Phase 6.5): BeLive does not primarily list on PropertyGuru or
+ * iProperty — those are condo/sale-oriented. Their actual listings live on
+ * ibilik.my (room-rental-oriented) and roomz.asia. So ibilik.my is the
+ * PRIMARY monitored portal, roomz.asia second, with PropertyGuru/iProperty
+ * kept as secondary so the proposal's original wording is still honoured.
+ * "We checked where you actually list, and built for that."
+ *
+ * FEASIBILITY FINDING (documented, not silently skipped): none of these
+ * portals — ibilik, roomz, PropertyGuru, iProperty — exposes a public
+ * inbound-enquiry webhook or API for third parties; enquiries surface only
+ * inside their own agent portals/apps. Automated capture is therefore not
+ * buildable honestly within competition scope.
  *
  * FALLBACK (same pattern as TikTok): admin logs the portal enquiry through
  * the manual-intake form (webhook/tiktok_fallback.php, channel selector) —
@@ -24,7 +31,8 @@ use App\Models\Lead;
  */
 final class ListingPortalMonitor
 {
-    public const PORTALS = ['propertyguru', 'iproperty'];
+    /** ibilik.my first — that's where BeLive actually lists. */
+    public const PORTALS = ['ibilik', 'roomz', 'propertyguru', 'iproperty'];
 
     /**
      * Manual intake for a portal enquiry. The portal name is preserved in the

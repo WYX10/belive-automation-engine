@@ -137,11 +137,19 @@ final class MockClient implements LlmClient
             default                                                                        => null,
         };
 
+        // Recommend the actual first candidate room from the inventory block,
+        // so downstream room-forwarding logic gets exercised offline too.
+        $roomIds = [];
+        if (preg_match('/room_id=(\d+)/', $userPrompt, $rm)) {
+            $roomIds[] = (int) $rm[1];
+        }
+
         return json_encode([
             'qualified'           => true,
             'closing_probability' => $isBooking ? 85 : 62,
             'lead_signals'        => ['asked about a specific area', 'gave a budget'],
             'next_action'         => $isBooking ? 'book_viewing' : 'answer_directly',
+            'recommended_room_ids'=> $roomIds,
             'recommended_tenure'  => $tenure,
             'send_photos_first'   => $photosFirst,
             'recommendation'      => $photosFirst
@@ -163,9 +171,14 @@ final class MockClient implements LlmClient
             $recall = '[MOCK] Welcome back! Still looking for ' . trim($m[1]) . ' in ' . trim($m[2]) . ', or has your search changed? ';
         }
 
+        // Echo the first tenure-labelled price from the grounding block, so
+        // offline replies obey the "never a price without its tenure" rule.
+        $priceLine = preg_match('/Pricing: (RM [\d,]+\/mo [^·.\n]+)/', $userPrompt, $p)
+            ? trim($p[1]) : 'RM 650/mo 6 months';
+
         return $recall . ($photosFirst
             ? "[MOCK] Here are photos of the room first 📷 — fully furnished, WiFi, weekly cleaning. Want the pricing details?"
-            : "[MOCK] Fully furnished room, zero deposit, weekly cleaning. Rental is RM 650/month. Want photos or a viewing?");
+            : "[MOCK] Fully furnished room, zero deposit, weekly cleaning. Rental is $priceLine. Want photos or a viewing?");
     }
 
     private function mockLearn(string $context): string

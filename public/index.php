@@ -51,10 +51,11 @@ $router->get('/health', function () {
     echo json_encode(['ok' => true, 'app' => 'BeLive Automation Engine', 'time' => date('c')]);
 });
 
-// --- Root → admin ------------------------------------------------------------
-$router->get('/', function () {
-    header('Location: /admin/dashboard');
-});
+// --- Public website (the front door) -------------------------------------------
+$router->get('/', "$pages/site/home.php");
+$router->get('/rooms', "$pages/site/rooms.php");
+$router->get('/rooms/{id}', "$pages/site/room_detail.php");
+$router->post('/enquire', "$pages/site/enquire.php");
 
 // --- Admin panel ---------------------------------------------------------------
 $router->any('/admin/login', "$pages/admin/login.php");

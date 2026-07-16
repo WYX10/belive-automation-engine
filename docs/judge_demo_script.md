@@ -13,6 +13,10 @@ calls, real WhatsApp messages. Nothing is mocked or pre-rendered on demo day.
   **Eve is an extension of that existing product line**, not a foreign add-on.
 - BeLive's own hero CTA is already a WhatsApp link — **we automated the channel BeLive already
   relies on**, we didn't propose a new one.
+- **We checked where BeLive actually lists** — ibilik.my and roomz.asia, not PropertyGuru/iProperty
+  (condo/sale-oriented). The portal monitor targets ibilik.my first, with the proposal's original
+  portals kept as secondary. Building for the channel they really use is a Marketing Intelligence
+  point, not an admission of error.
 - The admin dashboard, room matching language ("AI-driven matching") and owner-portal concepts all
   mirror what BeLive already promises publicly — we built into their stack's direction, not around it.
 
@@ -33,6 +37,20 @@ judge raises it, acknowledge the site's number — do not argue.*
 7. `php tests/run.php` → all green. Keep the output visible in a terminal as fallback proof.
 
 ---
+
+## Demo 0 — The front door: public website → channel #2 live (≈2 min)
+
+Start where a real tenant starts: **open `/` (the public site)** on the projector.
+
+1. Home page: BeLive's own voice, stat strip, featured rooms — every card shows **all three
+   tenure prices** (flexible monthly / 6-month / 12-month+ best value) and **RM 0 deposit**.
+   *"No hidden fees, no surprises"* — nothing is hidden behind an enquiry.
+2. Open a room (e.g. RM-107, M Vertica) → pricing table with the 12-month saving-vs-flexible
+   figure → fill the enquiry form with a judge's number, pick a tenure, submit.
+3. Seconds later the judge's WhatsApp receives Eve's follow-up **that already knows the exact room
+   and tenure they were looking at** — show the lead in Admin → Leads with `enquired room` and
+   `preferred tenure` filled, and the `room_recommendation` row in the activity log naming the
+   model. That context-carrying handoff is proposal channel #2, working.
 
 ## Demo 1 — The four AI skills, live (≈3 min)
 
@@ -118,7 +136,7 @@ generic "hi again".
 | Item | Status | Why |
 |---|---|---|
 | TikTok DM/comment capture | **Manual-intake fallback** | TikTok's official API does not allow third-party DM/comment webhook capture. Enquiries are logged in one form; everything downstream (scoring, conversion, memory, booking) is identical to automated channels. |
-| PropertyGuru / iProperty monitoring | **Manual-intake fallback** | Neither portal exposes a public inbound-enquiry API for third parties; enquiries only surface inside their own agent apps. Same fallback pattern, same identical downstream pipeline. |
+| Listing portal monitoring (ibilik.my primary, roomz.asia, PropertyGuru/iProperty secondary) | **Manual-intake fallback** | We checked where BeLive actually lists (ibilik.my/roomz.asia) and retargeted the monitor accordingly, keeping the proposal's named portals as secondary. None of the four exposes a public inbound-enquiry API for third parties — enquiries only surface inside their own agent apps. Same fallback pattern, identical downstream pipeline. |
 | Social post publishing | **Semi-automated** | Caption generation is fully automated from live room data. Meta page publishing requires a reviewed Meta app (out of RM 500 / 2-week scope); TikTok has no third-party publish API. Flow: generate → approve → paste → mark posted. Integration-ready for the Meta publish API. |
 | AI-guided 3D virtual tours | **Descoped — post-competition roadmap** | RM 500 leaves no room for 3D asset creation or tour hosting, and a from-scratch build would starve the self-learning system (20 pts) of build time. We chose to descope it openly rather than fake a static viewer. |
 | Tenant/Owner portals (Phase 9) | **Bonus beyond the written proposal** | Software-only concepts from our Sabah market research (verified listings, move-in logs, agreements, fair pricing). Framed as a deliberate extension, not something that was always in the submission. The listing verifier uses admin document review + GPS match, **not a real eKYC API**; the agreement flow is a typed-name acknowledgement, **not a cryptographic e-signature**. |

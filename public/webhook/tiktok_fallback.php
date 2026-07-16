@@ -21,6 +21,8 @@ Auth::requireAdmin();
 
 $channels = [
     'tiktok'       => 'TikTok (DM / comment)',
+    'ibilik'       => 'ibilik.my enquiry (BeLive\'s primary portal)',
+    'roomz'        => 'roomz.asia enquiry',
     'propertyguru' => 'PropertyGuru enquiry',
     'iproperty'    => 'iProperty enquiry',
 ];

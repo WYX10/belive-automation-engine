@@ -8,6 +8,10 @@ single entry point, one bootstrap.
 
 | Method | Path | Purpose |
 |---|---|---|
+| GET | `/` | Public homepage — hero, stat strip, featured rooms, locations (the judges' front door) |
+| GET | `/rooms` | Room listing with filters: `location`, `room_type` (single/middle/master), `tenure` (monthly/6_month/12_month), `max_price` (applied at the chosen tenure) |
+| GET | `/rooms/{id}` | Room detail: gallery, amenity list, tenure pricing table with best-value + saving-vs-flexible, enquiry form |
+| POST | `/enquire` | Room enquiry (channel #2): `name`, `wa_phone`, `room_id`, `tenure`, `message?` → lead with room context + instant AI WhatsApp follow-up |
 | GET | `/health` | Liveness check — JSON `{ok, app, time}` |
 | GET | `/webhook/whatsapp` | Meta verification handshake (`hub.mode`, `hub.verify_token`, `hub.challenge`) — echoes the challenge iff the token matches `WA_VERIFY_TOKEN` |
 | POST | `/webhook/whatsapp` | Meta event receiver. `object=whatsapp_business_account` → conversation pipeline; `object=page/instagram` → comment capture. Always answers 200 immediately, then processes |
@@ -77,7 +81,12 @@ All admin POSTs require the session CSRF token (`csrf_token` field, provided by 
 ## Database (dev/demo names)
 
 Default schema name: `belive_eve` (set via `DB_NAME` in `.env`). Tables:
-`api_credentials`, `ai_model_config`, `leads`, `ai_interactions`, `ai_feedback`,
-`ai_learned_memory`, `ai_activity_log`, `content_posts`, `rooms` + `bookings` (migration 009),
-`referrals`, `migrations` (runner bookkeeping). Phase 9 adds `verified_listings`, `move_in_logs`,
-`digital_agreements`.
+`api_credentials`, `ai_model_config`, `leads` (incl. `enquired_room_id` + `preferred_tenure`),
+`ai_interactions`, `ai_feedback`, `ai_learned_memory`, `ai_activity_log`, `content_posts`,
+`rooms` + `bookings` (009, extended by 014), `referrals`, `room_pricing` / `room_images` /
+`room_amenities` (015–017, Phase 6.5 catalog), `migrations` (runner bookkeeping).
+Phase 9 (bonus, `--bonus`) adds `verified_listings`, `move_in_logs`, `digital_agreements`.
+
+Catalog surfaces: `App\Catalog\RoomRepository` (all page reads), `PricingCalculator`
+(price per tenure + saving vs flexible), `RoomRecommender` (candidate block for DecideSkill;
+recommendations logged to `ai_activity_log` as `room_recommendation` with the model).
