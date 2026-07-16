@@ -37,8 +37,8 @@ final class MockClient implements LlmClient
 
         $text = match ($opts['mock_hint'] ?? '') {
             'understand' => $this->mockUnderstand($lastUser),
-            'decide'     => $this->mockDecide($system),
-            'create'     => $this->mockCreate($system),
+            'decide'     => $this->mockDecide($lastUser),
+            'create'     => $this->mockCreate($lastUser),
             'learn'      => $this->mockLearn($system . ' ' . $lastUser),
             'caption'    => "[MOCK] Fully furnished room, ready when you are. Just bring your bag — we handle the rest.",
             'time_parse' => $this->mockTimeParse($lastUser),
@@ -100,11 +100,12 @@ final class MockClient implements LlmClient
         ], JSON_UNESCAPED_UNICODE);
     }
 
-    private function mockDecide(string $system): string
+    private function mockDecide(string $userPrompt): string
     {
-        // If a sequencing rule was injected into the prompt context, honour it —
-        // this is what lets the Setapak lesson visibly change behaviour offline.
-        $photosFirst = (bool) preg_match('/photos?\s+(?:before|first)/i', $system);
+        // Honour an injected learned rule ONLY — the mock scans the LEARNED
+        // RULES block in the user prompt, never the static system prompt, so
+        // behaviour visibly changes offline exactly when a rule was learned.
+        $photosFirst = self::hasPhotosFirstRule($userPrompt);
 
         return json_encode([
             'qualified'           => true,
@@ -119,9 +120,10 @@ final class MockClient implements LlmClient
         ], JSON_UNESCAPED_UNICODE);
     }
 
-    private function mockCreate(string $system): string
+    private function mockCreate(string $userPrompt): string
     {
-        $photosFirst = (bool) preg_match('/photos?\s+(?:before|first)/i', $system);
+        $photosFirst = self::hasPhotosFirstRule($userPrompt)
+            || str_contains($userPrompt, '"send_photos_first":true');
 
         return $photosFirst
             ? "[MOCK] Here are photos of the room first 📷 — fully furnished, WiFi, weekly cleaning. Want the pricing details?"
@@ -145,6 +147,16 @@ final class MockClient implements LlmClient
                 : "Corrected fact for $tag enquiries (see source feedback for detail).",
             'reasoning'    => '[MOCK] Pattern keywords only — offline stub, not a real model.',
         ], JSON_UNESCAPED_UNICODE);
+    }
+
+    /** True iff the prompt carries an injected LEARNED RULES block with a photos-before-price rule. */
+    private static function hasPhotosFirstRule(string $prompt): bool
+    {
+        if (!preg_match('/LEARNED RULES.*?(?=\n\n[A-Z]|$)/s', $prompt, $m)) {
+            return false;
+        }
+
+        return (bool) preg_match('/photos?[^\n]*(before|first)[^\n]*(pric|quot)/i', $m[0]);
     }
 
     private function mockTimeParse(string $msg): string
