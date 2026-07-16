@@ -84,9 +84,23 @@ SELECT id, '6_month',  620, 0 FROM rooms WHERE room_code = 'RM-115' UNION ALL
 SELECT id, '12_month', 585, 1 FROM rooms WHERE room_code = 'RM-115';
 
 -- ---------------------------------------------------------------- images
+-- Real BeLive unit/facility photos (team-provided, in public/assets/img/rooms)
+-- for the demo-visible rooms; clearly-neutral placeholders for the rest.
 INSERT INTO room_images (room_id, image_path, sort_order)
-SELECT id, CONCAT('https://picsum.photos/seed/belive-', LOWER(room_code), 'a/800/600'), 0 FROM rooms UNION ALL
-SELECT id, CONCAT('https://picsum.photos/seed/belive-', LOWER(room_code), 'b/800/600'), 1 FROM rooms;
+SELECT id, '/assets/img/rooms/room-bedroom.jpg', 0 FROM rooms WHERE room_code = 'RM-102' UNION ALL
+SELECT id, '/assets/img/rooms/common-dining.jpg', 1 FROM rooms WHERE room_code = 'RM-102' UNION ALL
+SELECT id, '/assets/img/rooms/common-dining.jpg', 0 FROM rooms WHERE room_code = 'RM-101' UNION ALL
+SELECT id, '/assets/img/rooms/room-bedroom.jpg', 0 FROM rooms WHERE room_code = 'RM-107' UNION ALL
+SELECT id, '/assets/img/rooms/facility-pool.jpg', 1 FROM rooms WHERE room_code = 'RM-107' UNION ALL
+SELECT id, '/assets/img/rooms/facility-gym.jpg', 2 FROM rooms WHERE room_code = 'RM-107' UNION ALL
+SELECT id, '/assets/img/rooms/facility-pool.jpg', 1 FROM rooms WHERE room_code IN ('RM-103', 'RM-112') UNION ALL
+SELECT id, '/assets/img/rooms/facility-gym.jpg', 2 FROM rooms WHERE room_code IN ('RM-103', 'RM-113');
+
+-- Rooms without a real cover get the branded "photos coming soon" placeholder
+-- (cream + logo) — honest and on-brand, never random stock imagery.
+INSERT INTO room_images (room_id, image_path, sort_order)
+SELECT id, '/assets/img/rooms/placeholder.jpg', 0 FROM rooms
+WHERE room_code NOT IN ('RM-101', 'RM-102', 'RM-107');
 
 -- -------------------------------------------------------------- amenities
 -- Exact ibilik vocabulary. Base set for every room:

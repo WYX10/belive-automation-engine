@@ -63,12 +63,13 @@ function portal_header(string $audience, string $title, string $active = ''): vo
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#F5833C">
 <title><?= e($title) ?> · beLive</title>
+<link rel="icon" type="image/png" href="/assets/img/belive-favicon.png">
 <link rel="stylesheet" href="/assets/css/belive-theme.css">
 <link rel="stylesheet" href="/assets/css/portal.css">
 </head>
 <body class="portal-<?= e($audience) ?>">
 <nav class="portal-nav">
-    <div class="belive-wordmark" style="font-size:22px"><span class="be">be</span><span class="live">Live</span></div>
+    <a href="/" style="text-decoration:none"><img src="/assets/img/belive-logo.png" alt="beLive" style="height:28px; display:block"></a>
     <div class="links">
         <?php foreach ($nav as $key => [$href, $label]): ?>
             <a class="nav-link <?= $key === $active ? 'active' : '' ?>" href="<?= e($href) ?>"><?= e($label) ?></a>

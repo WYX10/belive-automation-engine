@@ -76,12 +76,13 @@ function site_header(string $title, string $active = ''): void
 <meta name="theme-color" content="#F5833C">
 <meta name="description" content="Fully furnished rooms. Zero deposit. Weekly cleaning. Just bring your bag — we handle the rest.">
 <title><?= e($title) ?> · beLive</title>
+<link rel="icon" type="image/png" href="/assets/img/belive-favicon.png">
 <link rel="stylesheet" href="/assets/css/belive-theme.css">
 <link rel="stylesheet" href="/assets/css/site.css">
 </head>
 <body>
 <nav class="site-nav">
-    <a href="/" style="text-decoration:none"><span class="belive-wordmark" style="font-size:24px"><span class="be">be</span><span class="live">Live</span></span></a>
+    <a href="/" style="text-decoration:none"><img src="/assets/img/belive-logo.png" alt="beLive" style="height:32px; display:block"></a>
     <div class="links">
         <a class="nav-link <?= $active === 'home' ? 'active' : '' ?>" href="/">Home</a>
         <a class="nav-link <?= $active === 'rooms' ? 'active' : '' ?>" href="/rooms">Find a room</a>
@@ -99,7 +100,7 @@ function site_footer(): void
     ?>
 </main>
 <footer class="site-footer">
-    <span class="belive-wordmark" style="font-size:17px"><span class="be">be</span><span class="live">Live</span></span>
+    <img src="/assets/img/belive-logo.png" alt="beLive" style="height:22px; display:inline-block; vertical-align:middle">
     &nbsp;·&nbsp; Live Smarter, Stay Better. &nbsp;·&nbsp; Demo build — GrenA · TAR UMT Johor · BeLive × TAR UMT AI Solopreneur Challenge 2026
 </footer>
 </body>

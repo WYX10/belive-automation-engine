@@ -29,13 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#F5833C">
 <title>Log in · BeLive Automation Engine</title>
+<link rel="icon" type="image/png" href="/assets/img/belive-favicon.png">
 <link rel="stylesheet" href="/assets/css/belive-theme.css">
 <link rel="stylesheet" href="/assets/css/admin.css">
 </head>
 <body class="admin-login">
 <div class="belive-card login-card">
     <div style="text-align:center; margin-bottom:18px">
-        <div class="belive-wordmark" style="font-size:32px"><span class="be">be</span><span class="live">Live</span></div>
+        <img src="/assets/img/belive-logo.png" alt="beLive" style="height:40px; display:inline-block">
         <div class="belive-muted" style="font-size:13px; margin-top:4px">Automation Engine — admin panel</div>
     </div>
 

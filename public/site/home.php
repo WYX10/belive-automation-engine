@@ -20,6 +20,10 @@ site_header('The smarter way to rent', 'home');
         <a class="belive-btn-primary" href="<?= e(eve_whatsapp_link()) ?>" target="_blank" rel="noopener">💬 Chat with us on WhatsApp</a>
         <a class="belive-btn-secondary" href="/rooms">Browse rooms</a>
     </div>
+    <div style="margin-top:38px">
+        <img src="/assets/img/rooms/facility-pool.jpg" alt="BeLive residence — pool and facilities"
+             style="width:100%; max-height:400px; object-fit:cover; border-radius:var(--belive-radius); box-shadow:var(--belive-shadow-lift)">
+    </div>
 </section>
 
 <div class="belive-stat-grid">

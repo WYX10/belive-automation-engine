@@ -31,6 +31,7 @@ $e = fn ($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#F5833C">
 <title>Find your room · beLive</title>
+<link rel="icon" type="image/png" href="/assets/img/belive-favicon.png">
 <link rel="stylesheet" href="/assets/css/belive-theme.css">
 <style>
     /* page-scoped layout only — all colours come from the theme tokens */
@@ -40,7 +41,7 @@ $e = fn ($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
 <body>
 <div class="enquiry-wrap">
     <div style="text-align:center; margin-bottom:22px">
-        <div class="belive-wordmark" style="font-size:34px"><span class="be">be</span><span class="live">Live</span></div>
+        <img src="/assets/img/belive-logo.png" alt="beLive" style="height:42px; display:inline-block">
         <h1 style="font-size:22px; margin-top:10px">The smarter way to rent</h1>
         <p class="belive-muted" style="margin-top:6px">Tell us what you need — Eve, our AI assistant, replies on WhatsApp within seconds.</p>
     </div>

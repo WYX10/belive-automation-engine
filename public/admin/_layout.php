@@ -48,13 +48,14 @@ function admin_header(string $title, string $active = ''): void
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#F5833C">
 <title><?= e($title) ?> · BeLive Automation Engine</title>
+<link rel="icon" type="image/png" href="/assets/img/belive-favicon.png">
 <link rel="stylesheet" href="/assets/css/belive-theme.css">
 <link rel="stylesheet" href="/assets/css/admin.css">
 </head>
 <body class="admin">
 <aside class="admin-sidebar">
     <div class="admin-brand">
-        <div class="belive-wordmark" style="font-size:24px"><span class="be">be</span><span class="live">Live</span></div>
+        <img src="/assets/img/belive-logo.png" alt="beLive" style="height:28px; display:block">
         <div class="admin-brand-sub">Automation Engine · Eve</div>
     </div>
     <nav class="admin-nav">

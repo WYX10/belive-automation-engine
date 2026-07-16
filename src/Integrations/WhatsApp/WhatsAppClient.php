@@ -58,6 +58,12 @@ final class WhatsAppClient
     /** Send an image by public URL (room photos). */
     public function sendImage(string $toWaPhone, string $imageUrl, string $caption = ''): array
     {
+        // Site-local photo paths (/assets/img/rooms/...) become absolute URLs —
+        // Meta fetches media by link, so APP_URL must be the public base.
+        if (str_starts_with($imageUrl, '/')) {
+            $imageUrl = rtrim($_ENV['APP_URL'] ?? 'http://localhost:8080', '/') . $imageUrl;
+        }
+
         $media = ['link' => $imageUrl] + ($caption !== '' ? ['caption' => $caption] : []);
 
         if (!$this->isConfigured()) {
