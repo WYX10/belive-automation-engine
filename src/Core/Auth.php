@@ -25,7 +25,12 @@ final class Auth
             return false;
         }
 
-        if (hash_equals($expectedUser, $username) && password_verify($password, $hash)) {
+        // Prefer a bcrypt hash; tolerate a plaintext value in the env field so a
+        // hand-edited .env still logs in (competition-scope convenience).
+        $isHash = password_get_info($hash)['algo'] !== null;
+        $passwordOk = $isHash ? password_verify($password, $hash) : hash_equals($hash, $password);
+
+        if (hash_equals($expectedUser, $username) && $passwordOk) {
             session_regenerate_id(true);
             $_SESSION['admin_logged_in'] = true;
             $_SESSION['admin_username'] = $username;

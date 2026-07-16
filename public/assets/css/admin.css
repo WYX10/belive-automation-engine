@@ -1,0 +1,91 @@
+/* Admin-only overrides. Brand tokens come from belive-theme.css — no new
+   colours are defined here, only layout. */
+
+body.admin {
+  display: flex;
+  min-height: 100vh;
+}
+
+.admin-sidebar {
+  width: 232px;
+  flex-shrink: 0;
+  background: var(--belive-white);
+  border-right: 1px solid var(--belive-line);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.admin-brand { padding: 22px 20px 14px; }
+.admin-brand-sub {
+  font-size: 11.5px;
+  color: var(--belive-muted);
+  margin-top: 2px;
+  letter-spacing: .3px;
+}
+
+.admin-nav { flex: 1; padding: 8px 12px; overflow-y: auto; }
+.admin-nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--belive-ink);
+  text-decoration: none !important;
+  margin-bottom: 2px;
+}
+.admin-nav a .icon { width: 20px; text-align: center; }
+.admin-nav a:hover { background: var(--belive-cream); }
+.admin-nav a.active {
+  background: var(--belive-orange-soft);
+  color: var(--belive-orange-dark);
+  font-weight: 600;
+}
+
+.admin-sidebar-foot { padding: 14px 16px; border-top: 1px solid var(--belive-line); }
+
+.admin-main {
+  flex: 1;
+  padding: 26px 30px 60px;
+  max-width: 1200px;
+  min-width: 0;
+}
+
+/* Login screen (no sidebar) */
+body.admin-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+.login-card { width: 380px; max-width: 92vw; }
+
+/* Chat bubbles in chat history / lead view */
+.chat-thread { display: flex; flex-direction: column; gap: 10px; }
+.chat-bubble {
+  max-width: 72%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.chat-bubble.inbound  { background: var(--belive-cream); align-self: flex-start; border-bottom-left-radius: 4px; }
+.chat-bubble.outbound { background: var(--belive-teal-soft); align-self: flex-end;  border-bottom-right-radius: 4px; }
+.chat-bubble .meta { font-size: 11px; color: var(--belive-muted); margin-top: 5px; display: flex; gap: 8px; flex-wrap: wrap; }
+.chat-bubble.flagged { outline: 2px solid var(--belive-danger); }
+
+/* Reasoning box under interactions */
+.reasoning-box {
+  font-size: 12.5px;
+  color: var(--belive-muted);
+  background: var(--belive-cream);
+  border-left: 3px solid var(--belive-teal);
+  padding: 8px 12px;
+  border-radius: 0 8px 8px 0;
+  margin-top: 6px;
+}

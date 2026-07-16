@@ -17,24 +17,42 @@ final class ApiCredential extends BaseModel
 {
     protected const TABLE = 'api_credentials';
 
-    /** Store (or replace) a key for a service. Deactivates older keys for it. */
-    public static function store(string $service, string $label, string $plainKey, array $meta = []): int
+    /**
+     * Store a key for a service. With $activate=true (default) it becomes the
+     * single active key for that service; pass false to save it dormant so
+     * test_connection can verify it before activation.
+     */
+    public static function store(string $service, string $label, string $plainKey, array $meta = [], bool $activate = true): int
     {
         if (!in_array($service, CREDENTIAL_SERVICES, true)) {
             throw new InvalidArgumentException("Unknown credential service: $service");
         }
 
-        // Single active key per service keeps "which key is live" unambiguous.
-        self::db()->prepare('UPDATE api_credentials SET is_active = 0 WHERE service = ?')
-            ->execute([$service]);
-
-        return self::create([
+        $id = self::create([
             'service'       => $service,
             'label'         => $label,
             'encrypted_key' => Encryption::encrypt($plainKey),
             'meta'          => json_encode($meta, JSON_UNESCAPED_UNICODE),
-            'is_active'     => 1,
+            'is_active'     => 0,
         ]);
+
+        if ($activate) {
+            self::activate($id);
+        }
+
+        return $id;
+    }
+
+    /** Make this row the single active key for its service. */
+    public static function activate(int $id): void
+    {
+        $row = self::find($id);
+        if ($row === null) {
+            return;
+        }
+        self::db()->prepare('UPDATE api_credentials SET is_active = 0 WHERE service = ?')
+            ->execute([$row['service']]);
+        self::update($id, ['is_active' => 1]);
     }
 
     public static function activeFor(string $service): ?array

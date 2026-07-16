@@ -6,7 +6,9 @@
 
 CREATE TABLE IF NOT EXISTS leads (
     id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    wa_phone            VARCHAR(20) NOT NULL,
+    -- WhatsApp number, or a pseudo-handle ('fb:<id>' / 'ig:<id>') for social
+    -- leads until they arrive on WhatsApp and the real number takes over.
+    wa_phone            VARCHAR(32) NOT NULL,
     name                VARCHAR(120) NULL,
     source_channel      ENUM('whatsapp', 'social', 'website', 'listing_portal', 'referral', 'tiktok') NOT NULL,
     status              ENUM('new', 'qualified', 'converted') NOT NULL DEFAULT 'new',
