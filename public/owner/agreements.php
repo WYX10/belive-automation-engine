@@ -40,7 +40,7 @@ $agreements = Database::run(
     [$owner]
 )->fetchAll();
 
-$rooms = Database::run('SELECT id, name, area FROM rooms WHERE owner_name = ? ORDER BY name', [$owner])->fetchAll();
+$rooms = Database::run('SELECT id, name, location AS area FROM rooms WHERE owner_name = ? ORDER BY name', [$owner])->fetchAll();
 $bookedLeads = Database::run(
     'SELECT DISTINCT l.id, l.name, l.wa_phone FROM leads l
      JOIN bookings b ON b.lead_id = l.id

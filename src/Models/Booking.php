@@ -50,7 +50,7 @@ final class Booking extends BaseModel
     public static function upcoming(int $limit = 20): array
     {
         return Database::run(
-            "SELECT b.*, l.name AS lead_name, l.wa_phone, r.name AS room_name, r.area AS room_area
+            "SELECT b.*, l.name AS lead_name, l.wa_phone, r.name AS room_name, r.location AS room_area
              FROM bookings b
              JOIN leads l ON l.id = b.lead_id
              LEFT JOIN rooms r ON r.id = b.room_id

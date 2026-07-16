@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $bookings = Database::run(
-    'SELECT b.*, l.name AS lead_name, l.wa_phone, r.name AS room_name, r.area
+    'SELECT b.*, l.name AS lead_name, l.wa_phone, r.name AS room_name, r.location AS area
      FROM bookings b
      JOIN leads l ON l.id = b.lead_id
      LEFT JOIN rooms r ON r.id = b.room_id

@@ -26,10 +26,22 @@ portal_header('tenant', 'My stay', 'dashboard');
             <?php if ($room === null): ?>
                 <p class="belive-muted">No room attached yet — Eve will match you during your next chat.</p>
             <?php else: ?>
+                <?php $roomPrices = \App\Models\Room::prices((int) $room['id']); ?>
                 <strong style="font-size:16px"><?= e($room['name']) ?></strong>
-                <div class="belive-muted" style="font-size:13.5px"><?= e($room['area']) ?> · <?= e($room['room_type']) ?> room · RM <?= e(number_format((float) $room['price'])) ?>/month</div>
+                <div class="belive-muted" style="font-size:13.5px">
+                    <?= e($room['location']) ?> · <?= e($room['room_type']) ?> room · RM 0 deposit
+                </div>
+                <div style="font-size:13.5px; margin-top:6px">
+                    <?php foreach (\App\Models\Room::TENURES as $tenure): ?>
+                        <?php if (isset($roomPrices[$tenure])): ?>
+                            <span class="belive-badge <?= $roomPrices[$tenure]['is_best_value'] ? '' : 'muted' ?>" style="margin-right:4px">
+                                <?= e(\App\Models\Room::TENURE_LABELS[$tenure]) ?>: RM <?= e(number_format($roomPrices[$tenure]['price'])) ?>/mo<?= $roomPrices[$tenure]['is_best_value'] ? ' ★' : '' ?>
+                            </span>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </div>
                 <ul class="belive-check-list" style="margin-top:10px">
-                    <?php foreach (json_decode($room['features'] ?? '[]', true) ?: [] as $feature): ?>
+                    <?php foreach (\App\Models\Room::amenities((int) $room['id']) as $feature): ?>
                         <li><?= e($feature) ?></li>
                     <?php endforeach; ?>
                 </ul>

@@ -46,7 +46,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$rooms = Database::run('SELECT * FROM rooms WHERE owner_name = ? ORDER BY area, name', [$owner])->fetchAll();
+$rooms = Database::run(
+    "SELECT r.*, COALESCE(rp.price, 0) AS monthly_price
+     FROM rooms r
+     LEFT JOIN room_pricing rp ON rp.room_id = r.id AND rp.tenure = 'monthly'
+     WHERE r.owner_name = ? ORDER BY r.location, r.name",
+    [$owner]
+)->fetchAll();
 
 portal_header('owner', 'My listings', 'listings');
 ?>
@@ -65,7 +71,7 @@ portal_header('owner', 'My listings', 'listings');
         <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:baseline">
             <div>
                 <strong style="font-size:16px"><?= e($room['name']) ?></strong>
-                <span class="belive-muted" style="font-size:13.5px"> — <?= e($room['area']) ?> · <?= e($room['room_type']) ?> · RM <?= e(number_format((float) $room['price'])) ?>/mo</span>
+                <span class="belive-muted" style="font-size:13.5px"> — <?= e($room['location']) ?> · <?= e($room['room_type']) ?> · RM <?= e(number_format((float) $room['monthly_price'])) ?>/mo flexible</span>
             </div>
             <div style="display:flex; gap:6px; flex-wrap:wrap">
                 <?php if ($verification !== null && (int) $verification['verified_badge'] === 1): ?>
@@ -73,7 +79,7 @@ portal_header('owner', 'My listings', 'listings');
                 <?php else: ?>
                     <span class="belive-badge muted">unverified</span>
                 <?php endif; ?>
-                <span class="belive-badge <?= (int) $room['available'] === 1 ? 'orange' : '' ?>"><?= (int) $room['available'] === 1 ? 'listed' : 'occupied' ?></span>
+                <span class="belive-badge <?= $room['status'] === 'available' ? 'orange' : '' ?>"><?= $room['status'] === 'available' ? 'listed' : e($room['status']) ?></span>
                 <span class="belive-badge muted"><?= $moveInCount ?> move-in photo(s)</span>
             </div>
         </div>

@@ -45,10 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate'
 }
 
 $posts = Database::run(
-    'SELECT p.*, r.name AS room_name, r.area FROM content_posts p
+    'SELECT p.*, r.name AS room_name, r.location AS area FROM content_posts p
      LEFT JOIN rooms r ON r.id = p.room_id ORDER BY p.id DESC LIMIT 100'
 )->fetchAll();
-$rooms = Room::all(['available' => 1], 'area ASC');
+$rooms = \App\Catalog\RoomRepository::filter(['tenure' => 'monthly'], 100);
 
 $platformIcons = ['facebook' => '📘', 'instagram' => '📷', 'tiktok' => '🎵'];
 
@@ -68,7 +68,7 @@ admin_header('Content', 'content');
             <label>Room to feature</label>
             <select name="room_id">
                 <?php foreach ($rooms as $room): ?>
-                    <option value="<?= (int) $room['id'] ?>"><?= e($room['name']) ?> — <?= e($room['area']) ?>, RM<?= e($room['price']) ?></option>
+                    <option value="<?= (int) $room['id'] ?>"><?= e($room['name']) ?> — <?= e($room['location']) ?>, RM<?= e(number_format($room['price_at_tenure'])) ?>/mo flexible</option>
                 <?php endforeach; ?>
             </select>
         </div>

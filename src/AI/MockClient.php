@@ -93,13 +93,26 @@ final class MockClient implements LlmClient
         $profile = preg_match('/\b(student|college|university|uni|tarumt)\b/i', $msg) ? 'student'
             : (preg_match('/\b(work|working|professional|job|office)\b/i', $msg) ? 'working_professional' : null);
 
+        $roomType = null;
+        if (preg_match('/\b(master|middle|medium|single|small)\b/i', $msg, $r)) {
+            $roomType = ['medium' => 'middle', 'small' => 'single'][strtolower($r[1])] ?? strtolower($r[1]);
+        }
+
+        $tenure = match (true) {
+            (bool) preg_match('/\b(12 ?month|1 ?year|a year|long term|whole (course|degree)|setahun)\b/i', $msg) => '12_month',
+            (bool) preg_match('/\b(6 ?month|half (a )?year|semester)\b/i', $msg)                                 => '6_month',
+            (bool) preg_match('/\b(short term|monthly|flexible|month to month|rotation|internship)\b/i', $msg)   => 'monthly',
+            default                                                                                              => null,
+        };
+
         return json_encode([
             'intent'          => $intent,
             'entities'        => [
                 'location'     => $location,
                 'budget'       => $budget,
                 'move_in_date' => preg_match('/\b(july|august|september|next month|asap)\b/i', $msg, $d) ? $d[1] : null,
-                'room_type'    => preg_match('/\b(master|medium|small|single|studio)\b/i', $msg, $r) ? strtolower($r[1]) : null,
+                'room_type'    => $roomType,
+                'tenure'       => $tenure,
             ],
             'tenant_profile'  => $profile,
             'language'        => 'en',
@@ -115,11 +128,21 @@ final class MockClient implements LlmClient
         $photosFirst = self::hasPhotosFirstRule($userPrompt);
         $isBooking = str_contains($userPrompt, '"intent":"booking_request"');
 
+        // Tenure logic mirrors the real prompt's guidance: customer statement
+        // wins; else students → 12_month, professionals → 6_month.
+        $tenure = match (true) {
+            (bool) preg_match('/"tenure":"(monthly|6_month|12_month)"/', $userPrompt, $m) => $m[1],
+            str_contains($userPrompt, '"tenant_profile":"student"')                        => '12_month',
+            str_contains($userPrompt, '"tenant_profile":"working_professional"')           => '6_month',
+            default                                                                        => null,
+        };
+
         return json_encode([
             'qualified'           => true,
             'closing_probability' => $isBooking ? 85 : 62,
             'lead_signals'        => ['asked about a specific area', 'gave a budget'],
             'next_action'         => $isBooking ? 'book_viewing' : 'answer_directly',
+            'recommended_tenure'  => $tenure,
             'send_photos_first'   => $photosFirst,
             'recommendation'      => $photosFirst
                 ? 'Send room photos before quoting the price (learned rule in effect).'

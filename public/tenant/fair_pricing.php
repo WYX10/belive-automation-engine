@@ -24,7 +24,7 @@ portal_header('tenant', 'Fair pricing', 'pricing');
         <p class="belive-muted">Your price check appears here once a room is attached to your booking.</p>
     <?php else: ?>
         <strong style="font-size:16px"><?= e($room['name']) ?></strong>
-        <div class="belive-muted" style="font-size:13.5px; margin-bottom:16px"><?= e($room['area']) ?> · <?= e($room['room_type']) ?> room</div>
+        <div class="belive-muted" style="font-size:13.5px; margin-bottom:16px"><?= e($room['location']) ?> · <?= e($room['room_type']) ?> room · flexible-monthly benchmark</div>
 
         <div class="belive-stat-grid">
             <div class="belive-stat">

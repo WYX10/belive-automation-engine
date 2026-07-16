@@ -10,7 +10,7 @@ use App\Pricing\FairPricingGuard;
 require dirname(__DIR__) . '/_portal_layout.php';
 $owner = require_owner();
 
-$rooms = Database::run('SELECT * FROM rooms WHERE owner_name = ? ORDER BY area, name', [$owner])->fetchAll();
+$rooms = Database::run('SELECT * FROM rooms WHERE owner_name = ? ORDER BY location, name', [$owner])->fetchAll();
 
 portal_header('owner', 'Pricing guard', 'pricing');
 ?>
@@ -26,9 +26,9 @@ portal_header('owner', 'Pricing guard', 'pricing');
         <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:baseline">
             <div>
                 <strong><?= e($room['name']) ?></strong>
-                <span class="belive-muted" style="font-size:13px"> — <?= e($room['area']) ?> · <?= e($room['room_type']) ?></span>
+                <span class="belive-muted" style="font-size:13px"> — <?= e($room['location']) ?> · <?= e($room['room_type']) ?></span>
             </div>
-            <div style="font-family:var(--font-head); font-weight:700">RM <?= e(number_format((float) $room['price'])) ?>/mo</div>
+            <div style="font-family:var(--font-head); font-weight:700">RM <?= e(number_format($assessment['price'])) ?>/mo <span class="belive-muted" style="font-size:11px; font-weight:400">flexible</span></div>
         </div>
 
         <?php

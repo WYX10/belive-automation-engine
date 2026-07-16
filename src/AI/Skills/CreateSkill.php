@@ -34,6 +34,7 @@ Hard rules:
 - WhatsApp style: 1–3 short sentences, or one sentence + a compact ✓ list. No markdown headers, no long paragraphs.
 - Reply in the customer's language (English / Malay / Chinese — match what they used).
 - Ground every fact in the provided room inventory. NEVER invent rooms, prices, or availability. If inventory says nothing matches, say so honestly and offer the closest alternative.
+- NEVER state a price without naming its tenure ("RM 620/mo on a 12-month stay", not a bare "RM 620"). When recommending a tenure, mention the saving vs the flexible monthly rate. Zero deposit is BeLive's signature — mention it when introducing a room.
 - Follow the decision given to you: if send_photos_first=true, do NOT state any price figure — tease the rooms, say photos are coming through, and ask if they'd like pricing after.
 - If a recall line about a returning customer is provided, open with it naturally (reference their earlier enquiry specifically — never a generic "hi again").
 - If next_action=request_info, ask for exactly the one missing detail.
@@ -78,9 +79,10 @@ PROMPT;
                 'entities' => $understanding['entities'],
             ], JSON_UNESCAPED_UNICODE),
             'DECISION TO EXECUTE: ' . json_encode([
-                'next_action'       => $decision['next_action'],
-                'send_photos_first' => $decision['send_photos_first'],
-                'recommendation'    => $decision['recommendation'],
+                'next_action'        => $decision['next_action'],
+                'send_photos_first'  => $decision['send_photos_first'],
+                'recommended_tenure' => $decision['recommended_tenure'] ?? null,
+                'recommendation'     => $decision['recommendation'],
             ], JSON_UNESCAPED_UNICODE),
             "ROOMS TO OFFER:\n" . Room::promptBlock($recommendedRooms),
             'CUSTOMER MESSAGE: ' . ($understanding['message'] ?? ''),
@@ -112,13 +114,17 @@ PROMPT;
     {
         $client = ModelRouter::clientForPhase('content_creation');
 
+        $roomId = (int) $room['id'];
+        $prices = Room::prices($roomId);
         $metrics = [
-            'platform'  => $platform,
-            'room'      => $room['name'],
-            'area'      => $room['area'],
-            'room_type' => $room['room_type'],
-            'price_rm'  => (float) $room['price'],
-            'features'  => json_decode($room['features'] ?? '[]', true) ?: [],
+            'platform'          => $platform,
+            'room'              => $room['property_name'] ?: $room['name'],
+            'area'              => $room['location'],
+            'room_type'         => $room['room_type'],
+            'price_rm_monthly'  => $prices['monthly']['price'] ?? null,
+            'price_rm_12_month' => $prices['12_month']['price'] ?? null,
+            'deposit_rm'        => (float) ($room['deposit_amount'] ?? 0),
+            'features'          => Room::amenities($roomId),
         ];
 
         [$result, $ms] = SkillSupport::timed(fn () => $client->generate(

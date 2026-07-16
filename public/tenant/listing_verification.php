@@ -28,12 +28,15 @@ portal_header('tenant', 'Verified listing', 'verification');
         <p class="belive-muted">Once a room is attached to your booking, its verification card appears here.</p>
     <?php elseif ($verification === null): ?>
         <strong><?= e($room['name']) ?></strong>
-        <div class="belive-muted" style="font-size:13.5px; margin-bottom:10px"><?= e($room['area']) ?> · <?= e($room['room_type']) ?> room</div>
+        <div class="belive-muted" style="font-size:13.5px; margin-bottom:10px"><?= e($room['location']) ?> · <?= e($room['room_type']) ?> room</div>
         <span class="verified-badge-big unverified">⏳ Verification in progress</span>
         <p class="belive-muted" style="font-size:13.5px; margin-top:10px">The owner hasn't submitted verification documents for this listing yet.</p>
     <?php else: ?>
         <strong style="font-size:16px"><?= e($room['name']) ?></strong>
-        <div class="belive-muted" style="font-size:13.5px; margin-bottom:12px"><?= e($room['area']) ?> · <?= e($room['room_type']) ?> room · RM <?= e(number_format((float) $room['price'])) ?>/month</div>
+        <div class="belive-muted" style="font-size:13.5px; margin-bottom:12px">
+            <?= e($room['location']) ?> · <?= e($room['room_type']) ?> room
+            · RM <?= e(number_format((float) (\App\Catalog\PricingCalculator::priceFor((int) $room['id'], 'monthly') ?? 0))) ?>/mo flexible · RM 0 deposit
+        </div>
 
         <?php if ((int) $verification['verified_badge'] === 1): ?>
             <span class="verified-badge-big">✓ Verified listing</span>

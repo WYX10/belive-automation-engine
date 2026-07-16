@@ -88,6 +88,13 @@ final class Lead extends BaseModel
                 $updates[$field] = $incoming;
             }
         }
+
+        // A tenure the customer states themselves always wins.
+        $tenure = $details['tenure'] ?? null;
+        if (in_array($tenure, ['monthly', '6_month', '12_month'], true) && $tenure !== $lead['preferred_tenure']) {
+            $updates['preferred_tenure'] = $tenure;
+        }
+
         if ($updates !== []) {
             self::update($id, $updates);
         }

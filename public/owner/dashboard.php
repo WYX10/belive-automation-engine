@@ -18,15 +18,22 @@ use App\Core\Database;
 require dirname(__DIR__) . '/_portal_layout.php';
 $owner = require_owner();
 
-$rooms = Database::run('SELECT * FROM rooms WHERE owner_name = ? ORDER BY area', [$owner])->fetchAll();
+// Income figures use the 12-month tenure rate (the committed-tenancy rate).
+$rooms = Database::run(
+    "SELECT r.*, COALESCE(rp.price, 0) AS price
+     FROM rooms r
+     LEFT JOIN room_pricing rp ON rp.room_id = r.id AND rp.tenure = '12_month'
+     WHERE r.owner_name = ? ORDER BY r.location",
+    [$owner]
+)->fetchAll();
 $roomIds = array_map(fn ($r) => (int) $r['id'], $rooms);
 $idList = $roomIds === [] ? '0' : implode(',', $roomIds);
 
 // REAL aggregates ------------------------------------------------------------
-$occupied = count(array_filter($rooms, fn ($r) => (int) $r['available'] === 0));
+$occupied = count(array_filter($rooms, fn ($r) => $r['status'] === 'occupied'));
 $occupancyPct = $rooms === [] ? 0 : (int) round($occupied / count($rooms) * 100);
 $monthlyPotential = array_sum(array_map(fn ($r) => (float) $r['price'], $rooms));
-$monthlyActual = array_sum(array_map(fn ($r) => (int) $r['available'] === 0 ? (float) $r['price'] : 0, $rooms));
+$monthlyActual = array_sum(array_map(fn ($r) => $r['status'] === 'occupied' ? (float) $r['price'] : 0, $rooms));
 $upcomingViewings = (int) Database::run(
     "SELECT COUNT(*) FROM bookings WHERE room_id IN ($idList) AND status IN ('pending','confirmed') AND viewing_datetime >= NOW()"
 )->fetchColumn();
@@ -50,7 +57,7 @@ portal_header('owner', 'Overview', 'dashboard');
     </div>
     <div class="belive-stat">
         <div class="belive-stat-icon">💰</div>
-        <div><div class="belive-stat-number">RM <?= e(number_format($monthlyActual)) ?></div><div class="belive-stat-label">occupied monthly income (of RM <?= e(number_format($monthlyPotential)) ?> potential)</div></div>
+        <div><div class="belive-stat-number">RM <?= e(number_format($monthlyActual)) ?></div><div class="belive-stat-label">occupied monthly income at 12-month rates (of RM <?= e(number_format($monthlyPotential)) ?> potential)</div></div>
     </div>
     <div class="belive-stat">
         <div class="belive-stat-icon teal">📅</div>
@@ -68,9 +75,10 @@ portal_header('owner', 'Overview', 'dashboard');
                 <?php
                 $byArea = [];
                 foreach ($rooms as $room) {
-                    $byArea[$room['area']]['n'] = ($byArea[$room['area']]['n'] ?? 0) + 1;
-                    $byArea[$room['area']]['occ'] = ($byArea[$room['area']]['occ'] ?? 0) + ((int) $room['available'] === 0 ? 1 : 0);
-                    $byArea[$room['area']]['rm'] = ($byArea[$room['area']]['rm'] ?? 0) + ((int) $room['available'] === 0 ? (float) $room['price'] : 0);
+                    $area = $room['location'];
+                    $byArea[$area]['n'] = ($byArea[$area]['n'] ?? 0) + 1;
+                    $byArea[$area]['occ'] = ($byArea[$area]['occ'] ?? 0) + ($room['status'] === 'occupied' ? 1 : 0);
+                    $byArea[$area]['rm'] = ($byArea[$area]['rm'] ?? 0) + ($room['status'] === 'occupied' ? (float) $room['price'] : 0);
                 }
                 ?>
                 <?php foreach ($byArea as $area => $stat): ?>

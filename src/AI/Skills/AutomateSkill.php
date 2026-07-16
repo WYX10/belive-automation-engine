@@ -35,9 +35,9 @@ final class AutomateSkill
         // 1. Photos before price when decided (the Setapak sequencing lesson).
         if ($decision['send_photos_first']) {
             foreach (array_slice($decision['rooms'], 0, 1) as $room) {
-                $photos = json_decode($room['photos'] ?? '[]', true) ?: [];
+                $photos = \App\Models\Room::photoUrls((int) $room['id']);
                 foreach (array_slice($photos, 0, 3) as $photoUrl) {
-                    $sent = $wa->sendImage($lead['wa_phone'], $photoUrl, $room['name'] . ' — ' . $room['area']);
+                    $sent = $wa->sendImage($lead['wa_phone'], $photoUrl, $room['name'] . ' — ' . $room['location']);
                     $dryRun = $dryRun || $sent['dry_run'];
                 }
                 if ($photos !== []) {

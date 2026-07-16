@@ -33,14 +33,20 @@ PROMPT;
         $lead = Lead::find($leadId) ?? throw new RuntimeException('Lead not found.');
         $room = Room::find($roomId) ?? throw new RuntimeException('Room not found.');
 
+        // Tenure: the customer's indicated preference, else 12-month best value.
+        $tenure = in_array($lead['preferred_tenure'] ?? '', Room::TENURES, true) ? $lead['preferred_tenure'] : '12_month';
+
         $details = [
             'tenant_name'   => $lead['name'] ?: 'Tenant',
             'tenant_phone'  => $lead['wa_phone'],
             'room'          => $room['name'],
-            'area'          => $room['area'],
+            'property'      => $room['property_name'],
+            'area'          => $room['location'],
             'room_type'     => $room['room_type'],
-            'monthly_rm'    => (float) $room['price'],
-            'features'      => json_decode($room['features'] ?? '[]', true) ?: [],
+            'tenure'        => Room::TENURE_LABELS[$tenure],
+            'monthly_rm'    => \App\Catalog\PricingCalculator::priceFor($roomId, $tenure),
+            'deposit_rm'    => (float) ($room['deposit_amount'] ?? 0),
+            'features'      => Room::amenities($roomId),
             'move_in'       => $lead['move_in_date'] ?: 'to be confirmed',
             'date_today'    => date('j F Y'),
         ];

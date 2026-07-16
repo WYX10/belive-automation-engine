@@ -1,36 +1,116 @@
 -- Demo seed data for finals day.
 --
--- Rooms use BeLive's REAL portfolio locations (Cheras, Sepang, Sri Kembangan,
--- Sentul, Kuala Lumpur, Petaling Jaya, Batu Kawan, Johor) — a BeLive judge
--- recognises their own areas. Setapak rooms exist for the canonical
--- self-learning demo scenario promised in the proposal.
+-- Rooms mirror BeLive's REAL portfolio: real locations (Taman Maluri and
+-- M Vertica in Cheras, PV9 Residence in Seri Kembangan, Sentul, Sepang, KL,
+-- PJ, Batu Kawan, Johor — plus Setapak for the proposal's demo scenario),
+-- real room types (single/middle/master), real amenity vocabulary (ibilik),
+-- and the real observed price band RM 450–1,100/month. Every room has all
+-- three tenure prices (monthly flexible highest, 12-month lowest = best
+-- value) and RM 0 deposit — BeLive's headline differentiator.
 --
--- Photo URLs are public placeholders (picsum.photos) so image sends genuinely
--- work — SWAP THEM FOR REAL BELIVE ROOM PHOTOS before finals (setup guide §6).
+-- Photo URLs are clearly-neutral placeholders (picsum.photos) so image sends
+-- genuinely work — swap for BeLive's own marketing photos (with permission)
+-- before finals; never hotlink their CDN or scrape ibilik tenant photos.
 --
--- The Setapak drop-off state is pre-loaded (3 leads that went silent after a
--- price quote >4h ago) so judges can watch the lesson being LEARNED live via
--- the learning job — the learned rule itself is deliberately NOT seeded.
+-- The Setapak drop-off state is pre-loaded (3 leads silent after a price
+-- quote) so judges can watch the lesson being LEARNED live — the learned
+-- rule itself is deliberately NOT seeded.
 
 -- ---------------------------------------------------------------- rooms
-INSERT INTO rooms (name, area, room_type, price, photos, features, available) VALUES
-('Casa Residenza A-12-3',   'Setapak',        'medium', 650.00, '["https://picsum.photos/seed/belive-setapak1/800/600","https://picsum.photos/seed/belive-setapak1b/800/600"]', '["Fully furnished","High-speed WiFi","Weekly cleaning"]', 1),
-('PV21 Residence B-8-1',    'Setapak',        'small',  500.00, '["https://picsum.photos/seed/belive-setapak2/800/600"]', '["Fully furnished","Near LRT","High-speed WiFi"]', 1),
-('Platinum Lake PV15 C-3',  'Setapak',        'master', 850.00, '["https://picsum.photos/seed/belive-setapak3/800/600"]', '["Private bathroom","Fully furnished","Weekly cleaning"]', 1),
-('Maluri Court 5-2',        'Cheras',         'medium', 600.00, '["https://picsum.photos/seed/belive-cheras1/800/600"]', '["Fully furnished","Near MRT","High-speed WiFi"]', 1),
-('EkoCheras Suite 18-5',    'Cheras',         'master', 900.00, '["https://picsum.photos/seed/belive-cheras2/800/600"]', '["Private bathroom","Gym & pool","Weekly cleaning"]', 1),
-('Kota Warisan Homestay 2', 'Sepang',         'small',  450.00, '["https://picsum.photos/seed/belive-sepang1/800/600"]', '["Fully furnished","Near KLIA","Free parking"]', 1),
-('The Atmosphere 7-1',      'Sri Kembangan',  'medium', 580.00, '["https://picsum.photos/seed/belive-srik1/800/600"]', '["Fully furnished","High-speed WiFi","Near The Mines"]', 1),
-('Sentul Point A-20-9',     'Sentul',         'medium', 700.00, '["https://picsum.photos/seed/belive-sentul1/800/600"]', '["Fully furnished","Near LRT","Weekly cleaning"]', 1),
-('Regalia Residence 30-2',  'Kuala Lumpur',   'master', 950.00, '["https://picsum.photos/seed/belive-kl1/800/600"]', '["KLCC view","Infinity pool","Private bathroom"]', 1),
-('Icon City 12-7',          'Petaling Jaya',  'medium', 750.00, '["https://picsum.photos/seed/belive-pj1/800/600"]', '["Fully furnished","Near LRT","High-speed WiFi"]', 1),
-('Aspen Vision City 3-2',   'Batu Kawan',     'small',  480.00, '["https://picsum.photos/seed/belive-bk1/800/600"]', '["Fully furnished","Near Design Village","Free parking"]', 1),
-('Austin Suites 15-3',      'Johor',          'medium', 620.00, '["https://picsum.photos/seed/belive-johor1/800/600"]', '["Fully furnished","Near AEON","Weekly cleaning"]', 1),
-('D''Summit Residences 9-9','Johor',          'studio', 880.00, '["https://picsum.photos/seed/belive-johor2/800/600"]', '["Private kitchenette","Fully furnished","Near Setia Tropika"]', 1);
+INSERT INTO rooms (room_code, name, property_name, location, room_type, description, status, deposit_amount, available_from, owner_name, address) VALUES
+('RM-101', 'A-12-3',  'Platinum Lake PV10',            'Setapak',        'middle', 'Fully furnished middle room with window, walking distance to LRT Wangsa Maju.', 'available', 0.00, CURDATE(), 'Encik Rahman', 'Platinum Lake PV10, Setapak'),
+('RM-102', 'B-8-1',   'PV21 Residence',                'Setapak',        'single', 'Cozy single room, ideal for students — TARUMT bus at the doorstep.',            'available', 0.00, CURDATE(), 'Encik Rahman', 'PV21 Residence, Setapak'),
+('RM-103', 'C-3-7',   'Platinum Lake PV15',            'Setapak',        'master', 'Master room with private bathroom and KL skyline view.',                        'available', 0.00, CURDATE(), 'Encik Rahman', 'Platinum Lake PV15, Setapak'),
+('RM-104', 'A-20-9',  'Sentul Point Suite Apartments', 'Sentul',         'middle', 'Middle room 5 minutes from LRT Sentul Timur — perfect for KL Sentral commuters.', 'available', 0.00, CURDATE(), 'Encik Rahman', 'Sentul Point, Sentul'),
+('RM-105', 'MK-5-2',  'Taman Maluri',                  'Cheras',         'master', 'Spacious master room with private bathroom, next to MRT Maluri and Sunway Velocity.', 'available', 0.00, CURDATE(), 'Ms Tan Li Hua', 'Taman Maluri, Cheras'),
+('RM-106', 'MK-5-3',  'Taman Maluri',                  'Cheras',         'middle', 'Bright middle room in the same Maluri unit — shared bathroom, great housemates.', 'available', 0.00, CURDATE(), 'Ms Tan Li Hua', 'Taman Maluri, Cheras'),
+('RM-107', 'T2-18-5', 'M Vertica KL City Residences',  'Cheras',         'single', 'Single room in a new high-rise — pool, gym, and MRT within reach.',              'available', 0.00, CURDATE(), 'Ms Tan Li Hua', 'M Vertica, Cheras'),
+('RM-108', 'MC-9-2',  'Maluri Court',                  'Cheras',         'single', 'Value single room near AEON Maluri — everything you need downstairs.',           'available', 0.00, CURDATE(), 'Ms Tan Li Hua', 'Maluri Court, Cheras'),
+('RM-109', 'PV9-11-6','PV9 Residence',                 'Seri Kembangan', 'single', 'Single room with balcony access, minutes from The Mines.',                       'available', 0.00, CURDATE(), NULL, 'PV9 Residence, Seri Kembangan'),
+('RM-110', 'AT-7-1',  'The Atmosphere',                'Seri Kembangan', 'single', 'Budget-friendly single room above the Atmosphere commercial strip.',             'available', 0.00, CURDATE(), NULL, 'The Atmosphere, Seri Kembangan'),
+('RM-111', 'KW-2-2',  'Kota Warisan',                  'Sepang',         'single', 'Single room near KLIA/klia2 — popular with airport and aviation staff.',        'available', 0.00, CURDATE(), NULL, 'Kota Warisan, Sepang'),
+('RM-112', 'RG-30-2', 'Regalia Residence',             'Kuala Lumpur',   'master', 'Master room with infinity-pool access and KLCC view.',                           'available', 0.00, CURDATE(), NULL, 'Regalia Residence, Kuala Lumpur'),
+('RM-113', 'IC-12-7', 'Icon City',                     'Petaling Jaya',  'middle', 'Middle room in Icon City — LRT, offices and food street below.',                 'available', 0.00, CURDATE(), NULL, 'Icon City, Petaling Jaya'),
+('RM-114', 'AV-3-2',  'Aspen Vision City',             'Batu Kawan',     'single', 'Single room near Design Village and Batu Kawan industrial park.',                'available', 0.00, CURDATE(), NULL, 'Aspen Vision City, Batu Kawan'),
+('RM-115', 'AS-15-3', 'Austin Suites',                 'Johor',          'middle', 'Middle room in Mount Austin — cafés, AEON and easy CIQ access.',                 'available', 0.00, CURDATE(), 'Ms Tan Li Hua', 'Austin Suites, Johor');
 
--- Phase 9 (bonus): owner accounts for the owner portal + demo addresses.
-UPDATE rooms SET owner_name = 'Encik Rahman',  address = CONCAT(name, ', ', area) WHERE area IN ('Setapak', 'Sentul');
-UPDATE rooms SET owner_name = 'Ms Tan Li Hua', address = CONCAT(name, ', ', area) WHERE area IN ('Cheras', 'Johor');
+-- ------------------------------------------------- tenure pricing (RM/month)
+-- monthly (flexible) highest · 6-month mid · 12-month lowest (best value).
+INSERT INTO room_pricing (room_id, tenure, price, is_best_value)
+SELECT id, 'monthly',  700, 0 FROM rooms WHERE room_code = 'RM-101' UNION ALL
+SELECT id, '6_month',  650, 0 FROM rooms WHERE room_code = 'RM-101' UNION ALL
+SELECT id, '12_month', 615, 1 FROM rooms WHERE room_code = 'RM-101' UNION ALL
+SELECT id, 'monthly',  540, 0 FROM rooms WHERE room_code = 'RM-102' UNION ALL
+SELECT id, '6_month',  500, 0 FROM rooms WHERE room_code = 'RM-102' UNION ALL
+SELECT id, '12_month', 470, 1 FROM rooms WHERE room_code = 'RM-102' UNION ALL
+SELECT id, 'monthly',  920, 0 FROM rooms WHERE room_code = 'RM-103' UNION ALL
+SELECT id, '6_month',  850, 0 FROM rooms WHERE room_code = 'RM-103' UNION ALL
+SELECT id, '12_month', 800, 1 FROM rooms WHERE room_code = 'RM-103' UNION ALL
+SELECT id, 'monthly',  750, 0 FROM rooms WHERE room_code = 'RM-104' UNION ALL
+SELECT id, '6_month',  700, 0 FROM rooms WHERE room_code = 'RM-104' UNION ALL
+SELECT id, '12_month', 660, 1 FROM rooms WHERE room_code = 'RM-104' UNION ALL
+SELECT id, 'monthly', 1100, 0 FROM rooms WHERE room_code = 'RM-105' UNION ALL
+SELECT id, '6_month', 1050, 0 FROM rooms WHERE room_code = 'RM-105' UNION ALL
+SELECT id, '12_month', 990, 1 FROM rooms WHERE room_code = 'RM-105' UNION ALL
+SELECT id, 'monthly',  860, 0 FROM rooms WHERE room_code = 'RM-106' UNION ALL
+SELECT id, '6_month',  800, 0 FROM rooms WHERE room_code = 'RM-106' UNION ALL
+SELECT id, '12_month', 750, 1 FROM rooms WHERE room_code = 'RM-106' UNION ALL
+SELECT id, 'monthly',  860, 0 FROM rooms WHERE room_code = 'RM-107' UNION ALL
+SELECT id, '6_month',  800, 0 FROM rooms WHERE room_code = 'RM-107' UNION ALL
+SELECT id, '12_month', 755, 1 FROM rooms WHERE room_code = 'RM-107' UNION ALL
+SELECT id, 'monthly',  700, 0 FROM rooms WHERE room_code = 'RM-108' UNION ALL
+SELECT id, '6_month',  650, 0 FROM rooms WHERE room_code = 'RM-108' UNION ALL
+SELECT id, '12_month', 615, 1 FROM rooms WHERE room_code = 'RM-108' UNION ALL
+SELECT id, 'monthly',  590, 0 FROM rooms WHERE room_code = 'RM-109' UNION ALL
+SELECT id, '6_month',  550, 0 FROM rooms WHERE room_code = 'RM-109' UNION ALL
+SELECT id, '12_month', 520, 1 FROM rooms WHERE room_code = 'RM-109' UNION ALL
+SELECT id, 'monthly',  495, 0 FROM rooms WHERE room_code = 'RM-110' UNION ALL
+SELECT id, '6_month',  465, 0 FROM rooms WHERE room_code = 'RM-110' UNION ALL
+SELECT id, '12_month', 450, 1 FROM rooms WHERE room_code = 'RM-110' UNION ALL
+SELECT id, 'monthly',  520, 0 FROM rooms WHERE room_code = 'RM-111' UNION ALL
+SELECT id, '6_month',  480, 0 FROM rooms WHERE room_code = 'RM-111' UNION ALL
+SELECT id, '12_month', 455, 1 FROM rooms WHERE room_code = 'RM-111' UNION ALL
+SELECT id, 'monthly', 1020, 0 FROM rooms WHERE room_code = 'RM-112' UNION ALL
+SELECT id, '6_month',  950, 0 FROM rooms WHERE room_code = 'RM-112' UNION ALL
+SELECT id, '12_month', 895, 1 FROM rooms WHERE room_code = 'RM-112' UNION ALL
+SELECT id, 'monthly',  810, 0 FROM rooms WHERE room_code = 'RM-113' UNION ALL
+SELECT id, '6_month',  750, 0 FROM rooms WHERE room_code = 'RM-113' UNION ALL
+SELECT id, '12_month', 705, 1 FROM rooms WHERE room_code = 'RM-113' UNION ALL
+SELECT id, 'monthly',  530, 0 FROM rooms WHERE room_code = 'RM-114' UNION ALL
+SELECT id, '6_month',  490, 0 FROM rooms WHERE room_code = 'RM-114' UNION ALL
+SELECT id, '12_month', 460, 1 FROM rooms WHERE room_code = 'RM-114' UNION ALL
+SELECT id, 'monthly',  670, 0 FROM rooms WHERE room_code = 'RM-115' UNION ALL
+SELECT id, '6_month',  620, 0 FROM rooms WHERE room_code = 'RM-115' UNION ALL
+SELECT id, '12_month', 585, 1 FROM rooms WHERE room_code = 'RM-115';
+
+-- ---------------------------------------------------------------- images
+INSERT INTO room_images (room_id, image_path, sort_order)
+SELECT id, CONCAT('https://picsum.photos/seed/belive-', LOWER(room_code), 'a/800/600'), 0 FROM rooms UNION ALL
+SELECT id, CONCAT('https://picsum.photos/seed/belive-', LOWER(room_code), 'b/800/600'), 1 FROM rooms;
+
+-- -------------------------------------------------------------- amenities
+-- Exact ibilik vocabulary. Base set for every room:
+INSERT INTO room_amenities (room_id, amenity)
+SELECT id, 'Air-Conditioning' FROM rooms UNION ALL
+SELECT id, 'Wifi / Internet Access' FROM rooms UNION ALL
+SELECT id, 'Washing Machine' FROM rooms UNION ALL
+SELECT id, '24 hours security' FROM rooms;
+
+-- Bathrooms: masters private, others shared.
+INSERT INTO room_amenities (room_id, amenity)
+SELECT id, 'Private Bathroom' FROM rooms WHERE room_type = 'master' UNION ALL
+SELECT id, 'Share Bathroom' FROM rooms WHERE room_type <> 'master';
+
+-- Location/facility extras.
+INSERT INTO room_amenities (room_id, amenity)
+SELECT id, 'Near LRT / MRT' FROM rooms WHERE room_code IN ('RM-101','RM-104','RM-105','RM-106','RM-107','RM-113') UNION ALL
+SELECT id, 'Near Bus stop' FROM rooms WHERE room_code IN ('RM-102','RM-109','RM-110','RM-111','RM-114','RM-115') UNION ALL
+SELECT id, 'Swimming Pools' FROM rooms WHERE room_code IN ('RM-103','RM-107','RM-112','RM-113') UNION ALL
+SELECT id, 'Gymnasium Facility' FROM rooms WHERE room_code IN ('RM-103','RM-107','RM-112','RM-113') UNION ALL
+SELECT id, 'Cooking Allowed' FROM rooms WHERE room_code IN ('RM-101','RM-104','RM-105','RM-106','RM-108','RM-115') UNION ALL
+SELECT id, 'Covered car park' FROM rooms WHERE room_code IN ('RM-103','RM-105','RM-112','RM-115') UNION ALL
+SELECT id, 'Mini Market' FROM rooms WHERE room_code IN ('RM-102','RM-108','RM-110','RM-113') UNION ALL
+SELECT id, 'Surau' FROM rooms WHERE room_code IN ('RM-101','RM-111');
 
 -- --------------------------------------------- per-phase model assignments
 INSERT INTO ai_model_config (phase, model_key) VALUES
@@ -45,26 +125,26 @@ ON DUPLICATE KEY UPDATE model_key = VALUES(model_key);
 -- learns the photos-before-price sequencing rule LIVE, and the next Setapak
 -- enquiry behaves differently — the exact scenario from the proposal.
 INSERT INTO leads (wa_phone, name, source_channel, status, location, budget, room_type, last_contact_at, created_at) VALUES
-('60170000101', 'Aisyah Rahman', 'whatsapp', 'new', 'Setapak', '650', 'medium', NOW() - INTERVAL 26 HOUR, NOW() - INTERVAL 26 HOUR),
+('60170000101', 'Aisyah Rahman', 'whatsapp', 'new', 'Setapak', '650', 'middle', NOW() - INTERVAL 26 HOUR, NOW() - INTERVAL 26 HOUR),
 ('60170000102', 'Jason Lim',     'whatsapp', 'new', 'Setapak', '600', NULL,     NOW() - INTERVAL 20 HOUR, NOW() - INTERVAL 20 HOUR),
-('60170000103', 'Priya Nair',    'website',  'new', 'Setapak', '700', 'medium', NOW() - INTERVAL 9 HOUR,  NOW() - INTERVAL 9 HOUR);
+('60170000103', 'Priya Nair',    'website',  'new', 'Setapak', '700', 'middle', NOW() - INTERVAL 9 HOUR,  NOW() - INTERVAL 9 HOUR);
 
 INSERT INTO ai_interactions (lead_id, phase, skill, model_used, direction, message_in, message_out, message_kind, reasoning, created_at)
 SELECT l.id, 'conversion', 'understand', 'claude-sonnet-5', 'inbound', CONCAT('Hi, any room in Setapak? Budget around RM', l.budget), NULL, NULL, 'Room enquiry with area and budget.', l.created_at
 FROM leads l WHERE l.wa_phone IN ('60170000101','60170000102','60170000103');
 
 INSERT INTO ai_interactions (lead_id, phase, skill, model_used, direction, message_in, message_out, message_kind, reasoning, created_at)
-SELECT l.id, 'conversion', 'automate', 'claude-sonnet-5', 'outbound', NULL, CONCAT('We have a medium room in Setapak at RM 650/month — fully furnished, WiFi, weekly cleaning. Want to book a viewing?'), 'price_quote', 'Answered directly with matching room and price.', l.created_at + INTERVAL 1 MINUTE
+SELECT l.id, 'conversion', 'automate', 'claude-sonnet-5', 'outbound', NULL, 'We have a middle room in Setapak at RM 650/mo on a 6-month stay — fully furnished, WiFi, zero deposit. Want to book a viewing?', 'price_quote', 'Answered directly with matching room and price.', l.created_at + INTERVAL 1 MINUTE
 FROM leads l WHERE l.wa_phone IN ('60170000101','60170000102','60170000103');
 
 -- ------------------------------------------ returning-customer memory demo
 -- Daniel enquired two days ago; when he messages again, Eve recalls his name
 -- and prior Sentul search in the opening line (LeadMemoryProfile).
-INSERT INTO leads (wa_phone, name, source_channel, status, location, budget, room_type, tenant_profile, closing_probability, lead_signals, ai_recommendation, last_contact_at, created_at) VALUES
-('60170000201', 'Daniel Wong', 'whatsapp', 'qualified', 'Sentul', '700', 'medium', 'working_professional', 68, '["gave a specific area","stated budget RM700","working professional"]', 'Offer the Sentul Point medium room and propose a viewing.', NOW() - INTERVAL 2 DAY, NOW() - INTERVAL 2 DAY);
+INSERT INTO leads (wa_phone, name, source_channel, status, location, budget, room_type, tenant_profile, preferred_tenure, closing_probability, lead_signals, ai_recommendation, last_contact_at, created_at) VALUES
+('60170000201', 'Daniel Wong', 'whatsapp', 'qualified', 'Sentul', '700', 'middle', 'working_professional', '6_month', 68, '["gave a specific area","stated budget RM700","working professional"]', 'Offer the Sentul Point middle room on a 6-month stay and propose a viewing.', NOW() - INTERVAL 2 DAY, NOW() - INTERVAL 2 DAY);
 
 INSERT INTO ai_interactions (lead_id, phase, skill, model_used, direction, message_in, message_out, message_kind, reasoning, created_at)
-SELECT id, 'conversion', 'understand', 'claude-sonnet-5', 'inbound', 'Hi, looking for a medium room near Sentul, I work in KL Sentral, budget RM700', NULL, NULL, 'Working professional, area Sentul, budget RM700.', NOW() - INTERVAL 2 DAY FROM leads WHERE wa_phone = '60170000201';
+SELECT id, 'conversion', 'understand', 'claude-sonnet-5', 'inbound', 'Hi, looking for a middle room near Sentul, I work in KL Sentral, budget RM700', NULL, NULL, 'Working professional, area Sentul, budget RM700.', NOW() - INTERVAL 2 DAY FROM leads WHERE wa_phone = '60170000201';
 
 INSERT INTO ai_interactions (lead_id, phase, skill, model_used, direction, message_in, message_out, message_kind, reasoning, created_at)
-SELECT id, 'conversion', 'automate', 'claude-sonnet-5', 'outbound', NULL, 'Sentul Point A-20-9 fits perfectly — medium room, RM 700/month, 5 min to the LRT. Fully furnished, weekly cleaning. Want photos or a viewing?', 'reply', 'Matched room to professional profile near workplace.', NOW() - INTERVAL 2 DAY + INTERVAL 1 MINUTE FROM leads WHERE wa_phone = '60170000201';
+SELECT id, 'conversion', 'automate', 'claude-sonnet-5', 'outbound', NULL, 'Sentul Point A-20-9 fits perfectly — middle room, RM 700/mo on a 6-month stay, 5 min to the LRT. Zero deposit, weekly cleaning. Want photos or a viewing?', 'reply', 'Matched room to professional profile near workplace.', NOW() - INTERVAL 2 DAY + INTERVAL 1 MINUTE FROM leads WHERE wa_phone = '60170000201';

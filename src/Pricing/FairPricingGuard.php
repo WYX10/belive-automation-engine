@@ -30,19 +30,27 @@ final class FairPricingGuard
             return ['room_id' => $roomId, 'price' => 0.0, 'average' => null, 'sample_size' => 0, 'deviation_pct' => null, 'verdict' => 'unknown', 'message' => 'Room not found.'];
         }
 
-        $price = (float) $room['price'];
+        // Benchmark on the flexible-monthly tenure so it's always like-for-like.
+        $price = \App\Catalog\PricingCalculator::priceFor($roomId, 'monthly');
+        if ($price === null) {
+            return ['room_id' => $roomId, 'price' => 0.0, 'average' => null, 'sample_size' => 0, 'deviation_pct' => null, 'verdict' => 'unknown', 'message' => 'Room has no monthly pricing row.'];
+        }
 
         $stats = Database::run(
-            'SELECT AVG(price) AS avg_price, COUNT(*) AS n FROM rooms
-             WHERE area = ? AND room_type = ? AND id <> ? AND available = 1',
-            [$room['area'], $room['room_type'], $roomId]
+            "SELECT AVG(rp.price) AS avg_price, COUNT(*) AS n
+             FROM rooms r
+             JOIN room_pricing rp ON rp.room_id = r.id AND rp.tenure = 'monthly'
+             WHERE r.location = ? AND r.room_type = ? AND r.id <> ? AND r.status = 'available'",
+            [$room['location'], $room['room_type'], $roomId]
         )->fetch();
 
         // Thin data in the exact area → widen to same room type across areas.
         if ((int) $stats['n'] < 2) {
             $stats = Database::run(
-                'SELECT AVG(price) AS avg_price, COUNT(*) AS n FROM rooms
-                 WHERE room_type = ? AND id <> ? AND available = 1',
+                "SELECT AVG(rp.price) AS avg_price, COUNT(*) AS n
+                 FROM rooms r
+                 JOIN room_pricing rp ON rp.room_id = r.id AND rp.tenure = 'monthly'
+                 WHERE r.room_type = ? AND r.id <> ? AND r.status = 'available'",
                 [$room['room_type'], $roomId]
             )->fetch();
         }
@@ -57,11 +65,11 @@ final class FairPricingGuard
 
         [$verdict, $message] = match (true) {
             $deviation > self::OVERPRICED_THRESHOLD =>
-                ['above_market', sprintf('Priced %.1f%% above the RM %s average of %d comparable rooms.', $deviation, number_format($average), $sample)],
+                ['above_market', sprintf('Flexible-monthly rate is %.1f%% above the RM %s average of %d comparable rooms.', $deviation, number_format($average), $sample)],
             $deviation < -self::UNDERPRICED_THRESHOLD =>
-                ['suspiciously_low', sprintf('Priced %.1f%% below the RM %s comparable average — verify before trusting (classic bait-listing signal).', abs($deviation), number_format($average))],
+                ['suspiciously_low', sprintf('Flexible-monthly rate is %.1f%% below the RM %s comparable average — verify before trusting (classic bait-listing signal).', abs($deviation), number_format($average))],
             default =>
-                ['fair', sprintf('Within the fair range: %+.1f%% vs the RM %s average of %d comparable rooms.', $deviation, number_format($average), $sample)],
+                ['fair', sprintf('Within the fair range: %+.1f%% vs the RM %s flexible-monthly average of %d comparable rooms.', $deviation, number_format($average), $sample)],
         };
 
         return [

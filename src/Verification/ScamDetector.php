@@ -47,11 +47,12 @@ PROMPT;
 
         $listing = [
             'name'        => $room['name'],
-            'area'        => $room['area'],
+            'area'        => $room['location'],
             'room_type'   => $room['room_type'],
-            'price_rm'    => (float) $room['price'],
+            'price_rm'    => \App\Catalog\PricingCalculator::priceFor($roomId, 'monthly'),
+            'tenure'      => 'monthly (flexible)',
             'address'     => $room['address'] ?: '(none given)',
-            'features'    => json_decode($room['features'] ?? '[]', true) ?: [],
+            'features'    => \App\Models\Room::amenities($roomId),
             'market'      => [
                 'comparable_avg_rm' => $pricing['average'],
                 'comparable_count'  => $pricing['sample_size'],

@@ -24,7 +24,8 @@ Respond with ONLY a JSON object, no prose:
     "location": string|null,       // area name e.g. "Setapak", "Cheras"
     "budget": number|null,         // monthly budget in RM, numbers only
     "move_in_date": string|null,   // as stated, e.g. "August", "next week"
-    "room_type": "small"|"medium"|"master"|"studio"|null
+    "room_type": "single"|"middle"|"master"|null,   // map "small"→single, "medium"→middle
+    "tenure": "monthly"|"6_month"|"12_month"|null   // stated commitment: "short term/flexible"→monthly, "half a year"→6_month, "a year+/long term/whole course"→12_month
   },
   "tenant_profile": "student" | "working_professional" | null,
   "language": "en" | "ms" | "zh" | "mixed",
@@ -61,6 +62,8 @@ PROMPT;
                 'budget'       => isset($parsed['entities']['budget']) ? (int) $parsed['entities']['budget'] : null,
                 'move_in_date' => $parsed['entities']['move_in_date'] ?? null,
                 'room_type'    => $parsed['entities']['room_type'] ?? null,
+                'tenure'       => in_array($parsed['entities']['tenure'] ?? '', ['monthly', '6_month', '12_month'], true)
+                    ? $parsed['entities']['tenure'] : null,
             ],
             'tenant_profile' => $parsed['tenant_profile'] ?? null,
             'language'       => $parsed['language'] ?? 'en',

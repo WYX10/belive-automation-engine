@@ -6,6 +6,8 @@ namespace App\AI\Skills;
 
 use App\AI\Memory\EpisodicLogger;
 use App\AI\ModelRouter;
+use App\Catalog\RoomRecommender;
+use App\Models\Lead;
 use App\Models\Room;
 
 /**
@@ -28,12 +30,14 @@ Respond with ONLY a JSON object:
   "next_action": "answer_directly" | "request_info" | "book_viewing" | "escalate",
   "send_photos_first": boolean,       // send room photos BEFORE any price figure?
   "recommended_room_ids": number[],   // ids from the inventory list, best first, max 3
+  "recommended_tenure": "monthly" | "6_month" | "12_month" | null,  // which commitment fits THIS person
   "recommendation": string,           // one line for the admin dashboard
   "reasoning": string                 // 1-2 sentences: why this decision
 }
 
 Decision guidance:
-- Situational matching: students → budget/small rooms; working professionals → medium/master/premium. Different situations get different answers, never a fixed script.
+- Situational matching: students → budget/single rooms; working professionals → middle/master/premium. Different situations get different answers, never a fixed script.
+- Tenure is situational too: a student on a multi-year course → 12_month (best value); someone on rotation/short assignment → monthly (flexibility premium); unsure or medium-term → 6_month. Recommend the tenure that fits their stated situation, and say why in reasoning. Prices are per tenure — never reason about a price without naming its tenure.
 - "book_viewing" when the customer proposes or agrees to a time/viewing.
 - "escalate" for complaints, legal/payment disputes, or anything Eve should not answer alone.
 - "request_info" only when a genuinely needed detail (like area) is missing.
@@ -50,11 +54,8 @@ PROMPT;
         $client = ModelRouter::clientForPhase($phase);
 
         $entities = $understanding['entities'];
-        $rooms = Room::matches(
-            $entities['location'] ?? $lead['location'] ?? null,
-            $entities['budget'] ?? (is_numeric($lead['budget'] ?? null) ? (int) $lead['budget'] : null),
-            $entities['room_type'] ?? $lead['room_type'] ?? null
-        );
+        $candidates = RoomRecommender::candidates($lead, $understanding);
+        $rooms = $candidates['rooms'];
 
         $prompt = implode("\n\n", array_filter([
             $memory['block'] ?? '',
@@ -71,7 +72,7 @@ PROMPT;
                 'entities' => $entities,
                 'language' => $understanding['language'],
             ], JSON_UNESCAPED_UNICODE),
-            "LIVE ROOM INVENTORY (matched):\n" . Room::promptBlock($rooms),
+            $candidates['block'],
         ]));
 
         [$result, $ms] = SkillSupport::timed(fn () => $client->generate(
@@ -89,12 +90,30 @@ PROMPT;
                 ? $parsed['next_action'] : 'answer_directly',
             'send_photos_first'    => (bool) ($parsed['send_photos_first'] ?? false),
             'recommended_room_ids' => array_slice(array_map('intval', (array) ($parsed['recommended_room_ids'] ?? [])), 0, 3),
+            'recommended_tenure'   => in_array($parsed['recommended_tenure'] ?? '', Room::TENURES, true)
+                ? $parsed['recommended_tenure'] : null,
             'recommendation'       => (string) ($parsed['recommendation'] ?? ''),
             'reasoning'            => (string) ($parsed['reasoning'] ?? 'Model returned unparseable output; safe defaults used.'),
             'model'                => $result['model'],
             'rooms'                => $rooms,
             'memory_ids'           => $memory['ids'] ?? [],
         ];
+
+        // Persist the tenure Eve landed on (customer's own statement wins).
+        if ($decision['recommended_tenure'] !== null && empty($lead['preferred_tenure'])) {
+            Lead::update((int) $lead['id'], ['preferred_tenure' => $decision['recommended_tenure']]);
+        }
+
+        // Every recommendation is auditable: which model, which rooms, which tenure.
+        if ($decision['recommended_room_ids'] !== [] || $decision['recommended_tenure'] !== null) {
+            EpisodicLogger::activity(
+                'room_recommendation',
+                $phase,
+                $result['model'],
+                (int) $lead['id'],
+                'rooms=[' . implode(',', $decision['recommended_room_ids']) . '] tenure=' . ($decision['recommended_tenure'] ?? 'n/a')
+            );
+        }
 
         EpisodicLogger::log([
             'lead_id'     => (int) $lead['id'],
@@ -109,6 +128,7 @@ PROMPT;
                 'closing_probability'  => $decision['closing_probability'],
                 'send_photos_first'    => $decision['send_photos_first'],
                 'recommended_room_ids' => $decision['recommended_room_ids'],
+                'recommended_tenure'   => $decision['recommended_tenure'],
             ],
             'reasoning'   => $decision['reasoning'],
             'memory_used' => $decision['memory_ids'],

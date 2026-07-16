@@ -53,8 +53,8 @@ foreach ($files as $file) {
     $name = basename($file);
     $number = (int) substr($name, 0, 3);
 
-    if (!$includeBonus && $number >= 11) {
-        continue; // 011–013 are Phase 9 bonus tables, deferred until that phase
+    if (!$includeBonus && $number >= 11 && $number <= 13) {
+        continue; // 011–013 are Phase 9 bonus tables; 014+ are core (Phase 6.5)
     }
     if (in_array($name, $applied, true)) {
         continue;
