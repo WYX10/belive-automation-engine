@@ -1,0 +1,28 @@
+# Front-controller rewrite: every request funnels through index.php.
+# Real files (css/js/img) are served directly; everything else — admin pages,
+# webhooks, public endpoints — is dispatched by the router. Webhooks do NOT
+# bypass the router; single entry point keeps bootstrap in one place.
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^assets/ - [L]
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+
+    # Existing .php files are still routed through the front controller so
+    # they can never be executed without the bootstrap having run.
+    RewriteCond %{REQUEST_URI} \.php$
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Never serve dotfiles (covers .env if the docroot is ever misconfigured).
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

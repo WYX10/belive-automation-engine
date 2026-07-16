@@ -1,0 +1,8 @@
+.env
+/vendor/
+composer.phar
+/public/assets/img/uploads/
+/storage/
+*.log
+.DS_Store
+Thumbs.db

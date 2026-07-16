@@ -1,0 +1,202 @@
+/* ==========================================================================
+   BeLive brand token layer + shared components.
+   Import this FIRST on every page (admin, tenant, owner), then page CSS.
+   Tokens verified against belive.asia metadata + logo — do not add hues.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  --belive-orange:      #F5833C;  /* PRIMARY. Site theme-color + logo sample. */
+  --belive-teal:        #40C0BF;  /* SECONDARY. The "be" in the beLive logo. */
+  --belive-cream:       #FAF5F1;  /* Warm off-white page background. */
+  --belive-white:       #FFFFFF;  /* Card surfaces on cream. */
+  --belive-ink:         #1F2937;  /* Body/heading text — never pure #000. */
+  --belive-muted:       #6B7280;  /* Secondary text, labels, timestamps. */
+  --belive-success:     #40C0BF;  /* Reuse teal — no new green. */
+  --belive-warning:     #F5833C;  /* Reuse orange — no new amber. */
+  --belive-danger:      #E5484D;  /* Genuine errors / flagged-incorrect only. */
+
+  /* Derived tints — lightness/opacity variations only, never new hues. */
+  --belive-orange-soft: rgba(245, 131, 60, 0.12);
+  --belive-orange-dark: #D96A26;
+  --belive-teal-soft:   rgba(64, 192, 191, 0.12);
+  --belive-teal-dark:   #2FA3A2;
+  --belive-danger-soft: rgba(229, 72, 77, 0.10);
+  --belive-line:        #EDE4DC;  /* hairlines on cream */
+
+  --belive-radius:      14px;
+  --belive-shadow:      0 4px 18px rgba(31, 41, 55, 0.06);
+  --belive-shadow-lift: 0 8px 26px rgba(31, 41, 55, 0.10);
+
+  --font-head: 'Poppins', 'Segoe UI', sans-serif;
+  --font-body: 'Inter', 'Segoe UI', sans-serif;
+}
+
+/* --- Base ----------------------------------------------------------------- */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--belive-ink);
+  background: var(--belive-cream);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { font-family: var(--font-head); font-weight: 600; line-height: 1.25; }
+h1 { font-size: 26px; font-weight: 700; }
+h2 { font-size: 20px; }
+h3 { font-size: 16px; }
+a { color: var(--belive-teal-dark); text-decoration: none; }
+a:hover { text-decoration: underline; }
+small, .belive-muted { color: var(--belive-muted); }
+
+/* --- Wordmark: "be" teal + "Live" orange, matching the real logo ---------- */
+.belive-wordmark { font-family: var(--font-head); font-weight: 700; letter-spacing: -0.5px; }
+.belive-wordmark .be   { color: var(--belive-teal); }
+.belive-wordmark .live { color: var(--belive-orange); }
+
+/* --- Cards ----------------------------------------------------------------- */
+.belive-card {
+  background: var(--belive-white);
+  border-radius: var(--belive-radius);
+  box-shadow: var(--belive-shadow);
+  padding: 22px;
+}
+.belive-card + .belive-card { margin-top: 16px; }
+.belive-card-title {
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- Stat strip: icon + big number + small label (site homepage pattern) --- */
+.belive-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
+}
+.belive-stat {
+  background: var(--belive-white);
+  border-radius: var(--belive-radius);
+  box-shadow: var(--belive-shadow);
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.belive-stat-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  background: var(--belive-orange-soft);
+  flex-shrink: 0;
+}
+.belive-stat-icon.teal { background: var(--belive-teal-soft); }
+.belive-stat-number {
+  font-family: var(--font-head);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--belive-orange);
+  line-height: 1.1;
+}
+.belive-stat-number.teal { color: var(--belive-teal-dark); }
+.belive-stat-label { font-size: 12.5px; color: var(--belive-muted); }
+
+/* --- Buttons ---------------------------------------------------------------- */
+.belive-btn-primary, .belive-btn-secondary, .belive-btn-ghost, .belive-btn-danger {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-body); font-size: 14px; font-weight: 600;
+  padding: 9px 18px; border-radius: 10px; border: none; cursor: pointer;
+  text-decoration: none !important; transition: filter .15s, box-shadow .15s;
+}
+.belive-btn-primary   { background: var(--belive-orange); color: #fff; }
+.belive-btn-secondary { background: var(--belive-teal);   color: #fff; }
+.belive-btn-danger    { background: var(--belive-danger); color: #fff; }
+.belive-btn-ghost {
+  background: transparent; color: var(--belive-ink);
+  border: 1.5px solid var(--belive-line);
+}
+.belive-btn-primary:hover, .belive-btn-secondary:hover, .belive-btn-danger:hover {
+  filter: brightness(0.94); box-shadow: var(--belive-shadow);
+}
+.belive-btn-ghost:hover { border-color: var(--belive-muted); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+
+/* --- Badges / status pills (orange + teal + danger only) -------------------- */
+.belive-badge {
+  display: inline-block; font-size: 12px; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--belive-teal-soft); color: var(--belive-teal-dark);
+}
+.belive-badge.orange { background: var(--belive-orange-soft); color: var(--belive-orange-dark); }
+.belive-badge.danger { background: var(--belive-danger-soft); color: var(--belive-danger); }
+.belive-badge.muted  { background: rgba(107, 114, 128, 0.12); color: var(--belive-muted); }
+
+/* --- Checkmark benefit list (site "✓ + short phrase" pattern) --------------- */
+.belive-check-list { list-style: none; }
+.belive-check-list li {
+  padding: 5px 0 5px 28px; position: relative; font-size: 14px;
+}
+.belive-check-list li::before {
+  content: '✓';
+  position: absolute; left: 0; top: 4px;
+  width: 19px; height: 19px; border-radius: 50%;
+  background: var(--belive-teal-soft); color: var(--belive-teal-dark);
+  font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* --- Tables ------------------------------------------------------------------ */
+.belive-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.belive-table th {
+  text-align: left; font-family: var(--font-head); font-size: 12.5px; font-weight: 600;
+  color: var(--belive-muted); text-transform: uppercase; letter-spacing: .4px;
+  padding: 10px 12px; border-bottom: 2px solid var(--belive-line);
+}
+.belive-table td { padding: 11px 12px; border-bottom: 1px solid var(--belive-line); vertical-align: top; }
+.belive-table tr:hover td { background: var(--belive-cream); }
+
+/* --- Forms --------------------------------------------------------------------- */
+.belive-field { margin-bottom: 16px; }
+.belive-field label {
+  display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;
+}
+.belive-field input, .belive-field select, .belive-field textarea {
+  width: 100%; padding: 10px 12px; font: inherit; font-size: 14px;
+  border: 1.5px solid var(--belive-line); border-radius: 10px;
+  background: var(--belive-white); color: var(--belive-ink);
+}
+.belive-field input:focus, .belive-field select:focus, .belive-field textarea:focus {
+  outline: none; border-color: var(--belive-teal);
+  box-shadow: 0 0 0 3px var(--belive-teal-soft);
+}
+.belive-field .hint { font-size: 12px; color: var(--belive-muted); margin-top: 4px; }
+
+/* --- Alerts ---------------------------------------------------------------------- */
+.belive-alert {
+  padding: 12px 16px; border-radius: 10px; font-size: 14px; margin-bottom: 16px;
+}
+.belive-alert.success { background: var(--belive-teal-soft);   color: var(--belive-teal-dark); }
+.belive-alert.warning { background: var(--belive-orange-soft); color: var(--belive-orange-dark); }
+.belive-alert.danger  { background: var(--belive-danger-soft); color: var(--belive-danger); }
+
+/* --- Progress / probability bar --------------------------------------------------- */
+.belive-bar { height: 8px; border-radius: 999px; background: var(--belive-line); overflow: hidden; }
+.belive-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--belive-teal); }
+.belive-bar.orange > span { background: var(--belive-orange); }
+
+/* --- Layout helpers ------------------------------------------------------------------ */
+.belive-row { display: flex; gap: 16px; flex-wrap: wrap; }
+.belive-col { flex: 1; min-width: 280px; }
+.belive-page-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+}
