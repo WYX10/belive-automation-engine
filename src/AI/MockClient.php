@@ -55,6 +55,11 @@ final class MockClient implements LlmClient
 
     private function mockUnderstand(string $msg): string
     {
+        // The prompt carries conversation history for context — heuristics
+        // must only read the new message, never keywords from old turns.
+        if (($pos = strrpos($msg, 'NEW CUSTOMER MESSAGE:')) !== false) {
+            $msg = trim(substr($msg, $pos + strlen('NEW CUSTOMER MESSAGE:')));
+        }
         $lower = mb_strtolower($msg);
 
         $location = null;
@@ -126,9 +131,16 @@ final class MockClient implements LlmClient
         $photosFirst = self::hasPhotosFirstRule($userPrompt)
             || str_contains($userPrompt, '"send_photos_first":true');
 
-        return $photosFirst
+        // Returning customer: acknowledge the recall context like the real
+        // model is instructed to (reference the prior enquiry specifically).
+        $recall = '';
+        if (preg_match('/RETURNING CUSTOMER RECALL.*?looked for: ([^;]+); in area: ([^;]+)/s', $userPrompt, $m)) {
+            $recall = '[MOCK] Welcome back! Still looking for ' . trim($m[1]) . ' in ' . trim($m[2]) . ', or has your search changed? ';
+        }
+
+        return $recall . ($photosFirst
             ? "[MOCK] Here are photos of the room first 📷 — fully furnished, WiFi, weekly cleaning. Want the pricing details?"
-            : "[MOCK] Fully furnished room, zero deposit, weekly cleaning. Rental is RM 650/month. Want photos or a viewing?";
+            : "[MOCK] Fully furnished room, zero deposit, weekly cleaning. Rental is RM 650/month. Want photos or a viewing?");
     }
 
     private function mockLearn(string $context): string
