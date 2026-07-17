@@ -5,7 +5,6 @@ declare(strict_types=1);
 defined('APP_BOOTED') || exit('No direct access.');
 
 use App\Core\Auth;
-use App\Core\Database;
 use App\Models\Room;
 use App\Models\VerifiedListing;
 use App\Verification\ListingVerifier;
@@ -21,35 +20,27 @@ if ($room === null || $room['owner_name'] !== $owner) {
     exit;
 }
 
-$isAdminToo = Auth::check(); // admin reviewing in the same browser session
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    Auth::requireCsrf();
     $do = $_POST['do'] ?? '';
 
     if ($do === 'submit_doc') {
         $docUrl = trim($_POST['doc_url'] ?? '');
         if (filter_var($docUrl, FILTER_VALIDATE_URL)) {
             ListingVerifier::recordOwnershipDoc($roomId, $docUrl);
-            set_flash('success', 'Ownership document submitted — pending BeLive admin review.');
+            set_flash('success', 'Ownership document submitted - pending BeLive admin review.');
         } else {
             set_flash('danger', 'Give a valid document URL.');
         }
     } elseif ($do === 'submit_gps') {
-        $lat = (float) ($_POST['gps_lat'] ?? 0);
-        $lng = (float) ($_POST['gps_lng'] ?? 0);
-        if ($lat !== 0.0 && $lng !== 0.0) {
-            ListingVerifier::recordGps($roomId, $lat, $lng, false);
-            set_flash('success', 'Coordinates submitted — pending admin map check.');
+        $lat = filter_var($_POST['gps_lat'] ?? null, FILTER_VALIDATE_FLOAT);
+        $lng = filter_var($_POST['gps_lng'] ?? null, FILTER_VALIDATE_FLOAT);
+        if ($lat !== false && $lng !== false && $lat >= -90 && $lat <= 90 && $lng >= -180 && $lng <= 180) {
+            ListingVerifier::recordGps($roomId, (float) $lat, (float) $lng, false);
+            set_flash('success', 'Coordinates submitted - pending admin map check.');
         } else {
-            set_flash('danger', 'Give both latitude and longitude.');
+            set_flash('danger', 'Give valid latitude and longitude coordinates.');
         }
-    } elseif ($do === 'admin_confirm_ownership' && $isAdminToo) {
-        ListingVerifier::confirmOwnership($roomId, ($_POST['confirmed'] ?? '') === '1');
-        set_flash('success', 'Ownership review recorded.');
-    } elseif ($do === 'admin_confirm_gps' && $isAdminToo) {
-        $row = VerifiedListing::ensure($roomId);
-        ListingVerifier::recordGps($roomId, (float) $row['gps_lat'], (float) $row['gps_lng'], ($_POST['confirmed'] ?? '') === '1');
-        set_flash('success', 'GPS review recorded.');
     }
 
     header('Location: /owner/listings/verify?room_id=' . $roomId);
@@ -58,46 +49,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $verification = VerifiedListing::ensure($roomId);
 $scamFlags = json_decode($verification['scam_flags'] ?? '[]', true) ?: [];
+$ownershipStatus = $verification['ownership_review_status'] ?? 'not_submitted';
+$gpsStatus = $verification['gps_review_status'] ?? 'not_submitted';
+$tone = static fn (string $status): string => match ($status) {
+    'approved' => '',
+    'pending' => 'orange',
+    'rejected' => 'danger',
+    default => 'muted',
+};
 
 portal_header('owner', 'Verification', 'listings');
 ?>
 <div class="portal-hero">
-    <h1>Verification — <?= e($room['name']) ?></h1>
-    <p>Verified listings convert better: tenants see the badge and the checks behind it.</p>
+    <h1>Verification - <?= e($room['name']) ?></h1>
+    <p>Submit evidence once. BeLive admins review it from a separate, auditable review queue.</p>
 </div>
 
 <div class="belive-row">
     <div class="belive-col">
         <div class="belive-card">
-            <div class="belive-card-title">📄 Ownership document</div>
+            <div class="belive-card-title">Ownership document</div>
             <?php if ($verification['ownership_doc_path']): ?>
-                <p style="font-size:13.5px">Submitted: <a href="<?= e($verification['ownership_doc_path']) ?>" target="_blank" rel="noopener">view document</a></p>
-                <p style="margin-top:6px">
-                    <?php if ((int) $verification['ownership_verified'] === 1): ?>
-                        <span class="belive-badge">✓ confirmed by BeLive admin</span>
-                    <?php else: ?>
-                        <span class="belive-badge orange">pending admin review</span>
-                    <?php endif; ?>
-                </p>
-            <?php else: ?>
-                <form method="post">
+                <p style="font-size:13.5px">Submitted: <a href="<?= e($verification['ownership_doc_path']) ?>" target="_blank" rel="noopener noreferrer">view document</a></p>
+                <p style="margin-top:6px"><span class="belive-badge <?= $tone($ownershipStatus) ?>"><?= e(str_replace('_', ' ', $ownershipStatus)) ?></span></p>
+                <?php if ($verification['ownership_reviewed_at'] !== null): ?>
+                    <p class="belive-muted" style="font-size:12px; margin-top:7px">Reviewed <?= e($verification['ownership_reviewed_at']) ?></p>
+                <?php endif; ?>
+                <?php if ($verification['ownership_review_note'] !== null): ?>
+                    <div class="belive-alert <?= $ownershipStatus === 'rejected' ? 'danger' : 'success' ?>" style="margin-top:12px">
+                        <strong>Admin feedback:</strong> <?= e($verification['ownership_review_note']) ?>
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
+
+            <?php if (!$verification['ownership_doc_path'] || $ownershipStatus === 'rejected'): ?>
+                <form method="post" style="margin-top:<?= $verification['ownership_doc_path'] ? '14px' : '0' ?>">
+                    <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                     <input type="hidden" name="room_id" value="<?= $roomId ?>">
                     <input type="hidden" name="do" value="submit_doc">
                     <div class="belive-field">
-                        <label>Document URL (title deed / SPA / utility bill)</label>
-                        <input type="url" name="doc_url" required placeholder="https://drive.google.com/…">
-                        <div class="hint">Reviewed manually by BeLive admin — this is a review flag, not an eKYC API.</div>
+                        <label for="doc-url"><?= $ownershipStatus === 'rejected' ? 'Replacement document URL' : 'Document URL' ?> (title deed / SPA / utility bill)</label>
+                        <input id="doc-url" type="url" name="doc_url" required placeholder="https://drive.google.com/...">
+                        <div class="hint">Make sure the link can be opened by the BeLive admin.</div>
                     </div>
-                    <button type="submit" class="belive-btn-primary">Submit for review</button>
-                </form>
-            <?php endif; ?>
-
-            <?php if ($isAdminToo && $verification['ownership_doc_path'] && (int) $verification['ownership_verified'] !== 1): ?>
-                <form method="post" style="margin-top:10px; display:flex; gap:8px">
-                    <input type="hidden" name="room_id" value="<?= $roomId ?>">
-                    <input type="hidden" name="do" value="admin_confirm_ownership">
-                    <input type="hidden" name="confirmed" value="1">
-                    <button type="submit" class="belive-btn-secondary" style="font-size:13px">[Admin] Confirm ownership</button>
+                    <button type="submit" class="belive-btn-primary"><?= $ownershipStatus === 'rejected' ? 'Resubmit for review' : 'Submit for review' ?></button>
                 </form>
             <?php endif; ?>
         </div>
@@ -105,50 +100,47 @@ portal_header('owner', 'Verification', 'listings');
 
     <div class="belive-col">
         <div class="belive-card">
-            <div class="belive-card-title">📍 Location match</div>
-            <?php if ($verification['gps_lat']): ?>
+            <div class="belive-card-title">Location match</div>
+            <?php if ($verification['gps_lat'] !== null && $verification['gps_lng'] !== null): ?>
                 <p style="font-size:13.5px">
                     Coordinates: <?= e($verification['gps_lat']) ?>, <?= e($verification['gps_lng']) ?>
-                    · <a href="https://www.openstreetmap.org/?mlat=<?= e($verification['gps_lat']) ?>&mlon=<?= e($verification['gps_lng']) ?>#map=17/<?= e($verification['gps_lat']) ?>/<?= e($verification['gps_lng']) ?>" target="_blank" rel="noopener">open map</a>
+                    · <a href="https://www.openstreetmap.org/?mlat=<?= e($verification['gps_lat']) ?>&mlon=<?= e($verification['gps_lng']) ?>#map=17/<?= e($verification['gps_lat']) ?>/<?= e($verification['gps_lng']) ?>" target="_blank" rel="noopener noreferrer">open map</a>
                 </p>
-                <p style="margin-top:6px">
-                    <?php if ((int) $verification['gps_matched'] === 1): ?>
-                        <span class="belive-badge">✓ matches listed address</span>
-                    <?php else: ?>
-                        <span class="belive-badge orange">pending admin map check</span>
-                    <?php endif; ?>
-                </p>
-                <?php if ($isAdminToo && (int) $verification['gps_matched'] !== 1): ?>
-                    <form method="post" style="margin-top:10px">
-                        <input type="hidden" name="room_id" value="<?= $roomId ?>">
-                        <input type="hidden" name="do" value="admin_confirm_gps">
-                        <input type="hidden" name="confirmed" value="1">
-                        <button type="submit" class="belive-btn-secondary" style="font-size:13px">[Admin] Confirm match</button>
-                    </form>
+                <p style="margin-top:6px"><span class="belive-badge <?= $tone($gpsStatus) ?>"><?= e(str_replace('_', ' ', $gpsStatus)) ?></span></p>
+                <?php if ($verification['gps_reviewed_at'] !== null): ?>
+                    <p class="belive-muted" style="font-size:12px; margin-top:7px">Reviewed <?= e($verification['gps_reviewed_at']) ?></p>
                 <?php endif; ?>
-            <?php else: ?>
-                <form method="post">
+                <?php if ($verification['gps_review_note'] !== null): ?>
+                    <div class="belive-alert <?= $gpsStatus === 'rejected' ? 'danger' : 'success' ?>" style="margin-top:12px">
+                        <strong>Admin feedback:</strong> <?= e($verification['gps_review_note']) ?>
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
+
+            <?php if ($verification['gps_lat'] === null || $verification['gps_lng'] === null || $gpsStatus === 'rejected'): ?>
+                <form method="post" style="margin-top:<?= $verification['gps_lat'] !== null ? '14px' : '0' ?>">
+                    <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                     <input type="hidden" name="room_id" value="<?= $roomId ?>">
                     <input type="hidden" name="do" value="submit_gps">
-                    <div style="display:flex; gap:10px">
-                        <div class="belive-field" style="flex:1"><label>Latitude</label><input type="text" name="gps_lat" required placeholder="3.2010"></div>
-                        <div class="belive-field" style="flex:1"><label>Longitude</label><input type="text" name="gps_lng" required placeholder="101.7180"></div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap">
+                        <div class="belive-field" style="flex:1; min-width:150px"><label for="gps-lat">Latitude</label><input id="gps-lat" type="number" step="any" min="-90" max="90" name="gps_lat" required placeholder="3.2010"></div>
+                        <div class="belive-field" style="flex:1; min-width:150px"><label for="gps-lng">Longitude</label><input id="gps-lng" type="number" step="any" min="-180" max="180" name="gps_lng" required placeholder="101.7180"></div>
                     </div>
-                    <button type="submit" class="belive-btn-primary">Submit coordinates</button>
+                    <button type="submit" class="belive-btn-primary"><?= $gpsStatus === 'rejected' ? 'Resubmit coordinates' : 'Submit coordinates' ?></button>
                 </form>
             <?php endif; ?>
         </div>
 
         <div class="belive-card" style="margin-top:16px">
-            <div class="belive-card-title">🤖 AI scam screen</div>
+            <div class="belive-card-title">AI scam screen</div>
             <?php if ($verification['scam_checked_at'] === null): ?>
-                <p class="belive-muted" style="font-size:13.5px">Not screened yet — run it from <a href="/owner/listings">My listings</a>.</p>
+                <p class="belive-muted" style="font-size:13.5px">Not screened yet - run it from <a href="/owner/listings">My listings</a>.</p>
             <?php elseif ($scamFlags === []): ?>
-                <span class="belive-badge">✓ clean — screened <?= e($verification['scam_checked_at']) ?></span>
+                <span class="belive-badge">clean - screened <?= e($verification['scam_checked_at']) ?></span>
             <?php else: ?>
                 <?php foreach ($scamFlags as $flag): ?>
                     <div class="belive-alert <?= ($flag['severity'] ?? '') === 'high' ? 'danger' : 'warning' ?>" style="font-size:13px">
-                        <strong><?= e($flag['pattern'] ?? '') ?></strong> (<?= e($flag['severity'] ?? '') ?>) — <?= e($flag['detail'] ?? '') ?>
+                        <strong><?= e($flag['pattern'] ?? '') ?></strong> (<?= e($flag['severity'] ?? '') ?>) - <?= e($flag['detail'] ?? '') ?>
                     </div>
                 <?php endforeach; ?>
             <?php endif; ?>
@@ -160,7 +152,7 @@ portal_header('owner', 'Verification', 'listings');
     <?php if ((int) $verification['verified_badge'] === 1): ?>
         <span class="verified-badge-big">✓ This listing carries the verified badge</span>
     <?php else: ?>
-        <span class="verified-badge-big unverified">Badge appears when ownership + location are confirmed and no high-severity flags remain</span>
+        <span class="verified-badge-big unverified">Badge appears when ownership and location are approved and no high-severity flags remain</span>
     <?php endif; ?>
 </div>
 <?php portal_footer();

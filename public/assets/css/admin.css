@@ -89,3 +89,118 @@ body.admin-login {
   border-radius: 0 8px 8px 0;
   margin-top: 6px;
 }
+
+/* Listing review queue and evidence review workflow */
+.review-filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.review-filter-bar a { min-height: 32px; display: inline-flex; align-items: center; }
+.review-table-wrap { overflow-x: auto; }
+.review-table { min-width: 820px; }
+.review-open-button { padding: 7px 12px; white-space: nowrap; }
+.review-empty-state { text-align: center; padding: 34px 16px; }
+.review-empty-state h2 { font-size: 18px; margin-bottom: 6px; }
+.review-back-link { display: inline-flex; min-height: 36px; align-items: center; font-size: 13.5px; }
+
+.review-listing-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 16px;
+}
+.review-listing-summary > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.review-listing-summary strong { overflow-wrap: anywhere; }
+
+.review-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.review-section-grid .belive-card + .belive-card { margin-top: 0; }
+.review-section { min-width: 0; }
+.review-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.review-section-head h2 { font-size: 17px; margin-bottom: 4px; }
+.review-section-head p { font-size: 13px; }
+.review-section-head .belive-badge { flex-shrink: 0; }
+
+.review-evidence-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--belive-line);
+  border-radius: 12px;
+  background: var(--belive-cream);
+}
+.review-evidence-row > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.review-evidence-row strong { overflow-wrap: anywhere; }
+.review-audit-line { color: var(--belive-muted); font-size: 12px; margin-top: 10px; }
+.review-existing-note {
+  padding: 12px 14px;
+  border-left: 3px solid var(--belive-teal);
+  background: var(--belive-teal-soft);
+  border-radius: 0 10px 10px 0;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.review-existing-note p { margin-top: 3px; overflow-wrap: anywhere; }
+
+.review-decision-forms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.review-action-form {
+  border: 1px solid var(--belive-line);
+  border-radius: 12px;
+  padding: 14px;
+  min-width: 0;
+}
+.review-action-form.reject { background: var(--belive-danger-soft); }
+.review-action-form label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; }
+.review-action-form textarea {
+  width: 100%;
+  min-height: 82px;
+  resize: vertical;
+  padding: 9px 10px;
+  margin-bottom: 10px;
+  border: 1.5px solid var(--belive-line);
+  border-radius: 9px;
+  background: var(--belive-white);
+  color: var(--belive-ink);
+  font: inherit;
+  font-size: 13px;
+}
+.review-action-form textarea:focus {
+  outline: none;
+  border-color: var(--belive-teal);
+  box-shadow: 0 0 0 3px var(--belive-teal-soft);
+}
+.review-action-form button { min-height: 44px; width: 100%; justify-content: center; }
+.review-screening-card { margin-top: 16px; }
+.review-flag-list { display: grid; gap: 8px; }
+.review-flag-list .belive-alert { margin-bottom: 0; }
+.review-badge-blocked { margin-top: 12px; color: var(--belive-danger); font-weight: 600; font-size: 13px; }
+
+@media (max-width: 900px) {
+  .review-section-grid, .review-decision-forms { grid-template-columns: 1fr; }
+  .review-listing-summary { grid-template-columns: 1fr; gap: 12px; }
+}
+
+@media (max-width: 700px) {
+  body.admin { display: block; }
+  .admin-sidebar { width: 100%; height: auto; position: static; }
+  .admin-brand { padding-bottom: 8px; }
+  .admin-nav { display: flex; overflow-x: auto; padding: 8px 12px 12px; }
+  .admin-nav a { flex: 0 0 auto; margin: 0 2px 0 0; }
+  .admin-sidebar-foot { padding: 0 12px 12px; border-top: 0; }
+  .admin-sidebar-foot a { width: auto !important; min-height: 44px; }
+  .admin-main { padding: 20px 16px 48px; }
+  .review-section-head, .review-evidence-row { align-items: flex-start; flex-direction: column; }
+}

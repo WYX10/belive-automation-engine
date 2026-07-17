@@ -30,6 +30,7 @@ function take_flashes(): array
 function admin_header(string $title, string $active = ''): void
 {
     $nav = [
+        'listing_reviews' => ['/admin/listing_reviews', '✓', 'Listing reviews'],
         'dashboard'    => ['/admin/dashboard',    '📊', 'Dashboard'],
         'leads'        => ['/admin/leads',        '👥', 'Leads'],
         'chat_history' => ['/admin/chat_history', '💬', 'Chat history'],

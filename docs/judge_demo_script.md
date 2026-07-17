@@ -118,7 +118,7 @@ generic "hi again".
    confirmation receipt. Show **Admin → Bookings** — the row appeared with zero admin input.
    (Try a clashing time to show the conflict handler proposing the nearest free slot.)
 2. Show a lead's **Refer & Earn link** (Admin → Leads → open lead). Open it, submit the enquiry
-   form as a "friend", book — the referrer is credited 50 points automatically and gets a WhatsApp
+   form as a "friend", book — the referrer is credited the booked room's owner-configured points automatically and gets a WhatsApp
    notification. Show the `referral_reward_credited` row in the activity log.
 
 ## Demo 6 — Lead channels + content (≈2 min)

@@ -56,6 +56,43 @@ body.portal-login { display: flex; align-items: center; justify-content: center;
 .movein-item .stamp { font-size: 12px; color: var(--belive-muted); margin-top: 6px; }
 
 /* Agreement text block */
+.agreement-timeline {
+  border: 1px solid var(--belive-line);
+  border-left: 5px solid var(--belive-teal);
+  border-radius: 14px;
+  padding: 18px;
+  margin: 0 0 16px;
+  background: var(--belive-white);
+}
+.agreement-timeline.state-ending-soon,
+.agreement-timeline.state-ending-today { border-left-color: var(--belive-orange); }
+.agreement-timeline.state-expired { border-left-color: var(--belive-danger); }
+.agreement-time-summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.agreement-time-badge {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: var(--belive-teal-soft);
+  color: var(--belive-teal-dark);
+  font-size: 12px;
+  font-weight: 700;
+}
+.state-ending-soon .agreement-time-badge,
+.state-ending-today .agreement-time-badge { background: var(--belive-orange-soft); color: var(--belive-orange-dark); }
+.state-expired .agreement-time-badge { background: var(--belive-danger-soft); color: var(--belive-danger); }
+.agreement-time-count { display: flex; align-items: baseline; gap: 8px; }
+.agreement-time-count strong { font-family: var(--font-head); font-size: 34px; line-height: 1; color: var(--belive-ink); }
+.agreement-time-count span { color: var(--belive-muted); font-size: 13px; font-weight: 600; }
+.agreement-date-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.agreement-date-range > div { border-radius: 10px; padding: 10px 12px; background: var(--belive-cream); }
+.agreement-date-range span { display: block; color: var(--belive-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.agreement-date-range time { display: block; margin-top: 3px; color: var(--belive-ink); font-weight: 600; }
+.agreement-progress { height: 7px; margin-top: 14px; overflow: hidden; border-radius: 999px; background: var(--belive-line); }
+.agreement-progress span { display: block; height: 100%; border-radius: inherit; background: var(--belive-teal); }
+.state-ending-soon .agreement-progress span,
+.state-ending-today .agreement-progress span { background: var(--belive-orange); }
+.state-expired .agreement-progress span { background: var(--belive-danger); }
+
 .agreement-text {
   background: var(--belive-cream);
   border-radius: 12px;
@@ -65,6 +102,116 @@ body.portal-login { display: flex; align-items: center; justify-content: center;
   line-height: 1.7;
   max-height: 460px;
   overflow-y: auto;
+}
+
+@media (max-width: 520px) {
+  .agreement-time-summary { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .agreement-date-range { grid-template-columns: 1fr; }
+}
+
+/* Tenant referral wallet and rent-credit redemption */
+.reward-summary-grid,
+.reward-history-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.reward-wallet { color: var(--belive-white); background: var(--belive-ink); border-top: 5px solid var(--belive-teal); }
+.reward-wallet .reward-eyebrow,
+.reward-wallet p { color: rgba(255, 255, 255, .86); }
+.reward-eyebrow { color: var(--belive-muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.reward-points { display: flex; align-items: baseline; gap: 8px; margin: 8px 0 12px; }
+.reward-points strong { font-family: var(--font-head); font-size: 44px; font-variant-numeric: tabular-nums; line-height: 1; }
+.reward-points span { font-size: 14px; font-weight: 600; }
+.rent-reward-card h2 { margin-top: 6px; }
+.rent-reward-card > p { margin-top: 6px; font-size: 13px; }
+.reward-progress-copy { display: flex; justify-content: space-between; gap: 12px; margin: 18px 0 7px; font-size: 13px; }
+.reward-progress-copy strong { color: var(--belive-teal-dark); }
+.reward-redeem-button { width: 100%; min-height: 44px; justify-content: center; margin-top: 18px; }
+.reward-helper { min-height: 20px; margin-top: 8px !important; font-size: 12px !important; }
+.reward-share-card { display: grid; grid-template-columns: minmax(0, .8fr) minmax(320px, 1.2fr); gap: 24px; align-items: end; margin-top: 16px; }
+.reward-share-card h2 { margin: 5px 0 8px; }
+.reward-share-card code { color: var(--belive-orange-dark); font-size: 24px; letter-spacing: .08em; }
+.reward-copy-control label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+.reward-copy-control > div { display: flex; gap: 8px; }
+.reward-copy-control input { min-width: 0; flex: 1; padding: 10px 12px; border: 1.5px solid var(--belive-line); border-radius: 10px; color: var(--belive-ink); background: var(--belive-cream); font: inherit; font-size: 13px; }
+.reward-copy-control button { min-height: 44px; white-space: nowrap; }
+.reward-copy-status { display: block; min-height: 18px; margin-top: 5px; color: var(--belive-teal-dark); font-size: 12px; }
+.reward-history-grid { margin-top: 16px; }
+.reward-history-list { display: grid; }
+.reward-history-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--belive-line); }
+.reward-history-row:last-child { border-bottom: 0; }
+.reward-history-row > div { display: grid; gap: 3px; }
+.reward-history-row span:not(.belive-badge) { color: var(--belive-muted); font-size: 12px; }
+.reward-history-value { justify-items: end; text-align: right; font-size: 13px; }
+.reward-history-value strong { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 720px) {
+  .reward-summary-grid,
+  .reward-history-grid,
+  .reward-share-card { grid-template-columns: 1fr; }
+  .reward-share-card { align-items: start; }
+}
+
+@media (max-width: 440px) {
+  .reward-copy-control > div { align-items: stretch; flex-direction: column; }
+  .reward-history-row { align-items: flex-start; }
+}
+
+/* Owner property and room management */
+.owner-property-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.owner-add-property { position: relative; flex: 0 0 auto; }
+.owner-add-property > summary { list-style: none; min-height: 44px; }
+.owner-add-property > summary::-webkit-details-marker { display: none; }
+.owner-property-form { position: absolute; z-index: 12; top: 52px; right: 0; width: min(620px, calc(100vw - 40px)); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; padding: 20px; border: 1px solid var(--belive-line); border-radius: var(--belive-radius); background: var(--belive-white); box-shadow: var(--belive-shadow-lift); }
+.owner-form-wide { grid-column: 1 / -1; }
+.owner-portfolio-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.owner-portfolio-stats > div { display: flex; align-items: baseline; gap: 8px; padding: 14px 16px; border-radius: 12px; background: var(--belive-white); box-shadow: var(--belive-shadow); }
+.owner-portfolio-stats strong { color: var(--belive-orange-dark); font-family: var(--font-head); font-size: 24px; font-variant-numeric: tabular-nums; }
+.owner-portfolio-stats span { color: var(--belive-muted); font-size: 13px; }
+.owner-property-list { display: grid; gap: 18px; }
+.owner-property-card { border-top: 5px solid var(--belive-orange); }
+.owner-property-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.owner-property-heading h2 { margin-top: 4px; }
+.owner-property-heading p,
+.owner-property-description { margin-top: 4px; color: var(--belive-muted); font-size: 13px; }
+.owner-property-description { max-width: 72ch; margin-top: 12px; }
+.owner-room-list { display: grid; gap: 12px; margin-top: 18px; }
+.owner-room-card { padding: 16px; border: 1px solid var(--belive-line); border-radius: 12px; background: var(--belive-cream); }
+.owner-room-main { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.owner-room-code { color: var(--belive-orange-dark); font-family: var(--font-head); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.owner-room-main h3 { margin-top: 3px; }
+.owner-room-main p { margin-top: 3px; color: var(--belive-muted); font-size: 13px; }
+.owner-room-link { min-height: 44px; }
+.owner-room-prices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.owner-room-prices > div { display: grid; gap: 2px; padding: 9px 10px; border-radius: 9px; background: var(--belive-white); }
+.owner-room-prices span { color: var(--belive-muted); font-size: 11px; }
+.owner-room-prices strong { font-size: 14px; font-variant-numeric: tabular-nums; }
+.owner-room-points { display: grid; grid-template-columns: minmax(0, 1fr) 100px auto; align-items: end; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--belive-line); }
+.owner-room-points label { display: block; font-size: 13px; font-weight: 700; }
+.owner-room-points span { display: block; color: var(--belive-muted); font-size: 11px; }
+.owner-room-points input { min-height: 44px; width: 100%; padding: 8px 10px; border: 1.5px solid var(--belive-line); border-radius: 9px; font: inherit; }
+.owner-room-points button { min-height: 44px; }
+.owner-add-room { margin-top: 16px; }
+.owner-add-room > summary { min-height: 44px; padding: 11px 14px; border: 1.5px dashed var(--belive-orange); border-radius: 10px; color: var(--belive-orange-dark); cursor: pointer; font-weight: 700; list-style-position: inside; }
+.owner-room-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 12px; margin-top: 14px; padding: 16px; border-radius: 12px; background: var(--belive-cream); }
+.owner-no-rooms,
+.owner-property-empty { text-align: center; }
+.owner-no-rooms { padding: 14px; color: var(--belive-muted); }
+.owner-property-empty p { margin-top: 6px; }
+
+@media (max-width: 760px) {
+  .owner-property-hero { align-items: stretch; flex-direction: column; }
+  .owner-add-property { align-self: flex-start; }
+  .owner-property-form { position: static; margin-top: 10px; }
+  .owner-room-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 520px) {
+  .owner-property-form,
+  .owner-room-form,
+  .owner-portfolio-stats,
+  .owner-room-prices,
+  .owner-room-points { grid-template-columns: 1fr; }
+  .owner-form-wide { grid-column: auto; }
+  .owner-room-points { align-items: stretch; }
+  .owner-room-main { flex-direction: column; }
 }
 
 /* Integration-ready sample panel (owner IoT) — visually distinct so sample

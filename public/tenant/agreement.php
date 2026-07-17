@@ -5,6 +5,7 @@ declare(strict_types=1);
 defined('APP_BOOTED') || exit('No direct access.');
 
 use App\Agreements\ESignatureHandler;
+use App\Core\Auth;
 use App\Models\DigitalAgreement;
 
 require dirname(__DIR__) . '/_portal_layout.php';
@@ -12,8 +13,15 @@ $lead = require_tenant();
 
 $agreements = DigitalAgreement::forLead((int) $lead['id']);
 $agreement = $agreements[0] ?? null;
+$timeline = $agreement !== null ? DigitalAgreement::timeline($agreement) : null;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $agreement !== null) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    Auth::requireCsrf();
+    if ($agreement === null) {
+        set_flash('danger', 'No agreement is available to acknowledge.');
+        header('Location: /tenant/agreement');
+        exit;
+    }
     $result = ESignatureHandler::acknowledge(
         (int) $agreement['id'],
         $_POST['typed_name'] ?? '',
@@ -48,10 +56,66 @@ portal_header('tenant', 'My agreement', 'agreement');
             <?php endif; ?>
         </div>
 
+        <?php if ($timeline !== null): ?>
+            <?php
+            $timelineCopy = match ($timeline['state']) {
+                'upcoming' => [
+                    'badge' => 'Upcoming agreement',
+                    'value' => (string) $timeline['days_until_start'],
+                    'label' => $timeline['days_until_start'] === 1 ? 'day until start' : 'days until start',
+                ],
+                'expired' => [
+                    'badge' => 'Agreement expired',
+                    'value' => (string) $timeline['days_since_end'],
+                    'label' => $timeline['days_since_end'] === 1 ? 'day since expiry' : 'days since expiry',
+                ],
+                'ending_today' => ['badge' => 'Ends today', 'value' => '0', 'label' => 'days left'],
+                'ending_soon' => [
+                    'badge' => 'Ending soon',
+                    'value' => (string) $timeline['days_remaining'],
+                    'label' => $timeline['days_remaining'] === 1 ? 'day left' : 'days left',
+                ],
+                default => [
+                    'badge' => 'Agreement active',
+                    'value' => (string) $timeline['days_remaining'],
+                    'label' => $timeline['days_remaining'] === 1 ? 'day left' : 'days left',
+                ],
+            };
+            ?>
+            <section class="agreement-timeline state-<?= e($timeline['state']) ?>" aria-labelledby="agreement-time-heading">
+                <div class="agreement-time-summary">
+                    <span class="agreement-time-badge"><?= e($timelineCopy['badge']) ?></span>
+                    <div class="agreement-time-count" id="agreement-time-heading">
+                        <strong><?= e($timelineCopy['value']) ?></strong>
+                        <span><?= e($timelineCopy['label']) ?></span>
+                    </div>
+                </div>
+                <div class="agreement-date-range">
+                    <div>
+                        <span>Start date</span>
+                        <time datetime="<?= e($timeline['starts_on']) ?>"><?= e(date('j M Y', strtotime($timeline['starts_on']))) ?></time>
+                    </div>
+                    <div>
+                        <span>End date</span>
+                        <time datetime="<?= e($timeline['ends_on']) ?>"><?= e(date('j M Y', strtotime($timeline['ends_on']))) ?></time>
+                    </div>
+                </div>
+                <div class="agreement-progress" role="progressbar" aria-label="Agreement term elapsed"
+                     aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= (int) $timeline['progress_percent'] ?>">
+                    <span style="width:<?= (int) $timeline['progress_percent'] ?>%"></span>
+                </div>
+            </section>
+        <?php else: ?>
+            <div class="belive-alert" style="margin-bottom:16px">
+                Agreement dates are not available for this earlier agreement. Ask the owner to issue an updated agreement with a confirmed start date.
+            </div>
+        <?php endif; ?>
+
         <div class="agreement-text"><?= e($agreement['agreement_text']) ?></div>
 
         <?php if ($agreement['status'] !== 'acknowledged'): ?>
             <form method="post" action="/tenant/agreement" style="margin-top:16px">
+                <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                 <div class="belive-field">
                     <label for="typed_name">Type your full name to acknowledge</label>
                     <input id="typed_name" name="typed_name" type="text" required placeholder="<?= e($lead['name'] ?? '') ?>">

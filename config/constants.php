@@ -63,6 +63,9 @@ define('CONTENT_PLATFORMS', ['facebook', 'instagram', 'tiktok']);
 
 define('REFERRAL_REWARD_STATUSES', ['pending', 'credited']);
 define('REFERRAL_REWARD_POINTS', 50); // fixed points per successful referral
+define('RENT_REWARD_POINTS', 200); // four confirmed referrals
+define('RENT_REWARD_CREDIT_RM', 50);
+define('RENT_REWARD_STATUSES', ['requested', 'approved', 'applied', 'rejected']);
 
 // API credential service identifiers.
 define('CREDENTIAL_SERVICES', ['whatsapp', 'anthropic', 'gemini', 'meta_graph']);

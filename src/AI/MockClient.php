@@ -231,13 +231,14 @@ final class MockClient implements LlmClient
         $rm = preg_match('/"monthly_rm":(\d+(?:\.\d+)?)/', $prompt, $m) ? $m[1] : '—';
 
         return "[MOCK AGREEMENT — offline stub]\n\n1. Parties: BeLive (landlord's agent) and {$get('tenant_name')} ({$get('tenant_phone')}).\n"
-            . "2. The room: {$get('room')}, {$get('area')} ({$get('room_type')} room).\n"
-            . "3. Monthly rental: RM $rm, including furnishings, WiFi and weekly cleaning.\n"
-            . "4. Deposit: zero deposit — BeLive standard.\n"
-            . "5. House rules: no smoking indoors; respect quiet hours 11pm–7am.\n"
-            . "6. Cleaning: weekly common-area cleaning included.\n"
-            . "7. Notice period: 30 days written notice either side.\n"
-            . "8. This document is acknowledged digitally with a typed name and timestamp.";
+            . "2. Tenancy term: {$get('starts_on')} through {$get('ends_on')} ({$get('tenure')}).\n"
+            . "3. The room: {$get('room')}, {$get('area')} ({$get('room_type')} room).\n"
+            . "4. Monthly rental: RM $rm, including furnishings, WiFi and weekly cleaning.\n"
+            . "5. Deposit: zero deposit — BeLive standard.\n"
+            . "6. House rules: no smoking indoors; respect quiet hours 11pm–7am.\n"
+            . "7. Cleaning: weekly common-area cleaning included.\n"
+            . "8. Notice period: 30 days written notice either side.\n"
+            . "9. This document is acknowledged digitally with a typed name and timestamp.";
     }
 
     /** True iff the prompt carries an injected LEARNED RULES block with a photos-before-price rule. */

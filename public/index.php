@@ -88,6 +88,8 @@ $router->get('/admin/content', "$pages/admin/content/index.php");
 $router->any('/admin/content/preview', "$pages/admin/content/preview.php");
 
 $router->get('/admin/bookings', "$pages/admin/bookings/index.php");
+$router->get('/admin/listing_reviews', "$pages/admin/listing_reviews/index.php");
+$router->any('/admin/listing_reviews/view', "$pages/admin/listing_reviews/view.php");
 
 // --- Webhooks (Meta calls GET for verification, POST for events) ---------------
 $router->get('/webhook/whatsapp', "$pages/webhook/verify.php");
@@ -102,6 +104,7 @@ $router->get('/tenant/logout', function () {
     header('Location: /tenant/login');
 });
 $router->get('/tenant/dashboard', "$pages/tenant/dashboard.php");
+$router->any('/tenant/rewards', "$pages/tenant/rewards.php");
 $router->get('/tenant/listing_verification', "$pages/tenant/listing_verification.php");
 $router->get('/tenant/move_in_log', "$pages/tenant/move_in_log.php");
 $router->any('/tenant/agreement', "$pages/tenant/agreement.php");
@@ -114,6 +117,7 @@ $router->get('/owner/logout', function () {
     header('Location: /owner/login');
 });
 $router->get('/owner/dashboard', "$pages/owner/dashboard.php");
+$router->any('/owner/properties', "$pages/owner/properties.php");
 $router->any('/owner/listings', "$pages/owner/listings/index.php");
 $router->any('/owner/listings/verify', "$pages/owner/listings/verify.php");
 $router->any('/owner/agreements', "$pages/owner/agreements.php");

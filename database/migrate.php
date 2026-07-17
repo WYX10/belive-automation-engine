@@ -6,7 +6,7 @@ declare(strict_types=1);
  * CLI migration runner.
  *
  *   php database/migrate.php               → creates the database if needed, runs ALL migrations
- *   php database/migrate.php --core-only   → skip 011–013 (Phase 9 portal tables)
+ *   php database/migrate.php --core-only   → skip optional portal migrations listed below
  *
  * The Phase 9 portal tables run by default: the tenant/owner portals are
  * linked from the public site nav, so their tables are required for a
@@ -24,6 +24,7 @@ Dotenv\Dotenv::createImmutable(APP_ROOT)->safeLoad();
 
 $cfg = require APP_ROOT . '/config/database.php';
 $includeBonus = !in_array('--core-only', $argv, true);
+$bonusMigrations = [11, 12, 13, 18, 19, 20, 21, 22, 23];
 
 // Connect server-level first so we can create the database itself.
 $server = new PDO(
@@ -56,8 +57,8 @@ foreach ($files as $file) {
     $name = basename($file);
     $number = (int) substr($name, 0, 3);
 
-    if (!$includeBonus && $number >= 11 && $number <= 13) {
-        continue; // --core-only: skip the Phase 9 portal tables
+    if (!$includeBonus && in_array($number, $bonusMigrations, true)) {
+        continue; // --core-only: skip optional portal tables and their extensions
     }
     if (in_array($name, $applied, true)) {
         continue;

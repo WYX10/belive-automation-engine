@@ -33,12 +33,16 @@ final class ConfirmationSender
         $lines = [
             '✅ Viewing confirmed!',
             $room !== null
-                ? "🏠 {$room['name']} — {$room['area']} ({$room['room_type']} room)"
+                ? "🏠 {$room['name']} — {$room['location']} ({$room['room_type']} room)"
                 : '🏠 BeLive room viewing',
             "🗓 $when",
             '',
             'Just bring yourself — we handle the rest. Need to reschedule? Reply here anytime.',
         ];
+
+        // Reward attribution is durable booking state. Record it before either
+        // outbound WhatsApp send can fail; a later retry remains idempotent.
+        ReferralRewardWebhook::onBookingConfirmed((int) $lead['id'], $room !== null ? (int) $room['id'] : null);
 
         $sent = $wa->sendText($lead['wa_phone'], implode("\n", $lines));
         Booking::update((int) $booking['id'], ['confirmation_sent' => 1]);
@@ -54,8 +58,5 @@ final class ConfirmationSender
             'reasoning'    => 'Automated booking confirmation for booking #' . $booking['id']
                 . ($sent['dry_run'] ? ' (dry-run: no WhatsApp credential configured)' : ''),
         ]);
-
-        // Refer & Earn: booking confirmation is the reward trigger.
-        ReferralRewardWebhook::onBookingConfirmed((int) $lead['id']);
     }
 }

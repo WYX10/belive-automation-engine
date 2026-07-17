@@ -68,6 +68,7 @@ portal_header('tenant', 'My stay', 'dashboard');
             <div class="belive-card-title">🛡 Your protection, built in</div>
             <p class="belive-muted" style="font-size:13.5px; margin-bottom:12px">Renting shouldn't be a gamble. Four tools, zero extra cost:</p>
             <div style="display:grid; gap:10px">
+                <a class="belive-btn-ghost" href="/tenant/rewards">Rent rewards from referrals</a>
                 <a class="belive-btn-ghost" href="/tenant/listing_verification">✅ Verified listing card</a>
                 <a class="belive-btn-ghost" href="/tenant/move_in_log">📷 Move-in condition log</a>
                 <a class="belive-btn-ghost" href="/tenant/agreement">📄 Digital agreement</a>

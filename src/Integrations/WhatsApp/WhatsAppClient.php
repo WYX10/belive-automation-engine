@@ -20,7 +20,7 @@ use RuntimeException;
  * labelled in logs and the admin activity view, never passed off as a real
  * delivery. Go-live steps: docs/setup_guide.md.
  */
-final class WhatsAppClient
+class WhatsAppClient
 {
     private const GRAPH = 'https://graph.facebook.com/v20.0';
 

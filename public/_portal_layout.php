@@ -44,6 +44,7 @@ function portal_header(string $audience, string $title, string $active = ''): vo
     $nav = $isTenant
         ? [
             'dashboard'    => ['/tenant/dashboard', 'My stay'],
+            'rewards'      => ['/tenant/rewards', 'Rent rewards'],
             'verification' => ['/tenant/listing_verification', 'Verified listing'],
             'move_in'      => ['/tenant/move_in_log', 'Move-in log'],
             'agreement'    => ['/tenant/agreement', 'My agreement'],
@@ -51,7 +52,8 @@ function portal_header(string $audience, string $title, string $active = ''): vo
         ]
         : [
             'dashboard'  => ['/owner/dashboard', 'Overview'],
-            'listings'   => ['/owner/listings', 'My listings'],
+            'properties' => ['/owner/properties', 'Properties & rooms'],
+            'listings'   => ['/owner/listings', 'Listing tools'],
             'agreements' => ['/owner/agreements', 'Agreements'],
             'pricing'    => ['/owner/pricing_guard', 'Pricing guard'],
         ];

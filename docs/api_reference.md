@@ -45,6 +45,8 @@ single entry point, one bootstrap.
 | GET | `/admin/activity_log` | Every AI action with the model that handled it |
 | GET/POST | `/admin/content` · `/admin/content/preview?id=` | Generate caption drafts from room metrics · approve / mark posted |
 | GET/POST | `/admin/bookings` | Zero-touch bookings; complete/cancel controls |
+| GET | `/admin/listing_reviews` | Filterable queue for pending, verified and rejected ownership/location reviews |
+| GET/POST | `/admin/listing_reviews/view?id={id}` | Open evidence, approve/reject ownership or GPS, and record reviewer notes |
 | GET/POST | `/admin/credentials` · `/admin/credentials/add` · POST `/admin/credentials/test` | Encrypted key management, masked display, test-before-activate |
 | GET/POST | `/admin/models` · POST `/admin/models/switch` | Per-phase model assignment (registry-driven) |
 
@@ -84,9 +86,13 @@ Default schema name: `belive_eve` (set via `DB_NAME` in `.env`). Tables:
 `api_credentials`, `ai_model_config`, `leads` (incl. `enquired_room_id` + `preferred_tenure`),
 `ai_interactions`, `ai_feedback`, `ai_learned_memory`, `ai_activity_log`, `content_posts`,
 `rooms` + `bookings` (009, extended by 014), `referrals`, `room_pricing` / `room_images` /
-`room_amenities` (015–017, Phase 6.5 catalog), `migrations` (runner bookkeeping),
+`room_amenities` (015–017, Phase 6.5 catalog), `referral_redemptions` (021 rent-credit
+request ledger), `properties` plus room-level `referral_reward_points` and referral
+`reward_room_id` attribution (022), `migrations` (runner bookkeeping),
 plus the portal tables `verified_listings`, `move_in_logs`, `digital_agreements` (011–013,
-included in a default migrate run).
+with listing review/audit extensions in 018–019 and nullable structured agreement `tenure`,
+`starts_on`, and `ends_on` fields in 020; all are included in a default migrate run). Legacy
+agreements remain undated rather than receiving inferred contract dates.
 
 Catalog surfaces: `App\Catalog\RoomRepository` (all page reads), `PricingCalculator`
 (price per tenure + saving vs flexible), `RoomRecommender` (candidate block for DecideSkill;
