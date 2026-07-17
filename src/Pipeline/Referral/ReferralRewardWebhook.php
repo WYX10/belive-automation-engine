@@ -18,7 +18,11 @@ use App\Models\Room;
 final class ReferralRewardWebhook
 {
     /** @return array|null the credited referral row, or null if none applies */
-    public static function onBookingConfirmed(int $bookedLeadId, ?int $roomId): ?array
+    public static function onBookingConfirmed(
+        int $bookedLeadId,
+        ?int $roomId,
+        ?WhatsAppClient $notificationClient = null
+    ): ?array
     {
         $room = $roomId !== null ? Room::find($roomId) : null;
         $rewardRoomId = $room !== null ? (int) $room['id'] : null;
@@ -49,11 +53,27 @@ final class ReferralRewardWebhook
         // Tell the referrer — pseudo-handles (fb:/ig:) can't receive WhatsApp.
         if ($referrer !== null && preg_match('/^\d+$/', $referrer['wa_phone'])) {
             $name = $referrer['name'] ? " {$referrer['name']}" : '';
-            (new WhatsAppClient())->sendText(
-                $referrer['wa_phone'],
-                "🎉 Nice one{$name}! Your friend just booked a viewing through your BeLive link — "
-                . $points . ' reward points are on your account. Share again anytime: more friends, more rewards.'
-            );
+            try {
+                ($notificationClient ?? new WhatsAppClient())->sendText(
+                    $referrer['wa_phone'],
+                    "🎉 Nice one{$name}! Your friend just booked a viewing through your BeLive link — "
+                    . $points . ' reward points are on your account. Share again anytime: more friends, more rewards.'
+                );
+            } catch (\Throwable $e) {
+                // Notification is best-effort: never block the referred friend's
+                // booking confirmation after the ledger credit is durable.
+                try {
+                    EpisodicLogger::activity(
+                        'referral_reward_notification_failed',
+                        'lead_gen',
+                        null,
+                        (int) $credited['referring_lead_id'],
+                        mb_substr($e->getMessage(), 0, 300)
+                    );
+                } catch (\Throwable) {
+                    // Preserve the booking flow if failure logging is unavailable.
+                }
+            }
         }
 
         return $credited;

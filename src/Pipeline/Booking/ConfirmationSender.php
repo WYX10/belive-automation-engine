@@ -18,7 +18,12 @@ use App\Pipeline\Referral\ReferralRewardWebhook;
  */
 final class ConfirmationSender
 {
-    public static function send(array $booking, string $modelUsed, ?WhatsAppClient $wa = null): void
+    public static function send(
+        array $booking,
+        string $modelUsed,
+        ?WhatsAppClient $wa = null,
+        ?WhatsAppClient $rewardNotificationClient = null
+    ): void
     {
         $wa ??= new WhatsAppClient();
 
@@ -42,7 +47,11 @@ final class ConfirmationSender
 
         // Reward attribution is durable booking state. Record it before either
         // outbound WhatsApp send can fail; a later retry remains idempotent.
-        ReferralRewardWebhook::onBookingConfirmed((int) $lead['id'], $room !== null ? (int) $room['id'] : null);
+        ReferralRewardWebhook::onBookingConfirmed(
+            (int) $lead['id'],
+            $room !== null ? (int) $room['id'] : null,
+            $rewardNotificationClient
+        );
 
         $sent = $wa->sendText($lead['wa_phone'], implode("\n", $lines));
         Booking::update((int) $booking['id'], ['confirmation_sent' => 1]);

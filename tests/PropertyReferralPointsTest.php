@@ -19,6 +19,7 @@ use App\Models\Room;
 use App\Pipeline\Booking\ConfirmationSender;
 use App\Pipeline\Referral\ReferralRewardWebhook;
 use App\Properties\PropertyManager;
+use App\Properties\PropertyReviewManager;
 
 $ownerName = 'Property Points Test Owner';
 $property = PropertyManager::addProperty($ownerName, [
@@ -28,7 +29,8 @@ $property = PropertyManager::addProperty($ownerName, [
     'description' => 'Property created by the room-level referral test.',
 ]);
 check('owner can add a property', $property['owner_name'] === $ownerName
-    && $property['name'] === 'Referral Point Residence');
+    && $property['name'] === 'Referral Point Residence'
+    && $property['review_status'] === 'pending');
 check('property appears in the owner portfolio', count(Property::forOwner($ownerName)) === 1);
 
 $duplicatePropertyBlocked = false;
@@ -43,7 +45,7 @@ try {
 }
 check('duplicate owner property is rejected', $duplicatePropertyBlocked);
 
-$room = PropertyManager::addRoom($ownerName, [
+$roomInput = [
     'property_id' => $property['id'],
     'room_code' => 'RPR-01',
     'name' => 'Referral Master Room',
@@ -54,7 +56,29 @@ $room = PropertyManager::addRoom($ownerName, [
     'price_12_month' => '850',
     'referral_reward_points' => '125',
     'available_from' => '2026-08-01',
-]);
+];
+$pendingRoomBlocked = false;
+try {
+    PropertyManager::addRoom($ownerName, $roomInput);
+} catch (RuntimeException) {
+    $pendingRoomBlocked = true;
+}
+check('owner cannot add a room while property awaits admin approval', $pendingRoomBlocked);
+
+$approvedProperty = PropertyReviewManager::review(
+    (int) $property['id'],
+    'approved',
+    'property-test-admin',
+    'Owner and address confirmed.',
+    (int) $property['review_version']
+);
+check('admin can approve the property', $approvedProperty['review_status'] === 'approved'
+    && $approvedProperty['reviewed_by'] === 'property-test-admin');
+check('approved property leaves the pending review queue',
+    PropertyReviewManager::counts()['pending'] === 0
+    && PropertyReviewManager::counts()['approved'] >= 1);
+
+$room = PropertyManager::addRoom($ownerName, $roomInput);
 check('owner can add a room under their property', (int) $room['property_id'] === (int) $property['id']
     && $room['property_name'] === $property['name']);
 check('new room stores owner-selected referral points', (int) $room['referral_reward_points'] === 125);
@@ -62,6 +86,135 @@ $roomPrices = Room::prices((int) $room['id']);
 check('new room stores all three tenure prices', count($roomPrices) === 3
     && $roomPrices['monthly']['price'] === 950.0
     && $roomPrices['12_month']['price'] === 850.0);
+
+$approvedPropertyRejectBlocked = false;
+try {
+    PropertyReviewManager::review(
+        (int) $property['id'],
+        'rejected',
+        'property-test-admin',
+        'Changed decision.',
+        (int) $approvedProperty['review_version']
+    );
+} catch (RuntimeException) {
+    $approvedPropertyRejectBlocked = true;
+}
+check('admin cannot reject an approved property after rooms exist', $approvedPropertyRejectBlocked
+    && Property::find((int) $property['id'])['review_status'] === 'approved');
+
+$rejectedProperty = PropertyManager::addProperty($ownerName, [
+    'name' => 'Property Requiring Correction',
+    'location' => 'Cheras',
+    'address' => 'Incomplete address supplied by owner',
+]);
+$emptyRejectionBlocked = false;
+try {
+    PropertyReviewManager::review(
+        (int) $rejectedProperty['id'],
+        'rejected',
+        'property-test-admin',
+        '',
+        (int) $rejectedProperty['review_version']
+    );
+} catch (InvalidArgumentException) {
+    $emptyRejectionBlocked = true;
+}
+check('admin rejection requires an owner-facing reason', $emptyRejectionBlocked);
+$rejectedProperty = PropertyReviewManager::review(
+    (int) $rejectedProperty['id'],
+    'rejected',
+    'property-test-admin',
+    'Provide the unit number and a complete street address.',
+    (int) $rejectedProperty['review_version']
+);
+check('admin can reject a pending property with a reason', $rejectedProperty['review_status'] === 'rejected'
+    && str_contains($rejectedProperty['review_note'], 'unit number'));
+$rejectedRoomBlocked = false;
+try {
+    PropertyManager::addRoom($ownerName, array_replace($roomInput, [
+        'property_id' => $rejectedProperty['id'],
+        'room_code' => 'RPR-02',
+    ]));
+} catch (RuntimeException) {
+    $rejectedRoomBlocked = true;
+}
+check('owner cannot add a room to a rejected property', $rejectedRoomBlocked);
+
+$crossOwnerResubmitBlocked = false;
+try {
+    PropertyManager::resubmitRejectedProperty('Different Owner', (int) $rejectedProperty['id'], [
+        'name' => $rejectedProperty['name'],
+        'location' => $rejectedProperty['location'],
+        'address' => '99 Corrected Street, Cheras',
+    ]);
+} catch (RuntimeException) {
+    $crossOwnerResubmitBlocked = true;
+}
+check('another owner cannot resubmit a rejected property', $crossOwnerResubmitBlocked);
+
+$resubmittedProperty = PropertyManager::resubmitRejectedProperty($ownerName, (int) $rejectedProperty['id'], [
+    'name' => $rejectedProperty['name'],
+    'location' => $rejectedProperty['location'],
+    'address' => 'Unit 12-3, 99 Corrected Street, Cheras',
+    'description' => 'Corrected property details.',
+]);
+check('owner can correct and resubmit a rejected property',
+    $resubmittedProperty['review_status'] === 'pending'
+    && $resubmittedProperty['review_note'] === null
+    && $resubmittedProperty['reviewed_at'] === null
+    && (int) $resubmittedProperty['review_version'] === (int) $rejectedProperty['review_version'] + 1);
+$resubmittedRoomBlocked = false;
+try {
+    PropertyManager::addRoom($ownerName, array_replace($roomInput, [
+        'property_id' => $resubmittedProperty['id'],
+        'room_code' => 'RPR-02',
+    ]));
+} catch (RuntimeException) {
+    $resubmittedRoomBlocked = true;
+}
+check('resubmitted property remains blocked until renewed admin approval', $resubmittedRoomBlocked);
+
+$renewedApproval = PropertyReviewManager::review(
+    (int) $resubmittedProperty['id'],
+    'approved',
+    'property-test-admin',
+    'Corrected address confirmed.',
+    (int) $resubmittedProperty['review_version']
+);
+$secondRoom = PropertyManager::addRoom($ownerName, array_replace($roomInput, [
+    'property_id' => $renewedApproval['id'],
+    'room_code' => 'RPR-02',
+]));
+check('owner can add a room after renewed admin approval',
+    (int) $secondRoom['property_id'] === (int) $renewedApproval['id']);
+
+$staleProperty = PropertyManager::addProperty($ownerName, [
+    'name' => 'Stale Decision Property',
+    'location' => 'Ampang',
+    'address' => '8 Review Lane, Ampang',
+]);
+$staleVersion = (int) $staleProperty['review_version'];
+PropertyReviewManager::review(
+    (int) $staleProperty['id'],
+    'approved',
+    'first-admin',
+    '',
+    $staleVersion
+);
+$staleDecisionBlocked = false;
+try {
+    PropertyReviewManager::review(
+        (int) $staleProperty['id'],
+        'rejected',
+        'second-admin',
+        'Decision from an older screen.',
+        $staleVersion
+    );
+} catch (RuntimeException) {
+    $staleDecisionBlocked = true;
+}
+check('stale admin decision cannot overwrite a newer review', $staleDecisionBlocked
+    && Property::find((int) $staleProperty['id'])['review_status'] === 'approved');
 
 $updatedRoom = PropertyManager::updateReferralPoints($ownerName, (int) $room['id'], '175');
 check('owner can update points for their own room', (int) $updatedRoom['referral_reward_points'] === 175);
@@ -162,3 +315,49 @@ check('booking reward is durable before confirmation messaging can fail',
     $messageFailed
     && $creditedDespiteFailure['reward_status'] === 'credited'
     && (int) $creditedDespiteFailure['reward_points'] === 175);
+
+$notificationReferrerId = Lead::create([
+    'wa_phone' => '601177770006',
+    'name' => 'Notification Failure Referrer',
+    'source_channel' => 'whatsapp',
+]);
+$notificationFriendId = Lead::create([
+    'wa_phone' => '601177770007',
+    'name' => 'Notification Failure Friend',
+    'source_channel' => 'referral',
+]);
+$notificationCode = Referral::codeFor($notificationReferrerId);
+Referral::attachReferredLead($notificationCode, $notificationFriendId);
+$notificationBookingId = Booking::create([
+    'lead_id' => $notificationFriendId,
+    'room_id' => $room['id'],
+    'viewing_datetime' => '2026-08-17 14:00:00',
+    'status' => 'confirmed',
+]);
+$primarySender = new class extends WhatsAppClient {
+    public bool $sent = false;
+
+    public function sendText(string $toWaPhone, string $text): array
+    {
+        $this->sent = true;
+        return ['message_id' => 'test-primary-confirmation', 'dry_run' => true];
+    }
+};
+$failingRewardNotifier = new class extends WhatsAppClient {
+    public function sendText(string $toWaPhone, string $text): array
+    {
+        throw new RuntimeException('Simulated reward notification failure.');
+    }
+};
+ConfirmationSender::send(
+    Booking::find($notificationBookingId),
+    'mock-offline-stub',
+    $primarySender,
+    $failingRewardNotifier
+);
+$notificationBooking = Booking::find($notificationBookingId);
+$notificationCredit = Referral::findByCode($notificationCode);
+check('failed referrer notification cannot block the friend booking confirmation',
+    $primarySender->sent
+    && (int) $notificationBooking['confirmation_sent'] === 1
+    && $notificationCredit['reward_status'] === 'credited');

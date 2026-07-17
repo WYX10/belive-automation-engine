@@ -113,11 +113,17 @@ generic "hi again".
 
 ## Demo 5 — Zero-touch booking + Refer & Earn (≈2 min)
 
-1. Continue any qualified conversation with *"Can I view it tomorrow 3pm?"*
+1. In the owner portal, submit a property. Show that **Add room** is locked while its status is
+   **Pending admin review**. In **Admin → Property reviews**, approve it; return to the owner page
+   and add a room with its referral-point value and room photo. Then open **Admin → Rooms** to show
+   that admin can edit the owner-uploaded room, add another room to the property, and maintain its
+   photo gallery. A rejected property shows the admin reason and an
+   owner-only **Correct and resubmit property** form; it returns to pending and remains room-locked.
+2. Continue any qualified conversation with *"Can I view it tomorrow 3pm?"*
    → Eve parses the natural-language time, cross-checks the live schedule, books, and sends a
    confirmation receipt. Show **Admin → Bookings** — the row appeared with zero admin input.
    (Try a clashing time to show the conflict handler proposing the nearest free slot.)
-2. Show a lead's **Refer & Earn link** (Admin → Leads → open lead). Open it, submit the enquiry
+3. Show a lead's **Refer & Earn link** (Admin → Leads → open lead). Open it, submit the enquiry
    form as a "friend", book — the referrer is credited the booked room's owner-configured points automatically and gets a WhatsApp
    notification. Show the `referral_reward_credited` row in the activity log.
 
@@ -144,6 +150,6 @@ generic "hi again".
 
 ## If the live demo misbehaves
 
-Run `php tests/run.php` on the projector: 23 automated checks prove the learning loop end-to-end
+Run `php tests/run.php` on the projector: the full automated regression suite proves the learning loop end-to-end
 (feedback → real rule distilled → retrieval honours confidence/active state) against a throwaway
 database created on the spot. This is the fallback proof that nothing is faked.

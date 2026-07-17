@@ -204,3 +204,81 @@ body.admin-login {
   .admin-main { padding: 20px 16px 48px; }
   .review-section-head, .review-evidence-row { align-items: flex-start; flex-direction: column; }
 }
+
+/* Property approval gate: admin confirms a property before room creation. */
+.property-review-intro { margin-top: 4px; font-size: 13.5px; }
+.property-review-list { display: grid; gap: 16px; }
+.property-review-card { border-top: 4px solid var(--belive-orange); }
+.property-review-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.property-review-head h2 { margin-top: 4px; font-size: 19px; }
+.property-review-head p { margin-top: 4px; color: var(--belive-muted); font-size: 13px; overflow-wrap: anywhere; }
+.property-review-meta { color: var(--belive-muted); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.property-review-facts { display: grid; grid-template-columns: minmax(140px, .7fr) 100px minmax(220px, 1.5fr); gap: 12px; margin-top: 16px; }
+.property-review-facts > div { min-width: 0; padding: 11px 12px; border-radius: 10px; background: var(--belive-cream); }
+.property-review-facts dt { color: var(--belive-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.property-review-facts dd { margin: 4px 0 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.property-review-audit { margin-top: 12px; color: var(--belive-muted); font-size: 12px; }
+.property-review-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.property-review-ready { margin: 16px 0 0; }
+
+@media (max-width: 760px) {
+  .property-review-facts,
+  .property-review-actions { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .property-review-head { flex-direction: column; }
+}
+
+/* Admin room inventory, editing and gallery uploads. */
+.admin-room-page-head p { margin-top: 4px; font-size: 13.5px; }
+.admin-room-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.admin-room-owner-filter { display: flex; align-items: center; gap: 8px; }
+.admin-room-owner-filter label { font-size: 13px; font-weight: 700; }
+.admin-room-owner-filter select { min-height: 44px; min-width: 220px; padding: 9px 12px; border: 1.5px solid var(--belive-line); border-radius: 10px; background: var(--belive-white); color: var(--belive-ink); font: inherit; }
+.admin-room-add { position: relative; }
+.admin-room-add > summary { min-height: 44px; list-style: none; }
+.admin-room-add > summary::-webkit-details-marker { display: none; }
+.admin-room-add > .admin-room-form,
+.admin-room-add > .belive-alert { position: absolute; z-index: 20; top: 52px; right: 0; width: min(820px, calc(100vw - 64px)); box-shadow: var(--belive-shadow-lift); }
+.admin-room-list { display: grid; gap: 16px; }
+.admin-room-card { border-top: 4px solid var(--belive-teal); }
+.admin-room-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.admin-room-owner { color: var(--belive-orange-dark); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.admin-room-card-head h2 { margin-top: 4px; font-size: 19px; }
+.admin-room-card-head p { margin-top: 3px; color: var(--belive-muted); font-size: 13px; }
+.admin-room-badges { display: flex; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
+.admin-room-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-top: 16px; }
+.admin-room-gallery img { width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 10px; border: 1px solid var(--belive-line); background: var(--belive-cream); }
+.admin-room-no-photo { margin-top: 14px; padding: 14px; border: 1px dashed var(--belive-line); border-radius: 10px; color: var(--belive-muted); font-size: 13px; text-align: center; }
+.admin-room-photo-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; margin-top: 16px; padding: 14px; border-radius: 12px; background: var(--belive-cream); }
+.admin-room-photo-form .belive-field { margin: 0; }
+.admin-room-photo-form button { min-height: 44px; }
+.admin-room-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 12px; padding: 18px; border: 1px solid var(--belive-line); border-radius: 12px; background: var(--belive-white); }
+.admin-room-form-wide { grid-column: 1 / -1; }
+.admin-room-form button { min-height: 44px; justify-content: center; }
+.admin-room-edit { margin-top: 14px; }
+.admin-room-edit > summary { min-height: 44px; padding: 11px 14px; border: 1.5px solid var(--belive-line); border-radius: 10px; cursor: pointer; font-weight: 700; list-style-position: inside; }
+.admin-room-edit > .admin-room-form { margin-top: 12px; background: var(--belive-cream); }
+
+@media (max-width: 900px) {
+  .admin-room-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .admin-room-toolbar,
+  .admin-room-card-head { flex-direction: column; }
+  .admin-room-add { width: 100%; }
+  .admin-room-add > summary { justify-content: center; }
+  .admin-room-add > .admin-room-form,
+  .admin-room-add > .belive-alert { position: static; width: 100%; margin-top: 10px; }
+  .admin-room-owner-filter { align-items: stretch; flex-direction: column; width: 100%; }
+  .admin-room-owner-filter select { min-width: 0; width: 100%; }
+  .admin-room-badges { justify-content: flex-start; }
+}
+
+@media (max-width: 520px) {
+  .admin-room-form,
+  .admin-room-photo-form { grid-template-columns: 1fr; }
+  .admin-room-form-wide { grid-column: auto; }
+}

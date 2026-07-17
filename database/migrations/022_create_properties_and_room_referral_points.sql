@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS properties (
 
 SET @ddl = IF(
     EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rooms' AND COLUMN_NAME = 'property_id'),
-    'SELECT 1',
+    'DO 1',
     'ALTER TABLE rooms ADD COLUMN property_id INT UNSIGNED NULL AFTER id'
 );
 PREPARE stmt FROM @ddl;
@@ -26,7 +26,7 @@ DEALLOCATE PREPARE stmt;
 
 SET @ddl = IF(
     EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rooms' AND COLUMN_NAME = 'referral_reward_points'),
-    'SELECT 1',
+    'DO 1',
     'ALTER TABLE rooms ADD COLUMN referral_reward_points INT UNSIGNED NOT NULL DEFAULT 50 AFTER deposit_amount'
 );
 PREPARE stmt FROM @ddl;
@@ -53,7 +53,7 @@ WHERE r.property_id IS NULL;
 
 SET @ddl = IF(
     EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rooms' AND INDEX_NAME = 'idx_room_property'),
-    'SELECT 1',
+    'DO 1',
     'ALTER TABLE rooms ADD INDEX idx_room_property (property_id)'
 );
 PREPARE stmt FROM @ddl;
@@ -62,7 +62,7 @@ DEALLOCATE PREPARE stmt;
 
 SET @ddl = IF(
     EXISTS(SELECT 1 FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'rooms' AND CONSTRAINT_NAME = 'fk_room_property'),
-    'SELECT 1',
+    'DO 1',
     'ALTER TABLE rooms ADD CONSTRAINT fk_room_property FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE SET NULL'
 );
 PREPARE stmt FROM @ddl;
@@ -71,7 +71,7 @@ DEALLOCATE PREPARE stmt;
 
 SET @ddl = IF(
     EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'referrals' AND COLUMN_NAME = 'reward_room_id'),
-    'SELECT 1',
+    'DO 1',
     'ALTER TABLE referrals ADD COLUMN reward_room_id INT UNSIGNED NULL AFTER referred_lead_id'
 );
 PREPARE stmt FROM @ddl;
@@ -80,7 +80,7 @@ DEALLOCATE PREPARE stmt;
 
 SET @ddl = IF(
     EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'referrals' AND COLUMN_NAME = 'reward_room_name'),
-    'SELECT 1',
+    'DO 1',
     'ALTER TABLE referrals ADD COLUMN reward_room_name VARCHAR(120) NULL AFTER reward_room_id'
 );
 PREPARE stmt FROM @ddl;
@@ -89,7 +89,7 @@ DEALLOCATE PREPARE stmt;
 
 SET @ddl = IF(
     EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'referrals' AND COLUMN_NAME = 'reward_property_name'),
-    'SELECT 1',
+    'DO 1',
     'ALTER TABLE referrals ADD COLUMN reward_property_name VARCHAR(120) NULL AFTER reward_room_name'
 );
 PREPARE stmt FROM @ddl;
@@ -98,7 +98,7 @@ DEALLOCATE PREPARE stmt;
 
 SET @ddl = IF(
     EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'referrals' AND INDEX_NAME = 'idx_referral_reward_room'),
-    'SELECT 1',
+    'DO 1',
     'ALTER TABLE referrals ADD INDEX idx_referral_reward_room (reward_room_id)'
 );
 PREPARE stmt FROM @ddl;
@@ -107,7 +107,7 @@ DEALLOCATE PREPARE stmt;
 
 SET @ddl = IF(
     EXISTS(SELECT 1 FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'referrals' AND CONSTRAINT_NAME = 'fk_referral_reward_room'),
-    'SELECT 1',
+    'DO 1',
     'ALTER TABLE referrals ADD CONSTRAINT fk_referral_reward_room FOREIGN KEY (reward_room_id) REFERENCES rooms(id) ON DELETE SET NULL'
 );
 PREPARE stmt FROM @ddl;
@@ -118,7 +118,7 @@ DEALLOCATE PREPARE stmt;
 -- multiple codes: that corruption must be resolved rather than silently lost.
 SET @ddl = IF(
     EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'referrals' AND INDEX_NAME = 'uq_referral_referred_lead'),
-    'SELECT 1',
+    'DO 1',
     'ALTER TABLE referrals ADD UNIQUE INDEX uq_referral_referred_lead (referred_lead_id)'
 );
 PREPARE stmt FROM @ddl;

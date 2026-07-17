@@ -45,6 +45,8 @@ single entry point, one bootstrap.
 | GET | `/admin/activity_log` | Every AI action with the model that handled it |
 | GET/POST | `/admin/content` · `/admin/content/preview?id=` | Generate caption drafts from room metrics · approve / mark posted |
 | GET/POST | `/admin/bookings` | Zero-touch bookings; complete/cancel controls |
+| GET/POST | `/admin/property_reviews` | Review owner-submitted properties; approve before room creation or reject with an owner-facing reason |
+| GET/POST | `/admin/rooms` | Filter owner inventory, add/edit rooms under approved properties, and upload validated room gallery photos |
 | GET | `/admin/listing_reviews` | Filterable queue for pending, verified and rejected ownership/location reviews |
 | GET/POST | `/admin/listing_reviews/view?id={id}` | Open evidence, approve/reject ownership or GPS, and record reviewer notes |
 | GET/POST | `/admin/credentials` · `/admin/credentials/add` · POST `/admin/credentials/test` | Encrypted key management, masked display, test-before-activate |
@@ -79,6 +81,8 @@ All admin POSTs require the session CSRF token (`csrf_token` field, provided by 
   rule (real model call; never hardcoded).
 - `App\Pipeline\Conversion\ConversationManager::handleInbound(array $message)` — the full
   Understand → Decide → Create → Automate pipeline with memory + booking handoff.
+- `App\Properties\RoomPhotoManager::addUpload(...)` — owner-scoped or admin room-gallery upload;
+  accepts JPG/PNG/WebP images up to 5 MB and stores randomized public paths in `room_images`.
 
 ## Database (dev/demo names)
 
@@ -88,7 +92,9 @@ Default schema name: `belive_eve` (set via `DB_NAME` in `.env`). Tables:
 `rooms` + `bookings` (009, extended by 014), `referrals`, `room_pricing` / `room_images` /
 `room_amenities` (015–017, Phase 6.5 catalog), `referral_redemptions` (021 rent-credit
 request ledger), `properties` plus room-level `referral_reward_points` and referral
-`reward_room_id` attribution (022), `migrations` (runner bookkeeping),
+`reward_room_id` attribution (022), immutable referral attribution snapshots (023), property
+admin-review status and audit fields (024), stale-decision review versions (025),
+`migrations` (runner bookkeeping),
 plus the portal tables `verified_listings`, `move_in_logs`, `digital_agreements` (011–013,
 with listing review/audit extensions in 018–019 and nullable structured agreement `tenure`,
 `starts_on`, and `ends_on` fields in 020; all are included in a default migrate run). Legacy

@@ -167,10 +167,13 @@ body.portal-login { display: flex; align-items: center; justify-content: center;
 .owner-portfolio-stats span { color: var(--belive-muted); font-size: 13px; }
 .owner-property-list { display: grid; gap: 18px; }
 .owner-property-card { border-top: 5px solid var(--belive-orange); }
+.owner-property-card.review-approved { border-top-color: var(--belive-teal); }
+.owner-property-card.review-rejected { border-top-color: var(--belive-danger); }
 .owner-property-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .owner-property-heading h2 { margin-top: 4px; }
 .owner-property-heading p,
 .owner-property-description { margin-top: 4px; color: var(--belive-muted); font-size: 13px; }
+.owner-property-statuses { display: flex; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
 .owner-property-description { max-width: 72ch; margin-top: 12px; }
 .owner-room-list { display: grid; gap: 12px; margin-top: 18px; }
 .owner-room-card { padding: 16px; border: 1px solid var(--belive-line); border-radius: 12px; background: var(--belive-cream); }
@@ -179,6 +182,11 @@ body.portal-login { display: flex; align-items: center; justify-content: center;
 .owner-room-main h3 { margin-top: 3px; }
 .owner-room-main p { margin-top: 3px; color: var(--belive-muted); font-size: 13px; }
 .owner-room-link { min-height: 44px; }
+.owner-room-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 7px; margin-top: 14px; }
+.owner-room-gallery img { width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border: 1px solid var(--belive-line); border-radius: 9px; background: var(--belive-white); }
+.owner-room-photo-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; margin-top: 14px; padding: 12px; border-radius: 10px; background: var(--belive-white); }
+.owner-room-photo-form .belive-field { margin: 0; }
+.owner-room-photo-form button { min-height: 44px; }
 .owner-room-prices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
 .owner-room-prices > div { display: grid; gap: 2px; padding: 9px 10px; border-radius: 9px; background: var(--belive-white); }
 .owner-room-prices span { color: var(--belive-muted); font-size: 11px; }
@@ -195,6 +203,14 @@ body.portal-login { display: flex; align-items: center; justify-content: center;
 .owner-property-empty { text-align: center; }
 .owner-no-rooms { padding: 14px; color: var(--belive-muted); }
 .owner-property-empty p { margin-top: 6px; }
+.owner-property-review-state { margin-top: 16px; padding: 14px 16px; border-left: 4px solid var(--belive-orange); border-radius: 0 10px 10px 0; background: var(--belive-orange-soft); }
+.owner-property-review-state.rejected { border-left-color: var(--belive-danger); background: var(--belive-danger-soft); }
+.owner-property-review-state strong { display: block; font-size: 14px; }
+.owner-property-review-state p { margin-top: 4px; color: var(--belive-muted); font-size: 13px; }
+.owner-resubmit-property { margin-top: 12px; }
+.owner-resubmit-property > summary { display: inline-flex; min-height: 44px; list-style: none; cursor: pointer; }
+.owner-resubmit-property > summary::-webkit-details-marker { display: none; }
+.owner-resubmit-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; margin-top: 12px; padding: 16px; border-radius: 12px; background: var(--belive-cream); }
 
 @media (max-width: 760px) {
   .owner-property-hero { align-items: stretch; flex-direction: column; }
@@ -205,13 +221,17 @@ body.portal-login { display: flex; align-items: center; justify-content: center;
 
 @media (max-width: 520px) {
   .owner-property-form,
+  .owner-resubmit-form,
   .owner-room-form,
   .owner-portfolio-stats,
   .owner-room-prices,
   .owner-room-points { grid-template-columns: 1fr; }
   .owner-form-wide { grid-column: auto; }
   .owner-room-points { align-items: stretch; }
+  .owner-room-photo-form { grid-template-columns: 1fr; }
   .owner-room-main { flex-direction: column; }
+  .owner-property-heading { flex-direction: column; }
+  .owner-property-statuses { justify-content: flex-start; }
 }
 
 /* Integration-ready sample panel (owner IoT) — visually distinct so sample
