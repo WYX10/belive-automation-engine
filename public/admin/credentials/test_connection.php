@@ -65,7 +65,15 @@ $http = new Client(['timeout' => 15, 'http_errors' => false]);
                 return [false, "No test defined for service '{$row['service']}'."];
         }
     } catch (\Throwable $e) {
-        return [false, 'Network error: ' . $e->getMessage()];
+        $detail = 'Network error: ' . $e->getMessage();
+        // cURL error 60 on this machine usually means antivirus HTTPS
+        // interception (e.g. Avast Web Shield re-signing certificates) —
+        // no CA bundle can fix that; the AV setting must be changed.
+        if (str_contains($e->getMessage(), 'cURL error 60')) {
+            $detail .= ' — HINT: an antivirus (e.g. Avast Web Shield) may be intercepting HTTPS.'
+                . ' Disable its "HTTPS scanning" or add an exception for this API host, then retest.';
+        }
+        return [false, $detail];
     }
 
     $status = $res->getStatusCode();
