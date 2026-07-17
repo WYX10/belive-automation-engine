@@ -125,4 +125,27 @@ $router->get('/r/{code}', function () {                    // Refer & Earn share
     App\Pipeline\Referral\ReferralLinkGenerator::handleVisit($_GET['code'] ?? '');
 });
 
-$router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/');
+try {
+    $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/');
+} catch (\Throwable $e) {
+    // Never dump a stack trace at a visitor (or a judge): log the real error,
+    // show a branded, minimal 500 page.
+    error_log('[unhandled] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: text/html; charset=utf-8');
+    }
+    echo '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        . '<title>Something went wrong · beLive</title>'
+        . '<link rel="icon" type="image/png" href="/assets/img/belive-favicon.png">'
+        . '<link rel="stylesheet" href="/assets/css/belive-theme.css"></head>'
+        . '<body style="display:flex;align-items:center;justify-content:center;min-height:100vh">'
+        . '<div class="belive-card" style="max-width:420px;text-align:center">'
+        . '<img src="/assets/img/belive-logo.svg" alt="beLive" style="height:36px">'
+        . '<h1 style="font-size:19px;margin:14px 0 8px">Something went wrong on our side</h1>'
+        . '<p class="belive-muted" style="font-size:14px">The team has been notified — please try again in a moment.</p>'
+        . '<p style="margin-top:16px"><a class="belive-btn-primary" href="/">Back to home</a></p>'
+        . '</div></body></html>';
+}

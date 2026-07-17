@@ -54,7 +54,7 @@ All admin POSTs require the session CSRF token (`csrf_token` field, provided by 
 
 | Command | Purpose |
 |---|---|
-| `php database/migrate.php [--bonus]` | Create DB + run migrations 001–010 (`--bonus`: 011–013) |
+| `php database/migrate.php [--core-only]` | Create DB + run ALL migrations (`--core-only` skips the Phase 9 portal tables) |
 | `php database/seed.php [--force]` | Load demo rooms + the Setapak scenario |
 | `php cron/learning_job.php [--quiet-hours=4]` | Drop-off pattern detection + batch rule distillation + reinforcement |
 | `php cron/memory_decay.php [--stale-days=30]` | Confidence decay + below-threshold retirement |
@@ -84,8 +84,9 @@ Default schema name: `belive_eve` (set via `DB_NAME` in `.env`). Tables:
 `api_credentials`, `ai_model_config`, `leads` (incl. `enquired_room_id` + `preferred_tenure`),
 `ai_interactions`, `ai_feedback`, `ai_learned_memory`, `ai_activity_log`, `content_posts`,
 `rooms` + `bookings` (009, extended by 014), `referrals`, `room_pricing` / `room_images` /
-`room_amenities` (015–017, Phase 6.5 catalog), `migrations` (runner bookkeeping).
-Phase 9 (bonus, `--bonus`) adds `verified_listings`, `move_in_logs`, `digital_agreements`.
+`room_amenities` (015–017, Phase 6.5 catalog), `migrations` (runner bookkeeping),
+plus the portal tables `verified_listings`, `move_in_logs`, `digital_agreements` (011–013,
+included in a default migrate run).
 
 Catalog surfaces: `App\Catalog\RoomRepository` (all page reads), `PricingCalculator`
 (price per tenure + saving vs flexible), `RoomRecommender` (candidate block for DecideSkill;

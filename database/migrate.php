@@ -5,10 +5,13 @@ declare(strict_types=1);
 /**
  * CLI migration runner.
  *
- *   php database/migrate.php            → creates the database if needed, runs 001–010
- *   php database/migrate.php --bonus    → also runs 011–013 (Phase 9 bonus tables)
+ *   php database/migrate.php               → creates the database if needed, runs ALL migrations
+ *   php database/migrate.php --core-only   → skip 011–013 (Phase 9 portal tables)
  *
- * Applied migrations are tracked in a `migrations` table; re-running is safe.
+ * The Phase 9 portal tables run by default: the tenant/owner portals are
+ * linked from the public site nav, so their tables are required for a
+ * complete install. Applied migrations are tracked in a `migrations` table;
+ * re-running is safe.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -20,7 +23,7 @@ require APP_ROOT . '/vendor/autoload.php';
 Dotenv\Dotenv::createImmutable(APP_ROOT)->safeLoad();
 
 $cfg = require APP_ROOT . '/config/database.php';
-$includeBonus = in_array('--bonus', $argv, true);
+$includeBonus = !in_array('--core-only', $argv, true);
 
 // Connect server-level first so we can create the database itself.
 $server = new PDO(
@@ -54,7 +57,7 @@ foreach ($files as $file) {
     $number = (int) substr($name, 0, 3);
 
     if (!$includeBonus && $number >= 11 && $number <= 13) {
-        continue; // 011–013 are Phase 9 bonus tables; 014+ are core (Phase 6.5)
+        continue; // --core-only: skip the Phase 9 portal tables
     }
     if (in_array($name, $applied, true)) {
         continue;

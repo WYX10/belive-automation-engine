@@ -31,11 +31,9 @@ Edit `.env`:
 ## 3. Database
 
 ```bash
-php database/migrate.php     # creates the DB + tables 001–010
-php database/seed.php        # demo rooms (real BeLive locations) + the Setapak scenario
+php database/migrate.php     # creates the DB + ALL tables (incl. catalog + portal tables)
+php database/seed.php        # demo rooms (real BeLive media) + the Setapak scenario
 ```
-
-(Phase 9 bonus tables: `php database/migrate.php --bonus`.)
 
 ## 4. Run
 

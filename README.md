@@ -22,7 +22,7 @@ real LLM call, remembered per customer and per context, and applied to future co
 ```bash
 php composer.phar install
 copy .env.example .env        # fill in DB credentials + generate keys (see comments)
-php database/migrate.php      # runs migrations 001–010 (011–013 are Phase 9 bonus)
+php database/migrate.php      # runs ALL migrations (catalog + portal tables included)
 php -S localhost:8080 -t public public/index.php
 ```
 
