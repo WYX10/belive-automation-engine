@@ -68,4 +68,7 @@ define('RENT_REWARD_CREDIT_RM', 50);
 define('RENT_REWARD_STATUSES', ['requested', 'approved', 'applied', 'rejected']);
 
 // API credential service identifiers.
-define('CREDENTIAL_SERVICES', ['whatsapp', 'anthropic', 'gemini', 'meta_graph']);
+define('CREDENTIAL_SERVICES', ['whatsapp', 'anthropic', 'gemini', 'meta_graph', 'openai', 'openrouter']);
+
+// Services that supply LLMs (subset of CREDENTIAL_SERVICES; drives the model registry).
+define('LLM_PROVIDERS', ['anthropic', 'gemini', 'openai', 'openrouter']);

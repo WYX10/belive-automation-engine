@@ -16,6 +16,8 @@ $serviceLabels = [
     'whatsapp'   => 'Meta WhatsApp Cloud API',
     'anthropic'  => 'Claude (Anthropic)',
     'gemini'     => 'Gemini (Google)',
+    'openai'     => 'OpenAI (ChatGPT)',
+    'openrouter' => 'OpenRouter',
     'meta_graph' => 'Meta Graph (FB/IG comments)',
 ];
 
@@ -73,6 +75,12 @@ admin_header('API credentials', 'credentials');
                                 <input type="hidden" name="id" value="<?= (int) $cred['id'] ?>">
                                 <input type="hidden" name="activate_on_success" value="1">
                                 <button type="submit" class="belive-btn-secondary" style="padding:6px 12px; font-size:13px">Test &amp; activate</button>
+                            </form>
+                            <form method="post" action="/admin/credentials/delete" style="display:inline"
+                                  onsubmit="return confirm('Delete credential \'<?= e($cred['label']) ?>\'? The key cannot be recovered.')">
+                                <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                                <input type="hidden" name="id" value="<?= (int) $cred['id'] ?>">
+                                <button type="submit" class="belive-btn-ghost" style="padding:6px 12px; font-size:13px; color:#c0392b">Delete</button>
                             </form>
                         <?php endif; ?>
                     </td>

@@ -14,6 +14,8 @@ $serviceOptions = [
     'whatsapp'   => 'Meta WhatsApp Cloud API (access token)',
     'anthropic'  => 'Claude — Anthropic API key',
     'gemini'     => 'Gemini — Google AI API key',
+    'openai'     => 'OpenAI (ChatGPT) — API key',
+    'openrouter' => 'OpenRouter — API key',
     'meta_graph' => 'Meta Graph — FB/IG comment capture token',
 ];
 

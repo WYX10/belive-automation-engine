@@ -68,9 +68,12 @@ $router->get('/admin/dashboard', "$pages/admin/dashboard.php");
 $router->get('/admin/credentials', "$pages/admin/credentials/index.php");
 $router->any('/admin/credentials/add', "$pages/admin/credentials/add.php");
 $router->post('/admin/credentials/test', "$pages/admin/credentials/test_connection.php");
+$router->post('/admin/credentials/delete', "$pages/admin/credentials/delete.php");
 
 $router->get('/admin/models', "$pages/admin/models/index.php");
 $router->post('/admin/models/switch', "$pages/admin/models/switch.php");
+$router->post('/admin/models/add', "$pages/admin/models/add.php");
+$router->post('/admin/models/remove', "$pages/admin/models/remove.php");
 
 $router->get('/admin/leads', "$pages/admin/leads/index.php");
 $router->get('/admin/leads/view', "$pages/admin/leads/view.php");

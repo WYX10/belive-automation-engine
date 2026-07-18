@@ -78,6 +78,14 @@ abstract class BaseModel
         )->rowCount() > 0;
     }
 
+    public static function delete(int $id): bool
+    {
+        return Database::run(
+            'DELETE FROM `' . static::TABLE . '` WHERE id = ?',
+            [$id]
+        )->rowCount() > 0;
+    }
+
     protected static function db(): PDO
     {
         return Database::pdo();

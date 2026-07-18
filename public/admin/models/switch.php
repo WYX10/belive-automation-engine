@@ -14,7 +14,7 @@ Auth::requireCsrf();
 $phase = $_POST['phase'] ?? '';
 $modelKey = $_POST['model_key'] ?? '';
 
-$registry = require APP_ROOT . '/config/ai_models.php';
+$registry = App\AI\ModelRouter::registry();
 
 if (!in_array($phase, AI_PHASES, true) || !isset($registry[$modelKey])) {
     set_flash('danger', 'Unknown phase or model.');

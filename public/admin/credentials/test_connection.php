@@ -55,6 +55,18 @@ $http = new Client(['timeout' => 15, 'http_errors' => false]);
                 ]);
                 break;
 
+            case 'openai':
+                $res = $http->get('https://api.openai.com/v1/models', [
+                    'headers' => ['Authorization' => "Bearer {$key}"],
+                ]);
+                break;
+
+            case 'openrouter':
+                $res = $http->get('https://openrouter.ai/api/v1/key', [
+                    'headers' => ['Authorization' => "Bearer {$key}"],
+                ]);
+                break;
+
             case 'meta_graph':
                 $res = $http->get('https://graph.facebook.com/v20.0/me', [
                     'headers' => ['Authorization' => "Bearer {$key}"],
