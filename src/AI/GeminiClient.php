@@ -45,6 +45,11 @@ final class GeminiClient implements LlmClient
                     'generationConfig'   => array_filter([
                         'maxOutputTokens' => $opts['max_tokens'] ?? 1024,
                         'temperature'     => $opts['temperature'] ?? null,
+                        // Thinking models spend maxOutputTokens on hidden
+                        // reasoning first — unbudgeted, it starves the visible
+                        // reply into mid-sentence truncation. These calls are
+                        // short structured tasks; no thinking needed.
+                        'thinkingConfig'  => ['thinkingBudget' => $opts['thinking_budget'] ?? 0],
                     ], static fn ($v) => $v !== null),
                 ],
             ]);
@@ -57,6 +62,9 @@ final class GeminiClient implements LlmClient
 
         $text = '';
         foreach ($raw['candidates'][0]['content']['parts'] ?? [] as $part) {
+            if ($part['thought'] ?? false) {
+                continue; // never let internal reasoning reach a customer
+            }
             $text .= $part['text'] ?? '';
         }
 
