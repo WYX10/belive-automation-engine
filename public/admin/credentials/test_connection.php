@@ -68,7 +68,17 @@ $http = new Client(['timeout' => 15, 'http_errors' => false]);
                 break;
 
             case 'meta_graph':
-                $res = $http->get('https://graph.facebook.com/v20.0/me', [
+                // Prefer verifying against the Page when a page_id is stored —
+                // publishing needs a Page token, and /me alone can't tell.
+                $pageId = $meta['page_id'] ?? '';
+                $res = $http->get(
+                    'https://graph.facebook.com/v20.0/' . ($pageId !== '' ? "{$pageId}?fields=id,name" : 'me'),
+                    ['headers' => ['Authorization' => "Bearer {$key}"]]
+                );
+                break;
+
+            case 'tiktok':
+                $res = $http->get('https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name', [
                     'headers' => ['Authorization' => "Bearer {$key}"],
                 ]);
                 break;

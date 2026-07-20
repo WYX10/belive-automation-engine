@@ -11,12 +11,15 @@ document.addEventListener('click', (e) => {
   if (el && !window.confirm(el.getAttribute('data-confirm'))) e.preventDefault();
 });
 
-// Credentials form: show WhatsApp-specific fields only for the whatsapp service.
+// Credentials form: show the extra-field block matching the selected service
+// (blocks carry data-service-fields="whatsapp" / "meta_graph" / "tiktok").
 const serviceSelect = document.querySelector('#credential-service');
 if (serviceSelect) {
-  const waFields = document.querySelector('#whatsapp-extra-fields');
+  const blocks = document.querySelectorAll('[data-service-fields]');
   const sync = () => {
-    if (waFields) waFields.style.display = serviceSelect.value === 'whatsapp' ? '' : 'none';
+    blocks.forEach((b) => {
+      b.style.display = b.getAttribute('data-service-fields') === serviceSelect.value ? '' : 'none';
+    });
   };
   serviceSelect.addEventListener('change', sync);
   sync();

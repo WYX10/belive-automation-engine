@@ -6,13 +6,15 @@ defined('APP_BOOTED') || exit('No direct access.');
 
 /**
  * Content module — AI-generated social post drafts from live room metrics.
- * Publishing is explicitly semi-automated: platform publish APIs (FB/IG page
- * publishing needs app review; TikTok has none) are out of competition
- * budget/scope, so admin approves and posts manually, then marks it posted.
+ * Fully automated pipeline: drafts arrive on demand (button below) or on
+ * schedule (cron/auto_draft_content.php); admin approval publishes straight
+ * to the platform via SocialPublishManager, with a dry-run fallback badged
+ * 'simulated' when no platform credential is active.
  */
 
 use App\AI\Skills\CreateSkill;
 use App\Core\Auth;
+use App\Integrations\Social\SocialPublishManager;
 use App\Models\Room;
 use App\Core\Database;
 
@@ -32,8 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate'
         try {
             $caption = CreateSkill::socialCaption($room, $platform);
             Database::run(
-                'INSERT INTO content_posts (platform, room_id, caption, status, generated_by_model) VALUES (?, ?, ?, ?, ?)',
-                [$platform, $room['id'], $caption['text'], 'draft', $caption['model']]
+                'INSERT INTO content_posts (platform, room_id, caption, status, generated_by_model, generated_via, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [$platform, $room['id'], $caption['text'], 'draft', $caption['model'], 'manual', Room::photoUrls((int) $room['id'])[0] ?? null]
             );
             set_flash('success', 'Draft generated from live room metrics by ' . $caption['model'] . '.');
         } catch (\Throwable $e) {
@@ -44,19 +46,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate'
     exit;
 }
 
+$filter = $_GET['status'] ?? 'all';
+$filterWhere = match ($filter) {
+    'draft'    => "WHERE p.status = 'draft'",
+    'failed'   => "WHERE p.status = 'approved'",
+    'posted'   => "WHERE p.status = 'posted'",
+    'rejected' => "WHERE p.status = 'rejected'",
+    default    => '',
+};
+if ($filterWhere === '') {
+    $filter = 'all';
+}
+
 $posts = Database::run(
-    'SELECT p.*, r.name AS room_name, r.location AS area FROM content_posts p
-     LEFT JOIN rooms r ON r.id = p.room_id ORDER BY p.id DESC LIMIT 100'
+    "SELECT p.*, r.name AS room_name, r.location AS area FROM content_posts p
+     LEFT JOIN rooms r ON r.id = p.room_id $filterWhere ORDER BY p.id DESC LIMIT 100"
 )->fetchAll();
 $rooms = \App\Catalog\RoomRepository::filter(['tenure' => 'monthly'], 100);
+$counts = SocialPublishManager::counts();
 
 $platformIcons = ['facebook' => '📘', 'instagram' => '📷', 'tiktok' => '🎵'];
+$filterTabs = [
+    'all'      => "All ({$counts['all']})",
+    'draft'    => "Awaiting approval ({$counts['pending']})",
+    'failed'   => "Needs publish ({$counts['failed']})",
+    'posted'   => "Posted ({$counts['posted']})",
+    'rejected' => "Rejected ({$counts['rejected']})",
+];
 
 admin_header('Content', 'content');
 ?>
 <div class="belive-page-head">
     <h1>Content studio</h1>
-    <span class="belive-muted" style="font-size:13px">Room metrics in → on-brand captions out. Publish is admin-approved (semi-automated by design).</span>
+    <span class="belive-muted" style="font-size:13px">Room metrics in → on-brand captions out. Approve a draft and it publishes to the platform automatically (dry-run when no credential is live).</span>
+</div>
+
+<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px">
+    <?php foreach ($filterTabs as $key => $label): ?>
+        <a class="<?= $filter === $key ? 'belive-btn-secondary' : 'belive-btn-ghost' ?>" style="padding:6px 14px; font-size:13px"
+           href="/admin/content<?= $key === 'all' ? '' : '?status=' . e($key) ?>"><?= e($label) ?></a>
+    <?php endforeach; ?>
 </div>
 
 <div class="belive-card" style="margin-bottom:16px">
@@ -86,7 +115,7 @@ admin_header('Content', 'content');
 
 <div class="belive-card">
     <?php if ($posts === []): ?>
-        <p class="belive-muted">No drafts yet — generate one above.</p>
+        <p class="belive-muted"><?= $filter === 'all' ? 'No drafts yet — generate one above, or let the daily cron draft for you.' : 'Nothing in this state right now.' ?></p>
     <?php else: ?>
         <table class="belive-table">
             <thead><tr><th>Platform</th><th>Room</th><th>Caption</th><th>Model</th><th>Status</th><th></th></tr></thead>
@@ -98,7 +127,13 @@ admin_header('Content', 'content');
                     <td style="font-size:13px; max-width:320px"><?= e(mb_substr($post['caption'], 0, 120)) ?><?= mb_strlen($post['caption']) > 120 ? '…' : '' ?></td>
                     <td style="font-size:12.5px"><code><?= e($post['generated_by_model']) ?></code></td>
                     <td>
-                        <span class="belive-badge <?= $post['status'] === 'posted' ? '' : 'orange' ?>"><?= e($post['status']) ?></span>
+                        <span class="belive-badge <?= match ($post['status']) { 'posted' => '', 'rejected' => 'danger', default => 'orange' } ?>"><?= e($post['status']) ?></span>
+                        <?php if ($post['publish_status']): ?>
+                            <span class="belive-badge <?= match ($post['publish_status']) { 'published' => '', 'simulated' => 'orange', default => 'danger' } ?>" style="font-size:11px"><?= e($post['publish_status']) ?></span>
+                        <?php endif; ?>
+                        <?php if ($post['publish_status'] === 'failed' && $post['publish_error']): ?>
+                            <div class="belive-muted" style="font-size:11px" title="<?= e($post['publish_error']) ?>"><?= e(mb_substr($post['publish_error'], 0, 60)) ?><?= mb_strlen($post['publish_error']) > 60 ? '…' : '' ?></div>
+                        <?php endif; ?>
                         <?php if ($post['posted_at']): ?><div class="belive-muted" style="font-size:11px"><?= e($post['posted_at']) ?></div><?php endif; ?>
                     </td>
                     <td><a class="belive-btn-ghost" style="padding:5px 12px; font-size:13px" href="/admin/content/preview?id=<?= (int) $post['id'] ?>">Preview</a></td>

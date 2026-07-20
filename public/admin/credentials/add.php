@@ -16,7 +16,15 @@ $serviceOptions = [
     'gemini'     => 'Gemini — Google AI API key',
     'openai'     => 'OpenAI (ChatGPT) — API key',
     'openrouter' => 'OpenRouter — API key',
-    'meta_graph' => 'Meta Graph — FB/IG comment capture token',
+    'meta_graph' => 'Meta Graph — Page token (FB/IG publishing + comment capture)',
+    'tiktok'     => 'TikTok — Content Posting API access token',
+];
+
+// Per-service extra fields stored in the credential's meta JSON.
+$serviceMetaFields = [
+    'whatsapp'   => ['phone_number_id', 'waba_id'],
+    'meta_graph' => ['page_id', 'ig_user_id'],
+    'tiktok'     => ['open_id'],
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -30,12 +38,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         set_flash('danger', 'Pick a service and paste the API key.');
     } else {
         $meta = [];
-        if ($service === 'whatsapp') {
-            foreach (['phone_number_id', 'waba_id'] as $field) {
-                $value = trim($_POST[$field] ?? '');
-                if ($value !== '') {
-                    $meta[$field] = $value;
-                }
+        foreach ($serviceMetaFields[$service] ?? [] as $field) {
+            $value = trim($_POST[$field] ?? '');
+            if ($value !== '') {
+                $meta[$field] = $value;
             }
         }
 
@@ -79,7 +85,7 @@ admin_header('Add credential', 'credentials');
             <div class="hint">Encrypted with AES-256-GCM before it touches the database. Shown masked afterwards.</div>
         </div>
 
-        <div id="whatsapp-extra-fields" style="display:none">
+        <div data-service-fields="whatsapp" style="display:none">
             <div class="belive-field">
                 <label for="phone_number_id">Phone number ID</label>
                 <input id="phone_number_id" name="phone_number_id" type="text" placeholder="From Meta App → WhatsApp → API Setup">
@@ -87,6 +93,36 @@ admin_header('Add credential', 'credentials');
             <div class="belive-field">
                 <label for="waba_id">WhatsApp Business Account ID <span class="belive-muted">(optional)</span></label>
                 <input id="waba_id" name="waba_id" type="text">
+            </div>
+        </div>
+
+        <div data-service-fields="meta_graph" style="display:none">
+            <div class="belive-field">
+                <label for="page_id">Facebook Page ID <span class="belive-muted">(needed for FB publishing)</span></label>
+                <input id="page_id" name="page_id" type="text" placeholder="From Meta Business Suite → Page settings">
+            </div>
+            <div class="belive-field">
+                <label for="ig_user_id">Instagram Business account ID <span class="belive-muted">(needed for IG publishing)</span></label>
+                <input id="ig_user_id" name="ig_user_id" type="text">
+            </div>
+            <div class="hint">
+                For auto-publishing this must be a <strong>Page access token</strong> with
+                <code>pages_manage_posts</code> and <code>instagram_content_publish</code>. Only one
+                meta_graph credential is active at a time, so keep the comment-capture scopes on the
+                same token if that feature is in use. Without an active credential, approvals publish
+                in clearly-badged dry-run mode.
+            </div>
+        </div>
+
+        <div data-service-fields="tiktok" style="display:none">
+            <div class="belive-field">
+                <label for="open_id">TikTok open_id <span class="belive-muted">(optional)</span></label>
+                <input id="open_id" name="open_id" type="text">
+            </div>
+            <div class="hint">
+                User access token with the <code>video.publish</code> scope from an approved TikTok
+                developer app. Unaudited apps can only post SELF_ONLY; until then approvals publish
+                in dry-run mode.
             </div>
         </div>
 

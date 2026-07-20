@@ -58,8 +58,13 @@ define('MEMORY_DECAY_STEP', 0.25);
 
 define('BOOKING_STATUSES', ['pending', 'confirmed', 'cancelled', 'completed']);
 
-define('CONTENT_POST_STATUSES', ['draft', 'approved', 'posted']);
+define('CONTENT_POST_STATUSES', ['draft', 'approved', 'rejected', 'posted']);
 define('CONTENT_PLATFORMS', ['facebook', 'instagram', 'tiktok']);
+
+// content_posts.publish_status — outcome of the auto-publish attempt.
+// 'simulated' = dry-run (no active credential), clearly badged, never passed
+// off as a real platform post.
+define('CONTENT_PUBLISH_STATUSES', ['published', 'simulated', 'failed']);
 
 define('REFERRAL_REWARD_STATUSES', ['pending', 'credited']);
 define('REFERRAL_REWARD_POINTS', 50); // fixed points per successful referral
@@ -68,7 +73,7 @@ define('RENT_REWARD_CREDIT_RM', 50);
 define('RENT_REWARD_STATUSES', ['requested', 'approved', 'applied', 'rejected']);
 
 // API credential service identifiers.
-define('CREDENTIAL_SERVICES', ['whatsapp', 'anthropic', 'gemini', 'meta_graph', 'openai', 'openrouter']);
+define('CREDENTIAL_SERVICES', ['whatsapp', 'anthropic', 'gemini', 'meta_graph', 'openai', 'openrouter', 'tiktok']);
 
 // Services that supply LLMs (subset of CREDENTIAL_SERVICES; drives the model registry).
 define('LLM_PROVIDERS', ['anthropic', 'gemini', 'openai', 'openrouter']);
