@@ -19,8 +19,10 @@ if errorlevel 1 (
     echo MariaDB already running.
 )
 
-REM --- PHP dev server (6 workers, front-controller routing) ---
-set PHP_CLI_SERVER_WORKERS=6
+REM --- PHP dev server (12 workers, front-controller routing) ---
+REM 12 workers: AI pipelines hold a worker for 10-25s each, and Meta's
+REM room-photo fetches (facebookexternalhit) must always find a free one.
+set PHP_CLI_SERVER_WORKERS=12
 echo.
 echo BeLive Automation Engine running at http://127.0.0.1:8080
 echo   Public site : http://127.0.0.1:8080/
