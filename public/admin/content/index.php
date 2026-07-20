@@ -68,7 +68,7 @@ admin_header('Content', 'content');
             <label>Room to feature</label>
             <select name="room_id">
                 <?php foreach ($rooms as $room): ?>
-                    <option value="<?= (int) $room['id'] ?>"><?= e($room['name']) ?> — <?= e($room['location']) ?>, RM<?= e(number_format($room['price_at_tenure'])) ?>/mo flexible</option>
+                    <option value="<?= (int) $room['id'] ?>"><?= e($room['name']) ?> — <?= e($room['location']) ?>, RM<?= e(number_format((float) $room['price_at_tenure'])) ?>/mo flexible</option>
                 <?php endforeach; ?>
             </select>
         </div>

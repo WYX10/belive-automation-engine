@@ -87,7 +87,7 @@ $router->get('/admin/learning_log/rule', "$pages/admin/learning_log/rule_detail.
 
 $router->get('/admin/activity_log', "$pages/admin/activity_log/index.php");
 
-$router->get('/admin/content', "$pages/admin/content/index.php");
+$router->any('/admin/content', "$pages/admin/content/index.php");
 $router->any('/admin/content/preview', "$pages/admin/content/preview.php");
 
 $router->get('/admin/bookings', "$pages/admin/bookings/index.php");
