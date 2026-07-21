@@ -101,7 +101,10 @@ function site_footer(): void
 </main>
 <footer class="site-footer">
     <img src="/assets/img/belive-logo.svg" alt="beLive" style="height:22px; display:inline-block; vertical-align:middle">
-    &nbsp;·&nbsp; Live Smarter, Stay Better. &nbsp;·&nbsp; Demo build — GrenA · TAR UMT Johor · BeLive × TAR UMT AI Solopreneur Challenge 2026
+    &nbsp;·&nbsp; Live Smarter, Stay Better.
+    &nbsp;·&nbsp; <a href="/terms">Terms of Service</a>
+    &nbsp;·&nbsp; <a href="/privacy">Privacy Policy</a>
+    &nbsp;·&nbsp; Demo build — GrenA · TAR UMT Johor · BeLive × TAR UMT AI Solopreneur Challenge 2026
 </footer>
 </body>
 </html>

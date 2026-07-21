@@ -57,6 +57,17 @@ $router->get('/rooms', "$pages/site/rooms.php");
 $router->get('/rooms/{id}', "$pages/site/room_detail.php");
 $router->post('/enquire', "$pages/site/enquire.php");
 
+// Legal pages — public and login-free; developer-platform reviewers (TikTok,
+// Meta) open these URLs directly as part of app submission.
+$router->get('/terms', function () use ($pages) {
+    $_GET['doc'] = 'terms';
+    require "$pages/site/legal.php";
+});
+$router->get('/privacy', function () use ($pages) {
+    $_GET['doc'] = 'privacy';
+    require "$pages/site/legal.php";
+});
+
 // --- Admin panel ---------------------------------------------------------------
 $router->any('/admin/login', "$pages/admin/login.php");
 $router->get('/admin/logout', function () {
