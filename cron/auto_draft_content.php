@@ -9,7 +9,11 @@ declare(strict_types=1);
  * post awaiting publish), generates a caption with CreateSkill, and leaves
  * the draft in the studio for admin approval. Approval then auto-publishes.
  *
- *   php cron/auto_draft_content.php [--platforms=facebook,instagram,tiktok] [--max=3]
+ * Platform list, per-run limit and the content brief default to whatever the
+ * admin saved in the content studio (Settings / app_settings); the flags below
+ * override them for a one-off run.
+ *
+ *   php cron/auto_draft_content.php [--platforms=facebook,instagram,tiktok] [--max=3] [--brief="..."]
  *
  * Schedule daily (Windows Task Scheduler):
  *   schtasks /Create /TN "BeLive AutoDraftContent" /SC DAILY /ST 09:00 ^
@@ -29,10 +33,14 @@ date_default_timezone_set('Asia/Kuala_Lumpur');
 use App\AI\Memory\EpisodicLogger;
 use App\AI\Skills\CreateSkill;
 use App\Core\Database;
+use App\Core\Settings;
 use App\Models\Room;
 
-$platforms = CONTENT_PLATFORMS;
-$max = 3;
+// Defaults come from the content studio's automation card; CLI flags override.
+$platforms = array_values(array_intersect(Settings::getList('content_auto_platforms', CONTENT_PLATFORMS), CONTENT_PLATFORMS));
+$max = max(1, Settings::getInt('content_auto_max', 3));
+$brief = Settings::get('content_brief', '');
+
 foreach ($argv as $arg) {
     if (str_starts_with($arg, '--platforms=')) {
         $requested = array_filter(array_map('trim', explode(',', substr($arg, 12))));
@@ -40,6 +48,9 @@ foreach ($argv as $arg) {
     }
     if (str_starts_with($arg, '--max=')) {
         $max = max(1, (int) substr($arg, 6));
+    }
+    if (str_starts_with($arg, '--brief=')) {
+        $brief = trim(substr($arg, 8));
     }
 }
 
@@ -71,7 +82,7 @@ foreach ($platforms as $platform) {
             continue;
         }
 
-        $caption = CreateSkill::socialCaption($room, $platform);
+        $caption = CreateSkill::socialCaption($room, $platform, $brief);
         Database::run(
             'INSERT INTO content_posts (platform, room_id, caption, status, generated_by_model, generated_via, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [$platform, $room['id'], $caption['text'], 'draft', $caption['model'], 'cron', Room::photoUrls((int) $room['id'])[0] ?? null]

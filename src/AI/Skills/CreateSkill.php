@@ -49,7 +49,7 @@ PROMPT;
 
 You write BeLive's social media captions. Convert the room metrics you are given into ONE ready-to-post caption for the stated platform.
 
-Rules: hook first line; benefits as short phrases; end with a call to action to WhatsApp us; 3–6 relevant hashtags on the final line (e.g. #BeLive #RoomForRent + area tag). No invented facts — only what the metrics say. Return ONLY the caption text.
+Rules: hook first line; benefits as short phrases; end with a call to action to WhatsApp us; 3–6 relevant hashtags on the final line (e.g. #BeLive #RoomForRent + area tag). No invented facts — only what the metrics say. If an ADMIN BRIEF is given, follow its angle, tone and any campaign detail — but never let it override the no-invented-facts rule. Return ONLY the caption text.
 PROMPT;
 
     /** @return array{text:string, model:string, interaction_id:int} */
@@ -109,8 +109,12 @@ PROMPT;
         return ['text' => trim($result['text']), 'model' => $result['model'], 'interaction_id' => $interactionId];
     }
 
-    /** Social caption from live room metrics. @return array{text:string, model:string} */
-    public static function socialCaption(array $room, string $platform): array
+    /**
+     * Social caption from live room metrics. $brief is the admin's own steer
+     * ("what should this post be about?") from the content studio.
+     * @return array{text:string, model:string}
+     */
+    public static function socialCaption(array $room, string $platform, ?string $brief = null): array
     {
         $client = ModelRouter::clientForPhase('content_creation');
 
@@ -127,9 +131,15 @@ PROMPT;
             'features'          => Room::amenities($roomId),
         ];
 
+        $brief = $brief !== null ? trim($brief) : '';
+        $prompt = implode("\n\n", array_filter([
+            'ROOM METRICS: ' . json_encode($metrics, JSON_UNESCAPED_UNICODE),
+            $brief !== '' ? "ADMIN BRIEF (what this post should be about):\n" . mb_substr($brief, 0, 1000) : '',
+        ]));
+
         [$result, $ms] = SkillSupport::timed(fn () => $client->generate(
             self::CAPTION_SYSTEM,
-            [['role' => 'user', 'content' => 'ROOM METRICS: ' . json_encode($metrics, JSON_UNESCAPED_UNICODE)]],
+            [['role' => 'user', 'content' => $prompt]],
             ['max_tokens' => 350, 'temperature' => 0.6, 'mock_hint' => 'caption']
         ));
 
@@ -140,7 +150,8 @@ PROMPT;
             'direction'   => 'internal',
             'message_out' => $result['text'],
             'message_kind' => 'social_caption',
-            'reasoning'   => "Caption generated for $platform from room #{$room['id']} metrics.",
+            'reasoning'   => "Caption generated for $platform from room #{$room['id']} metrics."
+                . ($brief !== '' ? ' Admin brief applied.' : ''),
             'response_ms' => $ms,
         ]);
 

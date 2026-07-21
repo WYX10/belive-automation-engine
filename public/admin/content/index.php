@@ -17,9 +17,31 @@ use App\Core\Auth;
 use App\Integrations\Social\SocialPublishManager;
 use App\Models\Room;
 use App\Core\Database;
+use App\Core\Settings;
 
 require dirname(__DIR__) . '/_layout.php';
 Auth::requireAdmin();
+
+// Automation controls: drafts per cron run, platforms covered, standing brief.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'settings') {
+    Auth::requireCsrf();
+
+    $max = max(1, min(20, (int) ($_POST['content_auto_max'] ?? 3)));
+    $platforms = array_values(array_intersect((array) ($_POST['content_auto_platforms'] ?? []), CONTENT_PLATFORMS));
+    $brief = trim((string) ($_POST['content_brief'] ?? ''));
+
+    if ($platforms === []) {
+        set_flash('danger', 'Pick at least one platform for the daily drafts.');
+    } else {
+        $by = (string) ($_SESSION['admin_username'] ?? 'admin');
+        Settings::set('content_auto_max', (string) $max, $by);
+        Settings::set('content_auto_platforms', implode(',', $platforms), $by);
+        Settings::set('content_brief', mb_substr($brief, 0, 1000), $by);
+        set_flash('success', "Automation saved — up to $max draft(s) per run across " . implode(', ', $platforms) . '.');
+    }
+    header('Location: /admin/content');
+    exit;
+}
 
 // Generate a new draft on demand (real CreateSkill call on live room data).
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate') {
@@ -27,12 +49,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate'
 
     $room = Room::find((int) ($_POST['room_id'] ?? 0));
     $platform = in_array($_POST['platform'] ?? '', CONTENT_PLATFORMS, true) ? $_POST['platform'] : 'facebook';
+    // Per-post steer wins; otherwise fall back to the standing brief.
+    $brief = trim((string) ($_POST['brief'] ?? '')) ?: Settings::get('content_brief', '');
 
     if ($room === null) {
         set_flash('danger', 'Pick a room to feature.');
     } else {
         try {
-            $caption = CreateSkill::socialCaption($room, $platform);
+            $caption = CreateSkill::socialCaption($room, $platform, $brief);
             Database::run(
                 'INSERT INTO content_posts (platform, room_id, caption, status, generated_by_model, generated_via, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
                 [$platform, $room['id'], $caption['text'], 'draft', $caption['model'], 'manual', Room::photoUrls((int) $room['id'])[0] ?? null]
@@ -64,6 +88,10 @@ $posts = Database::run(
 )->fetchAll();
 $rooms = \App\Catalog\RoomRepository::filter(['tenure' => 'monthly'], 100);
 $counts = SocialPublishManager::counts();
+
+$autoMax = Settings::getInt('content_auto_max', 3);
+$autoPlatforms = Settings::getList('content_auto_platforms', CONTENT_PLATFORMS);
+$standingBrief = Settings::get('content_brief', '');
 
 $platformIcons = ['facebook' => '📘', 'instagram' => '📷', 'tiktok' => '🎵'];
 $filterTabs = [
@@ -109,7 +137,46 @@ admin_header('Content', 'content');
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="belive-field" style="flex:1 1 100%; margin-bottom:0">
+            <label>What should this post be about? <span class="belive-muted" style="font-weight:400">(optional — blank uses the standing brief below)</span></label>
+            <textarea name="brief" rows="2" maxlength="1000"
+                      placeholder="e.g. push the zero-deposit angle for students moving in before September, mention the free weekly cleaning"></textarea>
+        </div>
         <button type="submit" class="belive-btn-primary">Generate caption</button>
+    </form>
+</div>
+
+<div class="belive-card" style="margin-bottom:16px">
+    <div class="belive-card-title">⚙️ Daily automation</div>
+    <p class="belive-muted" style="font-size:13px; margin-top:-4px">
+        <code>cron/auto_draft_content.php</code> runs once a day and drafts up to the limit below — currently
+        <strong><?= (int) $autoMax ?> per run ≈ <?= (int) $autoMax * 7 ?> a week</strong>. Drafts still wait for your approval before publishing.
+    </p>
+    <form method="post" action="/admin/content" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start">
+        <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+        <input type="hidden" name="do" value="settings">
+        <div class="belive-field" style="flex:0 0 150px; margin-bottom:0">
+            <label>Drafts per run</label>
+            <input type="number" name="content_auto_max" min="1" max="20" value="<?= (int) $autoMax ?>">
+        </div>
+        <div class="belive-field" style="flex:1; min-width:200px; margin-bottom:0">
+            <label>Platforms</label>
+            <div style="display:flex; gap:14px; flex-wrap:wrap; padding-top:6px">
+                <?php foreach (CONTENT_PLATFORMS as $platform): ?>
+                    <label style="font-weight:400; display:flex; gap:6px; align-items:center">
+                        <input type="checkbox" name="content_auto_platforms[]" value="<?= e($platform) ?>"
+                            <?= in_array($platform, $autoPlatforms, true) ? 'checked' : '' ?>>
+                        <?= $platformIcons[$platform] ?> <?= e(ucfirst($platform)) ?>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <div class="belive-field" style="flex:1 1 100%; margin-bottom:0">
+            <label>Standing content brief <span class="belive-muted" style="font-weight:400">(what the AI should write about by default)</span></label>
+            <textarea name="content_brief" rows="3" maxlength="1000"
+                      placeholder="e.g. lead with zero deposit and fully furnished; keep it upbeat for young professionals in KL; always mention flexible monthly tenure"><?= e($standingBrief) ?></textarea>
+        </div>
+        <button type="submit" class="belive-btn-secondary">Save automation</button>
     </form>
 </div>
 
