@@ -20,6 +20,23 @@ final class Interaction extends BaseModel
         return self::all(['lead_id' => $leadId], 'id DESC', $limit);
     }
 
+    /**
+     * Minutes since this lead's last logged interaction, measured on the
+     * DATABASE clock. Comparing MySQL's created_at against PHP's time() breaks
+     * whenever the two run in different timezones (Azure MySQL is UTC, the app
+     * is Asia/Kuala_Lumpur) — an 8-hour phantom gap made every message look
+     * like a return visit.
+     */
+    public static function minutesSinceLast(int $leadId): ?int
+    {
+        $minutes = Database::run(
+            'SELECT TIMESTAMPDIFF(MINUTE, MAX(created_at), NOW()) FROM ai_interactions WHERE lead_id = ?',
+            [$leadId]
+        )->fetchColumn();
+
+        return $minutes === null || $minutes === false ? null : (int) $minutes;
+    }
+
     /** Chronological conversation transcript (outbound replies + inbound). */
     public static function transcript(int $leadId, int $limit = 50): array
     {

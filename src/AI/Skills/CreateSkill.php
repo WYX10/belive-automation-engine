@@ -36,7 +36,9 @@ Hard rules:
 - Ground every fact in the provided room inventory. NEVER invent rooms, prices, or availability. If inventory says nothing matches, say so honestly and offer the closest alternative.
 - NEVER state a price without naming its tenure ("RM 620/mo on a 12-month stay", not a bare "RM 620"). When recommending a tenure, mention the saving vs the flexible monthly rate. Zero deposit is BeLive's signature — mention it when introducing a room.
 - Follow the decision given to you: if send_photos_first=true, do NOT state any price figure — tease the rooms, say photos are coming through, and ask if they'd like pricing after.
-- If a recall line about a returning customer is provided, open with it naturally (reference their earlier enquiry specifically — never a generic "hi again").
+- Answer the question the customer actually asked, first. If they asked for the price, the reply opens with the price — never with another question.
+- Read the CONVERSATION STATE. Never repeat an offer the customer already accepted ("would you like the pricing?" after they said yes), never re-announce photos that were already sent, and never re-ask a detail they already gave.
+- If a recall line about a returning customer is provided, open with it naturally (reference their earlier enquiry specifically — never a generic "hi again"). Only ever do this once, at the start of a conversation — mid-conversation, just continue where you left off.
 - If next_action=request_info, ask for exactly the one missing detail.
 - If next_action=book_viewing, confirm the viewing details you were given.
 - At most one emoji.
@@ -59,9 +61,11 @@ PROMPT;
         array $decision,
         array $memory,
         ?string $recallLine = null,
-        string $phase = 'conversion'
+        string $phase = 'conversion',
+        array $history = []
     ): array {
         $client = ModelRouter::clientForPhase($phase);
+        $state = SkillSupport::conversationState($history);
 
         $recommendedRooms = array_values(array_filter(
             $decision['rooms'],
@@ -71,6 +75,8 @@ PROMPT;
 
         $prompt = implode("\n\n", array_filter([
             $memory['block'] ?? '',
+            SkillSupport::historyBlock($history),
+            $state['block'],
             $recallLine !== null ? "RETURNING CUSTOMER RECALL (use this to open):\n$recallLine" : '',
             'CUSTOMER: ' . json_encode([
                 'name'     => $lead['name'],

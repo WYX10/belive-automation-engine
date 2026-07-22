@@ -42,6 +42,11 @@ Decision guidance:
 - "escalate" for complaints, legal/payment disputes, or anything Eve should not answer alone.
 - "request_info" only when a genuinely needed detail (like area) is missing.
 - If a LEARNED RULE applies to this context, you MUST follow it (e.g. a sequencing rule that says send photos before price ⇒ send_photos_first=true) and mention it in reasoning.
+
+Never loop. Read the CONVERSATION STATE before deciding:
+- "send_photos_first" is a ONE-TIME opener. If photos have already been sent to this customer, it MUST be false — the sequencing rule is already satisfied; re-sending is a bug, not a rule.
+- If the customer has asked for pricing (or agreed to Eve's offer to share it), next_action MUST be "answer_directly" with send_photos_first=false. Answer the question they actually asked; never re-offer something they already accepted.
+- Only use "request_info" for a detail the customer has not already given anywhere in the history.
 PROMPT;
 
     /**
@@ -49,16 +54,19 @@ PROMPT;
      *               send_photos_first:bool, recommended_room_ids:array, recommendation:string,
      *               reasoning:string, model:string, rooms:array, memory_ids:array}
      */
-    public static function run(array $lead, array $understanding, array $memory, string $phase = 'conversion'): array
+    public static function run(array $lead, array $understanding, array $memory, string $phase = 'conversion', array $history = []): array
     {
         $client = ModelRouter::clientForPhase($phase);
 
         $entities = $understanding['entities'];
         $candidates = RoomRecommender::candidates($lead, $understanding);
         $rooms = $candidates['rooms'];
+        $state = SkillSupport::conversationState($history);
 
         $prompt = implode("\n\n", array_filter([
             $memory['block'] ?? '',
+            SkillSupport::historyBlock($history),
+            $state['block'],
             'CUSTOMER PROFILE: ' . json_encode([
                 'name'           => $lead['name'],
                 'status'         => $lead['status'],
@@ -98,6 +106,22 @@ PROMPT;
             'rooms'                => $rooms,
             'memory_ids'           => $memory['ids'] ?? [],
         ];
+
+        // Photos-first is a one-time opener, and a direct price question always
+        // wins. Enforced in code, not left to the model: a learned sequencing
+        // rule ("photos before price") otherwise fires on every single turn and
+        // the customer never gets the price they keep asking for.
+        if ($decision['send_photos_first'] && ($state['photos_sent'] || $state['price_asked']
+            || $understanding['intent'] === 'price_enquiry')) {
+            $decision['send_photos_first'] = false;
+            $decision['reasoning'] .= $state['photos_sent']
+                ? ' [Photos already sent earlier — not re-sending; answering the pending question instead.]'
+                : ' [Customer asked for pricing directly — answering rather than teasing photos first.]';
+
+            if ($decision['next_action'] === 'request_info') {
+                $decision['next_action'] = 'answer_directly';
+            }
+        }
 
         // Persist the tenure Eve landed on (customer's own statement wins).
         if ($decision['recommended_tenure'] !== null && empty($lead['preferred_tenure'])) {

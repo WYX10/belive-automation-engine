@@ -82,7 +82,7 @@ final class ConversationManager
         $memory = MemoryRetriever::promptBlock(MemoryRetriever::forContext($contextTag));
 
         // 3. DECIDE — situational: qualification, matching, next action.
-        $decision = DecideSkill::run($lead, $understanding, $memory);
+        $decision = DecideSkill::run($lead, $understanding, $memory, 'conversion', $history);
 
         // Escalation short-circuits: honest human handoff, no AI bluffing.
         if ($decision['next_action'] === 'escalate') {
@@ -103,7 +103,7 @@ final class ConversationManager
         }
 
         // 4. CREATE — on-brand reply, grounded in inventory + learned rules.
-        $reply = CreateSkill::reply($lead, $understanding, $decision, $memory, $recallLine);
+        $reply = CreateSkill::reply($lead, $understanding, $decision, $memory, $recallLine, 'conversion', $history);
 
         // 5. AUTOMATE — photos-first if decided, send, status + assessment.
         AutomateSkill::run(

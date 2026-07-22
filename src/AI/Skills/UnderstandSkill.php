@@ -47,7 +47,7 @@ PROMPT;
     {
         $client = ModelRouter::clientForPhase($phase);
 
-        $context = self::historyBlock($history);
+        $context = SkillSupport::historyBlock($history);
         [$result, $ms] = SkillSupport::timed(fn () => $client->generate(
             self::SYSTEM,
             [['role' => 'user', 'content' => "$context\nNEW CUSTOMER MESSAGE:\n$message"]],
@@ -87,21 +87,4 @@ PROMPT;
         return $understanding;
     }
 
-    private static function historyBlock(array $history): string
-    {
-        if ($history === []) {
-            return 'CONVERSATION HISTORY: (first contact)';
-        }
-
-        $lines = [];
-        foreach ($history as $row) {
-            $who = $row['direction'] === 'inbound' ? 'Customer' : 'Eve';
-            $text = $row['direction'] === 'inbound' ? $row['message_in'] : $row['message_out'];
-            if ($text !== null && $text !== '') {
-                $lines[] = "$who: $text";
-            }
-        }
-
-        return "CONVERSATION HISTORY (oldest first):\n" . implode("\n", array_slice($lines, -12));
-    }
 }

@@ -35,8 +35,9 @@ final class LeadMemoryProfile
             return null; // returning number but no logged history — nothing to recall
         }
 
-        $gapHours = (time() - strtotime($last['created_at'])) / 3600;
-        if ($gapHours < self::RETURN_GAP_HOURS) {
+        // Measured on the database clock — see Interaction::minutesSinceLast().
+        $gapMinutes = Interaction::minutesSinceLast((int) $lead['id']);
+        if ($gapMinutes === null || $gapMinutes < self::RETURN_GAP_HOURS * 60) {
             return null; // same ongoing conversation, no recall needed
         }
 
