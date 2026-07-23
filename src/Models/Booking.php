@@ -30,6 +30,24 @@ final class Booking extends BaseModel
         return self::update($id, ['status' => $status]);
     }
 
+    /**
+     * The lead's live slot proposal: a pending booking whose viewing mode is
+     * still NULL — Eve proposed an exact time and asked "video call or
+     * face-to-face?", and the customer hasn't picked yet.
+     */
+    public static function awaitingMode(int $leadId): ?array
+    {
+        $row = Database::run(
+            "SELECT * FROM bookings
+             WHERE lead_id = ? AND status = 'pending' AND viewing_mode IS NULL
+               AND viewing_datetime >= (NOW() - INTERVAL 1 HOUR)
+             ORDER BY created_at DESC LIMIT 1",
+            [$leadId]
+        )->fetch();
+
+        return $row ?: null;
+    }
+
     /** Bookings that clash with a proposed slot (±duration window) for a room. */
     public static function conflictsAt(int $roomId, string $datetime, int $durationMinutes = 60): array
     {

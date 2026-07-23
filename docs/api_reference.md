@@ -45,6 +45,7 @@ single entry point, one bootstrap.
 | GET | `/admin/activity_log` | Every AI action with the model that handled it |
 | GET/POST | `/admin/content` · `/admin/content/preview?id=` | Generate caption drafts from room metrics · approve / mark posted |
 | GET/POST | `/admin/bookings` | Zero-touch bookings; complete/cancel controls |
+| GET/POST | `/admin/staff` | Viewing-staff roster: weekly shifts, time off, per-agent viewing modes and daily caps; 7-day coverage grid and manual assignment of unstaffed viewings |
 | GET/POST | `/admin/property_reviews` | Review owner-submitted properties; approve before room creation or reject with an owner-facing reason |
 | GET/POST | `/admin/rooms` | Filter owner inventory, add/edit rooms under approved properties, and upload validated room gallery photos |
 | GET | `/admin/listing_reviews` | Filterable queue for pending, verified and rejected ownership/location reviews |

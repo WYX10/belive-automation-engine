@@ -25,10 +25,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $bookings = Database::run(
-    'SELECT b.*, l.name AS lead_name, l.wa_phone, r.name AS room_name, r.location AS area
+    'SELECT b.*, l.name AS lead_name, l.wa_phone, r.name AS room_name, r.location AS area,
+            s.name AS staff_name
      FROM bookings b
      JOIN leads l ON l.id = b.lead_id
      LEFT JOIN rooms r ON r.id = b.room_id
+     LEFT JOIN staff s ON s.id = b.staff_id
      ORDER BY b.viewing_datetime DESC LIMIT 200'
 )->fetchAll();
 
@@ -47,7 +49,7 @@ admin_header('Bookings', 'bookings');
         Eve parses it, cross-checks the schedule, books it and sends the confirmation — it shows up here.</p>
     <?php else: ?>
         <table class="belive-table">
-            <thead><tr><th>Viewing</th><th>Customer</th><th>Room</th><th>Status</th><th>Confirmation</th><th></th></tr></thead>
+            <thead><tr><th>Viewing</th><th>Customer</th><th>Room</th><th>Mode</th><th>Agent</th><th>Status</th><th>Confirmation</th><th></th></tr></thead>
             <tbody>
             <?php foreach ($bookings as $booking): ?>
                 <tr>
@@ -60,6 +62,14 @@ admin_header('Bookings', 'bookings');
                         <div class="belive-muted" style="font-size:12px"><?= e($booking['wa_phone']) ?></div>
                     </td>
                     <td style="font-size:13.5px"><?= e($booking['room_name'] ? "{$booking['room_name']} — {$booking['area']}" : 'General viewing') ?></td>
+                    <td style="font-size:13px; white-space:nowrap"><?= match ($booking['viewing_mode'] ?? null) {
+                        'video_call' => '💻 Video call',
+                        'in_person'  => '🤝 In person',
+                        default      => '<span class="belive-muted">not picked yet</span>',
+                    } ?></td>
+                    <td style="font-size:13px; white-space:nowrap"><?= $booking['staff_name'] !== null
+                        ? e($booking['staff_name'])
+                        : '<a class="belive-muted" href="/admin/staff">unassigned</a>' ?></td>
                     <td><span class="belive-badge <?= $statusTone[$booking['status']] ?? '' ?>"><?= e($booking['status']) ?></span></td>
                     <td style="font-size:13px"><?= (int) $booking['confirmation_sent'] === 1 ? '✅ sent' : '<span class="belive-muted">—</span>' ?></td>
                     <td style="white-space:nowrap">

@@ -9,6 +9,7 @@ use App\Integrations\WhatsApp\WhatsAppClient;
 use App\Models\Booking;
 use App\Models\Lead;
 use App\Models\Room;
+use App\Models\Staff;
 use App\Pipeline\Referral\ReferralRewardWebhook;
 
 /**
@@ -35,15 +36,24 @@ final class ConfirmationSender
         $room = $booking['room_id'] !== null ? Room::find((int) $booking['room_id']) : null;
         $when = date('l, j M Y \a\t g:ia', strtotime($booking['viewing_datetime']));
 
-        $lines = [
+        $modeLine = ViewingMode::label($booking['viewing_mode'] ?? null);
+        $closing = ($booking['viewing_mode'] ?? null) === ViewingMode::VIDEO_CALL
+            ? 'No travel needed — just pick up when we call. Need to reschedule? Reply here anytime.'
+            : 'Just bring yourself — we handle the rest. Need to reschedule? Reply here anytime.';
+
+        $agent = ($booking['staff_id'] ?? null) !== null ? Staff::find((int) $booking['staff_id']) : null;
+
+        $lines = array_values(array_filter([
             '✅ Viewing confirmed!',
             $room !== null
                 ? "🏠 {$room['name']} — {$room['location']} ({$room['room_type']} room)"
                 : '🏠 BeLive room viewing',
             "🗓 $when",
+            $modeLine,
+            $agent !== null ? "👤 Your host: {$agent['name']}" : null,
             '',
-            'Just bring yourself — we handle the rest. Need to reschedule? Reply here anytime.',
-        ];
+            $closing,
+        ], fn ($line) => $line !== null));
 
         // Reward attribution is durable booking state. Record it before either
         // outbound WhatsApp send can fail; a later retry remains idempotent.

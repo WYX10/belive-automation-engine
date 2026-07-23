@@ -28,6 +28,7 @@ You are given NOW (the current datetime, timezone Asia/Kuala_Lumpur). Respond wi
 
 Rules:
 - "tomorrow 3pm" → tomorrow at 15:00. "esok" = tomorrow, "petang" = ~15:00, "malam" = ~20:00, "pagi" = ~10:00.
+- Part-of-day without a clock time still yields an exact datetime with confident=false: "morning" → 10:00, "afternoon" → 15:00, "evening"/"night" → 20:00 ("tuesday afternoon" → next Tuesday 15:00, confident=false).
 - A bare day ("Saturday") with no time → that day at 15:00, confident=false.
 - Never place the viewing in the past — roll to the next valid occurrence.
 PROMPT;
@@ -59,30 +60,40 @@ PROMPT;
         ];
     }
 
-    /** Live schedule cross-check: is this room free around the proposed slot? */
-    public static function isSlotFree(?int $roomId, string $datetime): bool
+    /**
+     * Live schedule cross-check. Two things have to be true: the room is free,
+     * and an agent is rostered to run the viewing (see StaffScheduler — with no
+     * roster configured that half always passes).
+     */
+    public static function isSlotFree(?int $roomId, string $datetime, ?string $mode = null): bool
     {
-        if ($roomId === null) {
-            return true; // general viewing without a fixed room — no room clash possible
+        // A general viewing without a fixed room can't clash on the room side.
+        if ($roomId !== null && Booking::conflictsAt($roomId, $datetime) !== []) {
+            return false;
         }
 
-        return Booking::conflictsAt($roomId, $datetime) === [];
+        return StaffScheduler::coversSlot($datetime, $mode);
     }
 
     /** Next free slot suggestion (hour steps within viewing hours 10:00–19:00). */
-    public static function suggestAlternative(?int $roomId, string $datetime): string
+    public static function suggestAlternative(?int $roomId, string $datetime, ?string $mode = null): string
     {
         $ts = strtotime($datetime);
-        for ($i = 1; $i <= 16; $i++) {
-            $candidate = $ts + $i * 3600;
-            $hour = (int) date('G', $candidate);
+        $cursor = $ts;
+
+        // Walk forward an hour at a time, staying inside viewing hours. The
+        // horizon is generous because a roster gap (weekend off, leave) can
+        // push the next staffed slot several days out.
+        for ($i = 1; $i <= 100; $i++) {
+            $cursor += 3600;
+            $hour = (int) date('G', $cursor);
             if ($hour < 10) {
-                $candidate = strtotime(date('Y-m-d 10:00:00', $candidate));
+                $cursor = strtotime(date('Y-m-d 10:00:00', $cursor));
             } elseif ($hour > 19) {
-                $candidate = strtotime(date('Y-m-d 10:00:00', $candidate + 86400));
+                $cursor = strtotime(date('Y-m-d 10:00:00', $cursor + 86400));
             }
-            $slot = date('Y-m-d H:i:s', $candidate);
-            if (self::isSlotFree($roomId, $slot)) {
+            $slot = date('Y-m-d H:i:s', $cursor);
+            if (self::isSlotFree($roomId, $slot, $mode)) {
                 return $slot;
             }
         }

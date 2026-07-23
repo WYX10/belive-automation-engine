@@ -78,7 +78,7 @@ final class MockClient implements LlmClient
         }
 
         $intent = 'general_enquiry';
-        if (preg_match('/\b(book|viewing|visit|appointment|tomorrow|tonight|am|pm)\b/i', $msg)) {
+        if (preg_match('/\b(book|viewing|visit|appointment|tomorrow|tonight|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|afternoon|evening|i\'?m free|am|pm)\b/i', $msg)) {
             $intent = 'booking_request';
         } elseif ($location !== null || $budget !== null || str_contains($lower, 'room')) {
             $intent = 'room_enquiry';
@@ -253,15 +253,39 @@ final class MockClient implements LlmClient
 
     private function mockTimeParse(string $msg): string
     {
-        $base = new \DateTimeImmutable('tomorrow 15:00');
+        $lower = mb_strtolower($msg);
+
+        $day = 'tomorrow';
+        foreach (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as $weekday) {
+            if (str_contains($lower, $weekday)) {
+                $day = $weekday; // strtotime rolls to the next occurrence
+                break;
+            }
+        }
+        if (preg_match('/\b(today|tonight)\b/', $lower)) {
+            $day = 'today';
+        }
+
+        // Part-of-day defaults mirror the real prompt: pagi ~10, petang ~15, malam ~20.
+        $hour = 15;
+        $confident = false;
         if (preg_match('/(\d{1,2})\s*(am|pm)/i', $msg, $m)) {
             $hour = (int) $m[1] % 12 + (strtolower($m[2]) === 'pm' ? 12 : 0);
-            $base = $base->setTime($hour, 0);
+            $confident = true;
+        } elseif (preg_match('/\b(morning|pagi)\b/u', $lower)) {
+            $hour = 10;
+        } elseif (preg_match('/\b(evening|night|tonight|malam)\b/u', $lower)) {
+            $hour = 20;
+        }
+
+        $base = (new \DateTimeImmutable($day))->setTime($hour, 0);
+        if ($base <= new \DateTimeImmutable('now')) {
+            $base = $base->modify('+1 day'); // never place the viewing in the past
         }
 
         return json_encode([
             'datetime'  => $base->format('Y-m-d H:i:s'),
-            'confident' => true,
+            'confident' => $confident,
             'reasoning' => '[MOCK] Regex time parse — offline stub, not a real model.',
         ]);
     }

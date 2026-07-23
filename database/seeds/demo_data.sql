@@ -189,3 +189,29 @@ SELECT id, 'conversion', 'understand', 'claude-sonnet-5', 'inbound', 'Hi, lookin
 
 INSERT INTO ai_interactions (lead_id, phase, skill, model_used, direction, message_in, message_out, message_kind, reasoning, created_at)
 SELECT id, 'conversion', 'automate', 'claude-sonnet-5', 'outbound', NULL, 'Sentul Point A-20-9 fits perfectly — middle room, RM 700/mo on a 6-month stay, 5 min to the LRT. Zero deposit, weekly cleaning. Want photos or a viewing?', 'reply', 'Matched room to professional profile near workplace.', NOW() - INTERVAL 2 DAY + INTERVAL 1 MINUTE FROM leads WHERE wa_phone = '60170000201';
+
+-- ------------------------------------------ viewing staff roster
+-- Eve cross-checks this roster before offering a slot: three agents with
+-- different mode capabilities and a weekend-only agent, so the coverage grid
+-- on /admin/staff shows real weekday/weekend contrast.
+INSERT INTO staff (name, role, wa_phone, email, handles_video, handles_in_person, max_daily_viewings) VALUES
+('Aisyah Rahman', 'Senior viewing agent', '60170000301', 'aisyah@belive.asia', 1, 1, 6),
+('Daniel Chong',  'Video host',           '60170000302', 'daniel@belive.asia', 1, 0, 10),
+('Mei Ling Tan',  'Weekend agent',        '60170000303', 'meiling@belive.asia', 1, 1, 5);
+
+-- Aisyah: Mon–Fri 10:00–18:00. Daniel: Mon–Fri 14:00–21:00 (evening video
+-- calls). Mei Ling: Sat + Sun 10:00–17:00.
+INSERT INTO staff_shifts (staff_id, weekday, starts_at, ends_at)
+SELECT s.id, d.weekday, '10:00:00', '18:00:00' FROM staff s
+JOIN (SELECT 1 AS weekday UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5) d
+WHERE s.name = 'Aisyah Rahman';
+
+INSERT INTO staff_shifts (staff_id, weekday, starts_at, ends_at)
+SELECT s.id, d.weekday, '14:00:00', '21:00:00' FROM staff s
+JOIN (SELECT 1 AS weekday UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5) d
+WHERE s.name = 'Daniel Chong';
+
+INSERT INTO staff_shifts (staff_id, weekday, starts_at, ends_at)
+SELECT s.id, d.weekday, '10:00:00', '17:00:00' FROM staff s
+JOIN (SELECT 0 AS weekday UNION SELECT 6) d
+WHERE s.name = 'Mei Ling Tan';

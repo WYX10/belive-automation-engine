@@ -102,6 +102,7 @@ $router->any('/admin/content', "$pages/admin/content/index.php");
 $router->any('/admin/content/preview', "$pages/admin/content/preview.php");
 
 $router->get('/admin/bookings', "$pages/admin/bookings/index.php");
+$router->any('/admin/staff', "$pages/admin/staff/index.php");
 $router->any('/admin/property_reviews', "$pages/admin/property_reviews/index.php");
 $router->any('/admin/rooms', "$pages/admin/rooms/index.php");
 $router->get('/admin/listing_reviews', "$pages/admin/listing_reviews/index.php");
