@@ -157,21 +157,125 @@ $modeLabel = static fn (?string $mode): string => match ($mode) {
     default      => 'not picked yet',
 };
 
+// One-line "Mon Tue Wed · 10:00–18:00" summary for a collapsed team row.
+$shiftSummary = static function (int $staffId) use ($shiftsByStaff): string {
+    $days = [];
+    $patterns = [];
+    foreach ($shiftsByStaff[$staffId] ?? [] as $weekday => $shifts) {
+        $days[$weekday] = substr(Staff::WEEKDAYS[$weekday], 0, 3);
+        foreach ($shifts as $shift) {
+            $patterns[substr($shift['starts_at'], 0, 5) . '–' . substr($shift['ends_at'], 0, 5)] = true;
+        }
+    }
+    if ($days === []) {
+        return 'No shifts yet — Eve cannot book them';
+    }
+    ksort($days);
+
+    return implode(' ', $days) . ' · ' . (count($patterns) === 1
+        ? array_key_first($patterns)
+        : count($patterns) . ' shift patterns');
+};
+
+// The same field grid backs "add someone" and "edit someone".
+$staffForm = static function (?array $member = null): void {
+    $isEdit = $member !== null;
+    $id = $isEdit ? 'e' . (int) $member['id'] : 'new';
+    $checked = static fn (bool $on): string => $on ? 'checked' : '';
+    ?>
+    <form method="post" class="staff-form">
+        <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+        <input type="hidden" name="do" value="<?= $isEdit ? 'update_staff' : 'add_staff' ?>">
+        <?php if ($isEdit): ?>
+            <input type="hidden" name="id" value="<?= (int) $member['id'] ?>">
+        <?php endif; ?>
+
+        <div class="belive-field span-2">
+            <label for="<?= $id ?>_name">Name</label>
+            <input id="<?= $id ?>_name" type="text" name="name" required
+                   value="<?= e($member['name'] ?? '') ?>" placeholder="Aisyah Rahman">
+        </div>
+        <div class="belive-field span-2">
+            <label for="<?= $id ?>_role">Role</label>
+            <input id="<?= $id ?>_role" type="text" name="role"
+                   value="<?= e($member['role'] ?? '') ?>" placeholder="Viewing agent">
+        </div>
+        <div class="belive-field span-2">
+            <label for="<?= $id ?>_phone">WhatsApp</label>
+            <input id="<?= $id ?>_phone" type="text" name="wa_phone"
+                   value="<?= e($member['wa_phone'] ?? '') ?>" placeholder="60123456789">
+        </div>
+        <div class="belive-field span-4">
+            <label for="<?= $id ?>_email">Email</label>
+            <input id="<?= $id ?>_email" type="email" name="email"
+                   value="<?= e($member['email'] ?? '') ?>" placeholder="name@belive.asia">
+        </div>
+        <div class="belive-field span-2">
+            <label for="<?= $id ?>_max">Viewings per day</label>
+            <input id="<?= $id ?>_max" type="number" name="max_daily_viewings" min="1" max="24"
+                   value="<?= (int) ($member['max_daily_viewings'] ?? 8) ?>">
+            <div class="hint">Eve stops booking them past this.</div>
+        </div>
+
+        <div class="staff-form-actions">
+            <label class="staff-toggle">
+                <input type="checkbox" name="handles_video" <?= $checked(!$isEdit || (int) $member['handles_video'] === 1) ?>>
+                💻 Video calls
+            </label>
+            <label class="staff-toggle">
+                <input type="checkbox" name="handles_in_person" <?= $checked(!$isEdit || (int) $member['handles_in_person'] === 1) ?>>
+                🤝 In person
+            </label>
+            <?php if ($isEdit): ?>
+                <label class="staff-toggle">
+                    <input type="checkbox" name="active" <?= $checked((int) $member['active'] === 1) ?>>
+                    On the roster
+                </label>
+            <?php endif; ?>
+            <button class="belive-btn-primary spacer"><?= $isEdit ? 'Save changes' : 'Add staff member' ?></button>
+        </div>
+    </form>
+    <?php
+};
+
 admin_header('Staff schedule', 'staff');
 ?>
 <div class="belive-page-head">
-    <h1>Staff schedule</h1>
-    <span class="belive-muted" style="font-size:13px">
-        Eve only offers a viewing slot when someone here is rostered to take it.
-    </span>
+    <div>
+        <h1>Staff schedule</h1>
+        <p class="belive-muted staff-intro">Eve only offers a viewing slot when someone here is rostered to take it.</p>
+    </div>
 </div>
 
-<?php if ($activeTeam === []): ?>
-    <div class="belive-alert warning">
-        No active staff yet — Eve is booking slots without checking human availability.
-        Add your first agent below and give them a weekly shift to switch scheduling on.
+<?php if ($team === []): ?>
+
+<div class="belive-card staff-onboard">
+    <h2>Put your first agent on the roster</h2>
+    <p>Until someone is rostered, Eve books viewings without checking whether a human is free.
+       Add an agent and give them weekly shifts to switch that check on.</p>
+
+    <div class="staff-steps">
+        <div class="staff-step">
+            <span class="staff-step-n">1</span>
+            <b>Add the agent</b>
+            <span>Name them, and say whether they host video calls, face-to-face viewings, or both.</span>
+        </div>
+        <div class="staff-step">
+            <span class="staff-step-n">2</span>
+            <b>Give them shifts</b>
+            <span>A weekly pattern — say Mon to Fri, 10:00 to 18:00. Leave and days off come later.</span>
+        </div>
+        <div class="staff-step">
+            <span class="staff-step-n">3</span>
+            <b>Eve takes over</b>
+            <span>She offers only staffed hours, spreads viewings across the team and names the host.</span>
+        </div>
     </div>
-<?php endif; ?>
+
+    <?php $staffForm(); ?>
+</div>
+
+<?php else: ?>
 
 <div class="belive-stat-grid" style="margin-bottom:20px">
     <div class="belive-stat">
@@ -199,92 +303,78 @@ admin_header('Staff schedule', 'staff');
 <?php if ($coverage !== []): ?>
 <div class="belive-card">
     <div class="belive-card-title">🔭 Next 7 days — who is free to host</div>
-    <p class="belive-muted" style="font-size:13px; margin-bottom:12px">
-        Each cell is the number of agents still free for that hour, after shifts, leave and
-        booked viewings. A grey cell is an hour Eve will not offer to a customer.
-    </p>
-    <div style="overflow-x:auto">
-        <table class="belive-table" style="font-size:12.5px">
+    <div class="staff-coverage-wrap">
+        <table class="staff-coverage">
             <thead>
                 <tr>
-                    <th style="text-align:left">Day</th>
+                    <th class="staff-day">Day</th>
                     <?php foreach (array_keys(reset($coverage)['hours']) as $hour): ?>
-                        <th style="text-align:center; font-weight:600"><?= sprintf('%02d', $hour) ?></th>
+                        <th><?= sprintf('%02d', $hour) ?></th>
                     <?php endforeach; ?>
                 </tr>
             </thead>
             <tbody>
             <?php foreach ($coverage as $day): ?>
                 <tr>
-                    <td style="white-space:nowrap; font-weight:600"><?= e($day['label']) ?></td>
+                    <td class="staff-day"><?= e($day['label']) ?></td>
                     <?php foreach ($day['hours'] as $hour => $cell): ?>
                         <?php
                         $free = (int) $cell['free'];
-                        $style = $free === 0
-                            ? 'background:rgba(107,114,128,0.10); color:var(--belive-muted)'
-                            : ($free === 1
-                                ? 'background:var(--belive-orange-soft); color:var(--belive-orange-dark)'
-                                : 'background:var(--belive-teal-soft); color:var(--belive-teal-dark)');
+                        $tone = $free === 0 ? 'none' : ($free === 1 ? 'thin' : 'good');
                         $title = sprintf('%s %02d:00 — %d of %d rostered agents free', $day['label'], $hour, $free, (int) $cell['rostered']);
                         ?>
-                        <td style="text-align:center; font-weight:600; <?= $style ?>" title="<?= e($title) ?>">
-                            <?= $free === 0 ? '·' : $free ?>
-                        </td>
+                        <td class="staff-cell-<?= $tone ?>" title="<?= e($title) ?>"><?= $free === 0 ? '·' : $free ?></td>
                     <?php endforeach; ?>
                 </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
     </div>
+    <div class="staff-legend">
+        <span><i style="background:var(--belive-teal-soft)"></i>2+ free — safe to offer</span>
+        <span><i style="background:var(--belive-orange-soft)"></i>1 free — last agent</span>
+        <span><i style="background:rgba(107,114,128,.14)"></i>Nobody — Eve skips this hour</span>
+    </div>
 </div>
 <?php endif; ?>
 
 <div class="belive-card">
     <div class="belive-card-title">📋 Weekly roster</div>
-    <?php if ($team === []): ?>
-        <p class="belive-muted">No staff yet — add someone below.</p>
-    <?php else: ?>
-    <div style="overflow-x:auto">
-        <table class="belive-table" style="font-size:13px">
+    <div class="staff-roster-wrap">
+        <table class="staff-roster">
             <thead>
                 <tr>
-                    <th style="text-align:left">Agent</th>
+                    <th>Agent</th>
                     <?php foreach (Staff::WEEKDAYS as $label): ?>
-                        <th style="text-align:left"><?= e(substr($label, 0, 3)) ?></th>
+                        <th><?= e(substr($label, 0, 3)) ?></th>
                     <?php endforeach; ?>
                 </tr>
             </thead>
             <tbody>
             <?php foreach ($team as $member): ?>
                 <?php $memberId = (int) $member['id']; ?>
-                <tr style="<?= (int) $member['active'] === 1 ? '' : 'opacity:.5' ?>">
-                    <td style="white-space:nowrap">
+                <tr class="<?= (int) $member['active'] === 1 ? '' : 'is-off' ?>">
+                    <td class="staff-who">
                         <strong><?= e($member['name']) ?></strong>
-                        <div class="belive-muted" style="font-size:12px"><?= e($member['role']) ?></div>
-                        <div style="font-size:11.5px; margin-top:3px">
-                            <?= (int) $member['handles_video'] === 1 ? '💻' : '' ?>
-                            <?= (int) $member['handles_in_person'] === 1 ? '🤝' : '' ?>
-                            <span class="belive-muted">max <?= (int) $member['max_daily_viewings'] ?>/day</span>
+                        <span><?= e($member['role']) ?></span>
+                        <div class="staff-tags">
+                            <span class="staff-tag"><?= (int) $member['handles_video'] === 1 ? '💻' : '' ?><?= (int) $member['handles_in_person'] === 1 ? '🤝' : '' ?></span>
+                            <span class="staff-tag">max <?= (int) $member['max_daily_viewings'] ?>/day</span>
                         </div>
                     </td>
                     <?php for ($weekday = 0; $weekday < 7; $weekday++): ?>
-                        <td style="vertical-align:top">
+                        <td>
                             <?php foreach ($shiftsByStaff[$memberId][$weekday] ?? [] as $shift): ?>
-                                <form method="post" style="display:block; margin-bottom:3px"
-                                      data-confirm="Remove this shift?">
+                                <form method="post" class="staff-shift" data-confirm="Remove this shift?">
                                     <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                                     <input type="hidden" name="do" value="remove_shift">
                                     <input type="hidden" name="shift_id" value="<?= (int) $shift['id'] ?>">
-                                    <span class="belive-badge" style="font-size:11.5px">
-                                        <?= e(substr($shift['starts_at'], 0, 5)) ?>–<?= e(substr($shift['ends_at'], 0, 5)) ?>
-                                    </span>
-                                    <button class="belive-btn-ghost"
-                                            style="padding:0 5px; font-size:12px; color:var(--belive-danger)"
-                                            title="Remove shift">✕</button>
+                                    <?= e(substr($shift['starts_at'], 0, 5)) ?>–<?= e(substr($shift['ends_at'], 0, 5)) ?>
+                                    <button type="submit" title="Remove shift" aria-label="Remove shift">✕</button>
                                 </form>
                             <?php endforeach; ?>
                             <?php if (($shiftsByStaff[$memberId][$weekday] ?? []) === []): ?>
-                                <span class="belive-muted" style="font-size:12px">—</span>
+                                <span class="staff-none">—</span>
                             <?php endif; ?>
                         </td>
                     <?php endfor; ?>
@@ -294,42 +384,39 @@ admin_header('Staff schedule', 'staff');
         </table>
     </div>
 
-    <form method="post" style="margin-top:18px; border-top:1px solid var(--belive-line); padding-top:16px">
+    <form method="post" class="staff-shift-form">
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
         <input type="hidden" name="do" value="add_shift">
-        <div class="belive-row">
-            <div class="belive-col belive-field" style="max-width:230px">
-                <label for="shift_staff">Agent</label>
-                <select id="shift_staff" name="staff_id" required>
-                    <?php foreach ($team as $member): ?>
-                        <option value="<?= (int) $member['id'] ?>"><?= e($member['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="belive-col belive-field" style="max-width:130px">
-                <label for="shift_start">From</label>
-                <input id="shift_start" type="time" name="starts_at" value="10:00" required>
-            </div>
-            <div class="belive-col belive-field" style="max-width:130px">
-                <label for="shift_end">To</label>
-                <input id="shift_end" type="time" name="ends_at" value="19:00" required>
-            </div>
-            <div class="belive-col belive-field">
-                <label>Days</label>
-                <div style="display:flex; gap:10px; flex-wrap:wrap; padding-top:4px">
-                    <?php foreach (Staff::WEEKDAYS as $weekday => $label): ?>
-                        <label style="font-weight:500; display:flex; align-items:center; gap:5px">
-                            <input type="checkbox" name="weekday[]" value="<?= $weekday ?>"
-                                   style="width:auto" <?= $weekday >= 1 && $weekday <= 5 ? 'checked' : '' ?>>
-                            <?= e(substr($label, 0, 3)) ?>
-                        </label>
-                    <?php endforeach; ?>
-                </div>
+        <div class="belive-field">
+            <label for="shift_staff">Agent</label>
+            <select id="shift_staff" name="staff_id" required>
+                <?php foreach ($team as $member): ?>
+                    <option value="<?= (int) $member['id'] ?>"><?= e($member['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="belive-field">
+            <label for="shift_start">From</label>
+            <input id="shift_start" type="time" name="starts_at" value="10:00" required>
+        </div>
+        <div class="belive-field">
+            <label for="shift_end">To</label>
+            <input id="shift_end" type="time" name="ends_at" value="19:00" required>
+        </div>
+        <div class="belive-field staff-days-field">
+            <label>Days</label>
+            <div class="staff-days">
+                <?php foreach (Staff::WEEKDAYS as $weekday => $label): ?>
+                    <label class="staff-day-toggle">
+                        <input type="checkbox" name="weekday[]" value="<?= $weekday ?>"
+                               <?= $weekday >= 1 && $weekday <= 5 ? 'checked' : '' ?>>
+                        <?= e(substr($label, 0, 3)) ?>
+                    </label>
+                <?php endforeach; ?>
             </div>
         </div>
         <button class="belive-btn-primary">Add shift</button>
     </form>
-    <?php endif; ?>
 </div>
 
 <div class="belive-row">
@@ -367,7 +454,6 @@ admin_header('Staff schedule', 'staff');
                 </table>
             <?php endif; ?>
 
-            <?php if ($team !== []): ?>
             <form method="post" style="margin-top:14px; border-top:1px solid var(--belive-line); padding-top:14px">
                 <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                 <input type="hidden" name="do" value="add_time_off">
@@ -395,7 +481,6 @@ admin_header('Staff schedule', 'staff');
                 </div>
                 <button class="belive-btn-primary">Add time off</button>
             </form>
-            <?php endif; ?>
         </div>
     </div>
 
@@ -434,8 +519,8 @@ admin_header('Staff schedule', 'staff');
 <div class="belive-card">
     <div class="belive-card-title">⚠️ Viewings with no agent</div>
     <p class="belive-muted" style="font-size:13px; margin-bottom:12px">
-        Booked when nobody was rostered (or before the roster existed). Assign someone by hand —
-        agents already busy or off duty at that hour are left out of the list.
+        Booked when nobody was rostered (or before the roster existed). Agents already busy or off duty
+        at that hour are left out of the list.
     </p>
     <table class="belive-table" style="font-size:13px">
         <thead><tr><th>When</th><th>Customer</th><th>Mode</th><th>Assign to</th></tr></thead>
@@ -456,16 +541,16 @@ admin_header('Staff schedule', 'staff');
                     <?php if ($candidates === []): ?>
                         <span class="belive-muted" style="font-size:12.5px">Nobody free — extend a shift or move the viewing.</span>
                     <?php else: ?>
-                        <form method="post" style="display:flex; gap:8px; align-items:center">
+                        <form method="post" class="staff-assign">
                             <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                             <input type="hidden" name="do" value="assign_booking">
                             <input type="hidden" name="booking_id" value="<?= (int) $row['id'] ?>">
-                            <select name="staff_id" style="padding:5px 8px; font-size:12.5px; border-radius:8px; border:1.5px solid var(--belive-line)">
+                            <select name="staff_id">
                                 <?php foreach ($candidates as $candidate): ?>
                                     <option value="<?= (int) $candidate['id'] ?>"><?= e($candidate['name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <button class="belive-btn-ghost" style="padding:4px 10px; font-size:12.5px">Assign</button>
+                            <button class="belive-btn-ghost" style="padding:8px 14px; font-size:13px">Assign</button>
                         </form>
                     <?php endif; ?>
                 </td>
@@ -478,85 +563,34 @@ admin_header('Staff schedule', 'staff');
 
 <div class="belive-card">
     <div class="belive-card-title">👥 The team</div>
-    <?php foreach ($team as $member): ?>
-        <form method="post" style="border-bottom:1px solid var(--belive-line); padding-bottom:14px; margin-bottom:14px">
-            <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-            <input type="hidden" name="do" value="update_staff">
-            <input type="hidden" name="id" value="<?= (int) $member['id'] ?>">
-            <div class="belive-row">
-                <div class="belive-col belive-field">
-                    <label>Name</label>
-                    <input type="text" name="name" value="<?= e($member['name']) ?>" required>
-                </div>
-                <div class="belive-col belive-field">
-                    <label>Role</label>
-                    <input type="text" name="role" value="<?= e($member['role']) ?>">
-                </div>
-                <div class="belive-col belive-field">
-                    <label>WhatsApp</label>
-                    <input type="text" name="wa_phone" value="<?= e($member['wa_phone']) ?>" placeholder="60123456789">
-                </div>
-                <div class="belive-col belive-field">
-                    <label>Email</label>
-                    <input type="email" name="email" value="<?= e($member['email']) ?>">
-                </div>
-                <div class="belive-col belive-field" style="max-width:130px">
-                    <label>Max / day</label>
-                    <input type="number" name="max_daily_viewings" min="1" max="24" value="<?= (int) $member['max_daily_viewings'] ?>">
-                </div>
-            </div>
-            <div style="display:flex; gap:18px; flex-wrap:wrap; align-items:center">
-                <label style="font-size:13px; display:flex; align-items:center; gap:6px">
-                    <input type="checkbox" name="handles_video" style="width:auto" <?= (int) $member['handles_video'] === 1 ? 'checked' : '' ?>>
-                    💻 Can host video calls
-                </label>
-                <label style="font-size:13px; display:flex; align-items:center; gap:6px">
-                    <input type="checkbox" name="handles_in_person" style="width:auto" <?= (int) $member['handles_in_person'] === 1 ? 'checked' : '' ?>>
-                    🤝 Can host in person
-                </label>
-                <label style="font-size:13px; display:flex; align-items:center; gap:6px">
-                    <input type="checkbox" name="active" style="width:auto" <?= (int) $member['active'] === 1 ? 'checked' : '' ?>>
-                    On the roster
-                </label>
-                <button class="belive-btn-ghost" style="padding:5px 14px; font-size:13px">Save</button>
-            </div>
-        </form>
-    <?php endforeach; ?>
-
-    <form method="post">
-        <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-        <input type="hidden" name="do" value="add_staff">
-        <div class="belive-row">
-            <div class="belive-col belive-field">
-                <label for="new_name">Name</label>
-                <input id="new_name" type="text" name="name" placeholder="Aisyah Rahman" required>
-            </div>
-            <div class="belive-col belive-field">
-                <label for="new_role">Role</label>
-                <input id="new_role" type="text" name="role" placeholder="Viewing agent">
-            </div>
-            <div class="belive-col belive-field">
-                <label for="new_phone">WhatsApp</label>
-                <input id="new_phone" type="text" name="wa_phone" placeholder="60123456789">
-            </div>
-            <div class="belive-col belive-field">
-                <label for="new_email">Email</label>
-                <input id="new_email" type="email" name="email">
-            </div>
-            <div class="belive-col belive-field" style="max-width:130px">
-                <label for="new_max">Max / day</label>
-                <input id="new_max" type="number" name="max_daily_viewings" min="1" max="24" value="8">
-            </div>
-        </div>
-        <div style="display:flex; gap:18px; flex-wrap:wrap; align-items:center">
-            <label style="font-size:13px; display:flex; align-items:center; gap:6px">
-                <input type="checkbox" name="handles_video" style="width:auto" checked> 💻 Can host video calls
-            </label>
-            <label style="font-size:13px; display:flex; align-items:center; gap:6px">
-                <input type="checkbox" name="handles_in_person" style="width:auto" checked> 🤝 Can host in person
-            </label>
-            <button class="belive-btn-primary">Add staff member</button>
-        </div>
-    </form>
+    <div class="staff-list">
+        <?php foreach ($team as $member): ?>
+            <details class="staff-member">
+                <summary>
+                    <span class="staff-member-name"><?= e($member['name']) ?></span>
+                    <span class="staff-member-meta"><?= e($shiftSummary((int) $member['id'])) ?></span>
+                    <span class="staff-member-badges">
+                        <?php if ((int) $member['handles_video'] === 1): ?>
+                            <span class="belive-badge">💻 Video</span>
+                        <?php endif; ?>
+                        <?php if ((int) $member['handles_in_person'] === 1): ?>
+                            <span class="belive-badge">🤝 In person</span>
+                        <?php endif; ?>
+                        <?php if ((int) $member['active'] !== 1): ?>
+                            <span class="belive-badge muted">Off roster</span>
+                        <?php endif; ?>
+                    </span>
+                </summary>
+                <?php $staffForm($member); ?>
+            </details>
+        <?php endforeach; ?>
+    </div>
 </div>
+
+<div class="belive-card">
+    <div class="belive-card-title">➕ Add an agent</div>
+    <?php $staffForm(); ?>
+</div>
+
+<?php endif; ?>
 <?php admin_footer();

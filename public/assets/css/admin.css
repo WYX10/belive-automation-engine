@@ -282,3 +282,159 @@ body.admin-login {
   .admin-room-photo-form { grid-template-columns: 1fr; }
   .admin-room-form-wide { grid-column: auto; }
 }
+
+/* Staff schedule: roster, 7-day coverage and viewing assignment. */
+.staff-intro { margin-top: 4px; font-size: 13.5px; }
+
+/* First-run onboarding — the add form IS the empty state, not a pointer to it. */
+.staff-onboard { text-align: center; }
+.staff-onboard h2 { font-size: 20px; margin-bottom: 6px; }
+.staff-onboard > p { color: var(--belive-muted); font-size: 13.5px; max-width: 620px; margin: 0 auto; }
+.staff-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0 22px; text-align: left; }
+.staff-step { background: var(--belive-cream); border-radius: 12px; padding: 14px; min-width: 0; }
+.staff-step b { display: block; font-size: 13.5px; margin-bottom: 3px; }
+.staff-step span { color: var(--belive-muted); font-size: 12.5px; }
+.staff-step-n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%; margin-bottom: 8px;
+  background: var(--belive-orange-soft); color: var(--belive-orange-dark);
+  font-size: 12px; font-weight: 700;
+}
+
+/* Shared field grid for the add and edit forms. */
+.staff-form { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0 12px; text-align: left; }
+.staff-form .belive-field { min-width: 0; }
+.staff-form .span-2 { grid-column: span 2; }
+.staff-form .span-4 { grid-column: span 4; }
+.staff-form-actions {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; padding-top: 2px;
+}
+.staff-form-actions button { min-height: 44px; }
+.staff-form-actions .spacer { margin-left: auto; }
+
+/* Capability toggles read as switches, not loose checkboxes. */
+.staff-toggle {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px;
+  padding: 8px 14px; border: 1.5px solid var(--belive-line); border-radius: 999px;
+  background: var(--belive-white); font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.staff-toggle input { width: auto; accent-color: var(--belive-teal); }
+.staff-toggle:has(input:checked) {
+  border-color: var(--belive-teal); background: var(--belive-teal-soft);
+  color: var(--belive-teal-dark); font-weight: 600;
+}
+
+/* Coverage heatmap. */
+.staff-coverage-wrap { overflow-x: auto; }
+.staff-coverage { border-collapse: separate; border-spacing: 4px; font-size: 12.5px; min-width: 560px; }
+.staff-coverage th {
+  padding: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--belive-muted);
+}
+.staff-coverage td { min-width: 40px; padding: 10px 0; border-radius: 8px; text-align: center; font-weight: 700; }
+.staff-coverage .staff-day {
+  text-align: left; white-space: nowrap; padding-right: 12px;
+  font-size: 12.5px; font-weight: 600; background: none;
+}
+.staff-cell-none { background: rgba(107, 114, 128, .10); color: var(--belive-muted); }
+.staff-cell-thin { background: var(--belive-orange-soft); color: var(--belive-orange-dark); }
+.staff-cell-good { background: var(--belive-teal-soft); color: var(--belive-teal-dark); }
+.staff-legend {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  margin-top: 14px; font-size: 12px; color: var(--belive-muted);
+}
+.staff-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; margin-right: 6px; vertical-align: -2px; }
+
+/* Weekly roster grid. */
+.staff-roster-wrap { overflow-x: auto; }
+.staff-roster { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 13px; }
+.staff-roster th {
+  padding: 0 8px 8px; text-align: left; font-size: 11px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--belive-muted);
+}
+.staff-roster td { padding: 11px 8px; border-top: 1px solid var(--belive-line); vertical-align: top; }
+.staff-roster tr.is-off td { opacity: .5; }
+.staff-who strong { display: block; font-size: 14px; }
+.staff-who span { display: block; color: var(--belive-muted); font-size: 12px; }
+.staff-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.staff-tag { font-size: 11px; font-weight: 600; color: var(--belive-muted); }
+
+/* A shift is a chip; its remove control lives inside it. */
+.staff-shift {
+  display: inline-flex; align-items: center; gap: 2px; margin: 0 4px 4px 0;
+  padding: 3px 3px 3px 10px; border: 1px solid var(--belive-line); border-radius: 999px;
+  background: var(--belive-cream); font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.staff-shift button {
+  border: 0; background: none; cursor: pointer; color: var(--belive-muted);
+  font-size: 12px; line-height: 1; padding: 5px 7px; border-radius: 50%;
+}
+.staff-shift button:hover { color: var(--belive-danger); background: var(--belive-danger-soft); }
+.staff-none { color: var(--belive-muted); font-size: 13px; }
+
+/* Add-shift row + day picker. */
+.staff-shift-form {
+  display: grid; grid-template-columns: minmax(0, 1.4fr) 130px 130px minmax(0, 2fr) auto;
+  align-items: end; gap: 12px; margin-top: 18px; padding: 16px;
+  border-radius: 12px; background: var(--belive-cream);
+}
+.staff-shift-form .belive-field { margin: 0; min-width: 0; }
+.staff-shift-form button { min-height: 44px; }
+.staff-days { display: flex; gap: 6px; flex-wrap: wrap; }
+.staff-day-toggle {
+  position: relative; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center; min-width: 46px;
+  min-height: 44px; padding: 11px 6px; border: 1.5px solid var(--belive-line); border-radius: 10px;
+  background: var(--belive-white); font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+/* Visually hidden, but still focusable and clickable via the label. Width is
+   pinned because .belive-field inputs are 100% wide by default. */
+.staff-day-toggle input {
+  position: absolute; top: 0; left: 0;
+  width: 1px; height: 1px; opacity: 0; pointer-events: none;
+}
+.staff-day-toggle:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--belive-teal-soft); }
+.staff-day-toggle:has(input:checked) {
+  border-color: var(--belive-teal); background: var(--belive-teal-soft); color: var(--belive-teal-dark);
+}
+
+/* Team list — collapsed rows, expand to edit. */
+.staff-list { display: grid; gap: 10px; }
+.staff-member { border: 1px solid var(--belive-line); border-radius: 12px; }
+.staff-member > summary {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  min-height: 44px; padding: 12px 14px; cursor: pointer; list-style: none;
+}
+.staff-member > summary::-webkit-details-marker { display: none; }
+.staff-member[open] > summary { border-bottom: 1px solid var(--belive-line); }
+.staff-member > .staff-form { padding: 16px 14px; background: var(--belive-cream); border-radius: 0 0 11px 11px; }
+.staff-member-name { font-size: 14px; font-weight: 700; }
+.staff-member-meta { color: var(--belive-muted); font-size: 12.5px; }
+.staff-member-badges { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Manual assignment of an unstaffed viewing. */
+.staff-assign { display: flex; align-items: center; gap: 8px; }
+.staff-assign select {
+  min-height: 40px; padding: 8px 10px; font: inherit; font-size: 13px;
+  border: 1.5px solid var(--belive-line); border-radius: 9px;
+  background: var(--belive-white); color: var(--belive-ink);
+}
+
+@media (max-width: 1000px) {
+  .staff-shift-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .staff-shift-form .staff-days-field, .staff-shift-form button { grid-column: 1 / -1; }
+}
+
+@media (max-width: 820px) {
+  .staff-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .staff-form .span-4 { grid-column: span 2; }
+  .staff-steps { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .staff-form, .staff-shift-form { grid-template-columns: 1fr; }
+  .staff-form .span-2, .staff-form .span-4 { grid-column: auto; }
+  .staff-member-badges { margin-left: 0; }
+  .staff-assign { flex-direction: column; align-items: stretch; }
+}
