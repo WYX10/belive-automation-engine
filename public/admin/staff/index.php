@@ -563,13 +563,23 @@ admin_header('Staff schedule', 'staff');
 
 <div class="belive-card">
     <div class="belive-card-title">👥 The team</div>
-    <div class="staff-list">
+    <div class="staff-team">
+        <div class="staff-team-head">
+            <span>Agent</span>
+            <span>Schedule</span>
+            <span>Handles</span>
+            <span>Max / day</span>
+            <span></span>
+        </div>
         <?php foreach ($team as $member): ?>
             <details class="staff-member">
                 <summary>
-                    <span class="staff-member-name"><?= e($member['name']) ?></span>
-                    <span class="staff-member-meta"><?= e($shiftSummary((int) $member['id'])) ?></span>
-                    <span class="staff-member-badges">
+                    <span class="col-agent">
+                        <strong><?= e($member['name']) ?></strong>
+                        <em><?= e($member['role']) ?></em>
+                    </span>
+                    <span class="col-sched"><?= e($shiftSummary((int) $member['id'])) ?></span>
+                    <span class="col-handles">
                         <?php if ((int) $member['handles_video'] === 1): ?>
                             <span class="belive-badge">💻 Video</span>
                         <?php endif; ?>
@@ -580,6 +590,8 @@ admin_header('Staff schedule', 'staff');
                             <span class="belive-badge muted">Off roster</span>
                         <?php endif; ?>
                     </span>
+                    <span class="col-max"><?= (int) $member['max_daily_viewings'] ?></span>
+                    <span class="col-edit">Edit</span>
                 </summary>
                 <?php $staffForm($member); ?>
             </details>

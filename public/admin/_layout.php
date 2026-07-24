@@ -14,6 +14,19 @@ function e(mixed $value): string
     return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
 }
 
+/**
+ * Cache-busting asset URL: appends ?v=<mtime> so a deployed CSS/JS change is
+ * fetched immediately instead of being served from the browser (or Azure)
+ * cache. Falls back to the bare path if the file can't be stat'd.
+ */
+function asset_url(string $path): string
+{
+    $file = (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__, 2)) . '/public' . $path;
+    $mtime = is_file($file) ? filemtime($file) : false;
+
+    return $mtime !== false ? $path . '?v=' . $mtime : $path;
+}
+
 function set_flash(string $type, string $message): void
 {
     $_SESSION['flash'][] = ['type' => $type, 'message' => $message];
@@ -53,8 +66,8 @@ function admin_header(string $title, string $active = ''): void
 <meta name="theme-color" content="#F5833C">
 <title><?= e($title) ?> · BeLive Automation Engine</title>
 <link rel="icon" type="image/png" href="/assets/img/belive-favicon.png">
-<link rel="stylesheet" href="/assets/css/belive-theme.css">
-<link rel="stylesheet" href="/assets/css/admin.css">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/belive-theme.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/admin.css')) ?>">
 </head>
 <body class="admin">
 <aside class="admin-sidebar">
@@ -84,7 +97,7 @@ function admin_footer(): void
 {
     ?>
 </main>
-<script src="/assets/js/admin.js"></script>
+<script src="<?= e(asset_url('/assets/js/admin.js')) ?>"></script>
 </body>
 </html>
     <?php
