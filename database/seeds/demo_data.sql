@@ -191,20 +191,25 @@ INSERT INTO ai_interactions (lead_id, phase, skill, model_used, direction, messa
 SELECT id, 'conversion', 'automate', 'claude-sonnet-5', 'outbound', NULL, 'Sentul Point A-20-9 fits perfectly — middle room, RM 700/mo on a 6-month stay, 5 min to the LRT. Zero deposit, weekly cleaning. Want photos or a viewing?', 'reply', 'Matched room to professional profile near workplace.', NOW() - INTERVAL 2 DAY + INTERVAL 1 MINUTE FROM leads WHERE wa_phone = '60170000201';
 
 -- ------------------------------------------ viewing staff roster
--- Eve cross-checks this roster before offering a slot: three agents with
--- different mode capabilities and a weekend-only agent, so the coverage grid
--- on /admin/staff shows real weekday/weekend contrast.
+-- Eve cross-checks this roster before offering a slot. Four agents with
+-- deliberately different capabilities so /admin/staff shows real contrast:
+--   Aida  — video + in person, weekday days   (the all-rounder)
+--   Daniel— video only,        weekday evenings(remote host)
+--   Rajesh— in person only,    Tue/Thu/Sat    (site specialist)
+--   Mei Ling — video + in person, weekends     (weekend cover)
+-- Names are kept distinct from the demo *leads* (there is a customer named
+-- Aisyah Rahman) so the assigned-viewings card never reads agent == customer.
 INSERT INTO staff (name, role, wa_phone, email, handles_video, handles_in_person, max_daily_viewings) VALUES
-('Aisyah Rahman', 'Senior viewing agent', '60170000301', 'aisyah@belive.asia', 1, 1, 6),
-('Daniel Chong',  'Video host',           '60170000302', 'daniel@belive.asia', 1, 0, 10),
-('Mei Ling Tan',  'Weekend agent',        '60170000303', 'meiling@belive.asia', 1, 1, 5);
+('Aida Zulkifli', 'Senior viewing agent',  '60170000301', 'aida@belive.asia',    1, 1, 6),
+('Daniel Chong',  'Video host',            '60170000302', 'daniel@belive.asia',  1, 0, 10),
+('Rajesh Kumar',  'In-person specialist',  '60170000303', 'rajesh@belive.asia',  0, 1, 4),
+('Mei Ling Tan',  'Weekend agent',         '60170000304', 'meiling@belive.asia', 1, 1, 5);
 
--- Aisyah: Mon–Fri 10:00–18:00. Daniel: Mon–Fri 14:00–21:00 (evening video
--- calls). Mei Ling: Sat + Sun 10:00–17:00.
+-- Weekly shifts. weekday 0 = Sunday … 6 = Saturday (PHP date('w')).
 INSERT INTO staff_shifts (staff_id, weekday, starts_at, ends_at)
 SELECT s.id, d.weekday, '10:00:00', '18:00:00' FROM staff s
 JOIN (SELECT 1 AS weekday UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5) d
-WHERE s.name = 'Aisyah Rahman';
+WHERE s.name = 'Aida Zulkifli';
 
 INSERT INTO staff_shifts (staff_id, weekday, starts_at, ends_at)
 SELECT s.id, d.weekday, '14:00:00', '21:00:00' FROM staff s
@@ -212,6 +217,17 @@ JOIN (SELECT 1 AS weekday UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SEL
 WHERE s.name = 'Daniel Chong';
 
 INSERT INTO staff_shifts (staff_id, weekday, starts_at, ends_at)
+SELECT s.id, d.weekday, '10:00:00', '16:00:00' FROM staff s
+JOIN (SELECT 2 AS weekday UNION SELECT 4 UNION SELECT 6) d
+WHERE s.name = 'Rajesh Kumar';
+
+INSERT INTO staff_shifts (staff_id, weekday, starts_at, ends_at)
 SELECT s.id, d.weekday, '10:00:00', '17:00:00' FROM staff s
 JOIN (SELECT 0 AS weekday UNION SELECT 6) d
 WHERE s.name = 'Mei Ling Tan';
+
+-- For the fuller demo — upcoming leave and a few assigned/unassigned viewings
+-- so every card on /admin/staff has content — run the idempotent seeder:
+--   php database/seed_staff_schedule.php
+-- (kept out of this file because those rows need real "next weekday" date
+-- logic, and the seeder can also top up an already-populated database.)
