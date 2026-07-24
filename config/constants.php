@@ -72,6 +72,13 @@ define('RENT_REWARD_POINTS', 200); // four confirmed referrals
 define('RENT_REWARD_CREDIT_RM', 50);
 define('RENT_REWARD_STATUSES', ['requested', 'approved', 'applied', 'rejected']);
 
+// electric_bills.status. 'overdue' is absent on purpose — it is unpaid with a
+// due date in the past, derived at read time (ElectricBill::isOverdue).
+define('ELECTRIC_BILL_STATUSES', ['unpaid', 'paid', 'waived']);
+
+// Where a meter reading pair came from. Never a live-feed simulation.
+define('ELECTRIC_READING_SOURCES', ['smart_meter', 'manual']);
+
 // API credential service identifiers.
 define('CREDENTIAL_SERVICES', ['whatsapp', 'anthropic', 'gemini', 'meta_graph', 'openai', 'openrouter', 'tiktok']);
 

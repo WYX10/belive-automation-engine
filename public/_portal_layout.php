@@ -31,6 +31,21 @@ if (!function_exists('set_flash')) {
     }
 }
 
+if (!function_exists('asset_url')) {
+    /**
+     * Cache-busting asset URL: appends ?v=<mtime> so a deployed CSS change is
+     * fetched immediately instead of being served from the browser (or Azure)
+     * cache. Falls back to the bare path if the file can't be stat'd.
+     */
+    function asset_url(string $path): string
+    {
+        $file = (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__)) . '/public' . $path;
+        $mtime = is_file($file) ? filemtime($file) : false;
+
+        return $mtime !== false ? $path . '?v=' . $mtime : $path;
+    }
+}
+
 function eve_whatsapp_link(): string
 {
     $number = preg_replace('/[^0-9]/', '', $_ENV['EVE_WA_NUMBER'] ?? '');
@@ -44,6 +59,7 @@ function portal_header(string $audience, string $title, string $active = ''): vo
     $nav = $isTenant
         ? [
             'dashboard'    => ['/tenant/dashboard', 'My stay'],
+            'electric'     => ['/tenant/electric', 'Electric bill'],
             'rewards'      => ['/tenant/rewards', 'Rent rewards'],
             'verification' => ['/tenant/listing_verification', 'Verified listing'],
             'move_in'      => ['/tenant/move_in_log', 'Move-in log'],
@@ -66,8 +82,8 @@ function portal_header(string $audience, string $title, string $active = ''): vo
 <meta name="theme-color" content="#F5833C">
 <title><?= e($title) ?> · beLive</title>
 <link rel="icon" type="image/png" href="/assets/img/belive-favicon.png">
-<link rel="stylesheet" href="/assets/css/belive-theme.css">
-<link rel="stylesheet" href="/assets/css/portal.css">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/belive-theme.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/portal.css')) ?>">
 </head>
 <body class="portal-<?= e($audience) ?>">
 <nav class="portal-nav">

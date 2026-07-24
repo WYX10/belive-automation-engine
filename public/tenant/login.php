@@ -66,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
 
     <ul class="belive-check-list" style="margin-top:16px">
+        <li>Your own meter's electricity bills</li>
         <li>Verified listing card</li>
         <li>Move-in condition log</li>
         <li>Digital agreement</li>

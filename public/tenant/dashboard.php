@@ -5,11 +5,13 @@ declare(strict_types=1);
 defined('APP_BOOTED') || exit('No direct access.');
 
 use App\Models\Booking;
+use App\Models\ElectricBill;
 
 require dirname(__DIR__) . '/_portal_layout.php';
 $lead = require_tenant();
 $room = tenant_room($lead);
 $bookings = Booking::forLead((int) $lead['id']);
+$electric = ElectricBill::summaryForTenant((int) $lead['id']);
 
 portal_header('tenant', 'My stay', 'dashboard');
 ?>
@@ -60,6 +62,35 @@ portal_header('tenant', 'My stay', 'dashboard');
                     </div>
                 <?php endforeach; ?>
             <?php endif; ?>
+        </div>
+
+        <div class="belive-card" style="margin-top:16px">
+            <div class="belive-card-title">⚡ Electricity</div>
+            <?php if ($electric['bills'] === []): ?>
+                <p class="belive-muted">Your room has its own meter, so you only ever pay for what your room uses.
+                Your bills appear here once the first billing period closes.</p>
+            <?php else: ?>
+                <div class="electric-glance">
+                    <?php if ($electric['outstanding_count'] > 0): ?>
+                        <div class="electric-glance-figure">
+                            <strong>RM <?= e(number_format($electric['outstanding_rm'], 2)) ?></strong>
+                            <span>outstanding<?= $electric['next_due_on'] !== null ? ' · due ' . e(date('j M', strtotime($electric['next_due_on']))) : '' ?></span>
+                        </div>
+                        <span class="belive-badge <?= $electric['overdue_count'] > 0 ? 'danger' : 'orange' ?>">
+                            <?= $electric['overdue_count'] > 0 ? 'overdue' : 'unpaid' ?>
+                        </span>
+                    <?php else: ?>
+                        <div class="electric-glance-figure">
+                            <strong><?= e(number_format((float) $electric['latest']['units_kwh'], 1)) ?></strong>
+                            <span>kWh last period</span>
+                        </div>
+                        <span class="belive-badge">all settled</span>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+            <div style="margin-top:14px">
+                <a class="belive-btn-ghost" href="/tenant/electric">⚡ My electric bill</a>
+            </div>
         </div>
     </div>
 

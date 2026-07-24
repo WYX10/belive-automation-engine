@@ -121,6 +121,7 @@ $router->get('/tenant/logout', function () {
     header('Location: /tenant/login');
 });
 $router->get('/tenant/dashboard', "$pages/tenant/dashboard.php");
+$router->get('/tenant/electric', "$pages/tenant/electric.php");
 $router->any('/tenant/rewards', "$pages/tenant/rewards.php");
 $router->get('/tenant/listing_verification', "$pages/tenant/listing_verification.php");
 $router->get('/tenant/move_in_log', "$pages/tenant/move_in_log.php");

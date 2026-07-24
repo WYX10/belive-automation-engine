@@ -61,6 +61,7 @@ All admin POSTs require the session CSRF token (`csrf_token` field, provided by 
 |---|---|
 | `php database/migrate.php [--core-only]` | Create DB + run ALL migrations (`--core-only` skips the Phase 9 portal tables) |
 | `php database/seed.php [--force]` | Load demo rooms + the Setapak scenario |
+| `php database/seed_electric_bills.php` | Idempotent: a tagged demo tenant with a room meter and six months of bills for `/tenant/electric` |
 | `php cron/learning_job.php [--quiet-hours=4]` | Drop-off pattern detection + batch rule distillation + reinforcement |
 | `php cron/memory_decay.php [--stale-days=30]` | Confidence decay + below-threshold retirement |
 | `php tests/run.php` | 23-check learning/retrieval suite on a throwaway DB |
@@ -84,6 +85,12 @@ All admin POSTs require the session CSRF token (`csrf_token` field, provided by 
   Understand → Decide → Create → Automate pipeline with memory + booking handoff.
 - `App\Properties\RoomPhotoManager::addUpload(...)` — owner-scoped or admin room-gallery upload;
   accepts JPG/PNG/WebP images up to 5 MB and stores randomized public paths in `room_images`.
+- `App\Models\ElectricBill::registerMeter(...)` / `::issue(array $bill)` — write side of the
+  per-room submeter: one meter per room, and one bill per period computed as
+  `(current − previous) × rate + standing charge`, with the rate snapshotted onto the row.
+  `::summaryForTenant(int $leadId)` is the read side `/tenant/electric` renders; both scope by
+  `lead_id`, so a new tenant never sees the previous occupant's consumption. Overdue is derived
+  (`::isOverdue`), never stored.
 
 ## Database (dev/demo names)
 
@@ -96,6 +103,8 @@ request ledger), `properties` plus room-level `referral_reward_points` and refer
 `reward_room_id` attribution (022), immutable referral attribution snapshots (023), property
 admin-review status and audit fields (024), stale-decision review versions (025),
 `migrations` (runner bookkeeping),
+per-room electricity submetering `electric_meters` + `electric_bills` (034, read by the tenant
+portal's electricity view),
 plus the portal tables `verified_listings`, `move_in_logs`, `digital_agreements` (011–013,
 with listing review/audit extensions in 018–019 and nullable structured agreement `tenure`,
 `starts_on`, and `ends_on` fields in 020; all are included in a default migrate run). Legacy

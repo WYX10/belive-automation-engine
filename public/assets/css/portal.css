@@ -154,6 +154,37 @@ body.portal-login { display: flex; align-items: center; justify-content: center;
   .reward-history-row { align-items: flex-start; }
 }
 
+/* Tenant electricity — per-room meter usage and bills */
+.electric-chart { display: flex; align-items: flex-end; gap: 10px; min-height: 170px; padding-top: 6px; }
+.electric-chart-col { display: flex; flex: 1; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.electric-chart-value { color: var(--belive-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.electric-chart-bar { display: flex; align-items: flex-end; width: 100%; max-width: 54px; height: 120px; border-radius: 8px; background: var(--belive-cream); }
+.electric-chart-bar > span { width: 100%; border-radius: 8px; background: var(--belive-teal); }
+.electric-chart-col:last-child .electric-chart-bar > span { background: var(--belive-orange); }
+.electric-chart-label { color: var(--belive-muted); font-size: 12px; font-weight: 600; }
+
+.electric-table-wrap { overflow-x: auto; }
+.electric-bill-table { min-width: 560px; }
+.electric-bill-table td { font-variant-numeric: tabular-nums; }
+.electric-num { white-space: nowrap; }
+.electric-sub { display: block; margin-top: 3px; color: var(--belive-muted); font-size: 11.5px; font-variant-numeric: normal; }
+
+.electric-meter-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.electric-meter-facts > div { padding: 10px 12px; border-radius: 10px; background: var(--belive-cream); }
+.electric-meter-facts span { display: block; color: var(--belive-muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.electric-meter-facts strong { display: block; margin-top: 3px; font-size: 14px; }
+
+/* Compact electricity line on the tenant dashboard */
+.electric-glance { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.electric-glance-figure { display: flex; align-items: baseline; gap: 6px; }
+.electric-glance-figure strong { font-family: var(--font-head); font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1; }
+.electric-glance-figure span { color: var(--belive-muted); font-size: 13px; }
+
+@media (max-width: 520px) {
+  .electric-chart { gap: 6px; }
+  .electric-chart-value { font-size: 11px; }
+}
+
 /* Owner property and room management */
 .owner-property-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .owner-add-property { position: relative; flex: 0 0 auto; }
