@@ -14,6 +14,7 @@ defined('APP_BOOTED') || exit('No direct access.');
 
 use App\Core\Auth;
 use App\Core\Settings;
+use App\Integrations\Meta\InstagramApi;
 use App\Integrations\Meta\MetaMessenger;
 use App\Models\SocialReply;
 use App\Pipeline\LeadGeneration\CommentResponder;
@@ -59,6 +60,9 @@ $liveOn = array_filter([
     'Facebook'  => $messenger->isConfigured('facebook'),
     'Instagram' => $messenger->isConfigured('instagram'),
 ]);
+$igPath = InstagramApi::usesInstagramLogin()
+    ? 'Instagram Login — graph.instagram.com, using the `instagram` credential'
+    : 'Facebook Login — graph.facebook.com, using the Page token on `meta_graph`';
 
 $counts = SocialReply::counts();
 $events = SocialReply::recent(60);
@@ -90,6 +94,10 @@ admin_header('Social auto-reply', 'social');
             <span class="belive-badge">live</span>
             Replying on <strong><?= e(implode(' and ', array_keys($liveOn))) ?></strong>.
         <?php endif; ?>
+    </p>
+    <p class="belive-muted" style="font-size:12.5px">
+        Instagram path in use: <strong><?= e($igPath) ?></strong>. Meta ships two Instagram APIs and
+        they take different tokens — this is decided by whether an <code>instagram</code> credential is active.
     </p>
     <p class="belive-muted" style="font-size:12.5px">
         Callback URL for the Messenger and Instagram products:

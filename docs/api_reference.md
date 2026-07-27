@@ -127,7 +127,15 @@ lead at the WhatsApp lead it became.
 Flow: `CommentWebhookParser` / `MessageWebhookParser` normalize the payload → `CommentScanner`
 captures the lead (comments are filtered to rental enquiries, a DM never is) → `CommentResponder`
 sends the public reply and the private reply → `MetaMessenger` is the transport, with the same
-dry-run behaviour as `WhatsAppClient` when no `meta_graph` credential is active.
+dry-run behaviour as `WhatsAppClient` when no usable credential is active.
+
+`InstagramApi` resolves which of Meta's **two** Instagram APIs an install talks to, because they
+are not interchangeable: an app set up for Instagram Login uses `graph.instagram.com` with an
+Instagram user token (`instagram_business_*` permissions), while the older Facebook Login path
+uses `graph.facebook.com` with the Page token (`instagram_manage_*`). An active `instagram`
+credential (038) selects the former and covers replies, DMs and content publishing alike; with
+only `meta_graph` present, every Instagram call behaves exactly as it did before. Facebook is
+unaffected either way — it is always the Page token.
 
 Attribution closes the loop: the `wa.me` link carries a single-use token (`BL7A3F2C`) inside the
 prefilled first message. `SocialRefMerger` redeems it on the first inbound WhatsApp message,

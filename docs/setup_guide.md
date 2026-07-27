@@ -87,7 +87,25 @@ everything below is the Meta-side setup.
 1. **Prerequisites.** The Instagram account must be a **Professional** account linked to the
    Facebook Page. In the Instagram app: Settings → Privacy → Messages →
    **Allow access to messages** must be ON, or Meta silently never sends message webhooks.
-2. **Add the products** to the same Meta app: **Messenger** and **Instagram**.
+2. **Add the products** to the same Meta app: **Messenger** and **Instagram**. Newer dashboards
+   call these *use cases* — "Engage with customers on Messenger" and "Manage messaging & content
+   on Instagram" — and each has a **Customize** screen holding its webhooks and permissions.
+
+   **Which Instagram API you are on matters**, because Meta ships two and they take different
+   tokens. Check the permission names on the Instagram Customize screen:
+
+   | Permissions look like | API | Token | Credential to add |
+   |---|---|---|---|
+   | `instagram_business_*` | Instagram Login (`graph.instagram.com`) | Instagram user token | service **instagram** + `ig_user_id` |
+   | `instagram_manage_*` | Facebook Login (`graph.facebook.com`) | Page token | service **meta_graph** with `ig_user_id` |
+
+   The engine follows whichever is configured — an active `instagram` credential wins, and covers
+   replies, DMs *and* content publishing. See `App\Integrations\Meta\InstagramApi`.
+
+   On the Instagram Login path, get the token from **Generate access tokens → Add account** after
+   giving the account the **Instagram Tester** role (Roles tab) and accepting the invite from
+   inside Instagram. Business Login (the redirect-URL dialog) is only needed if *other* businesses
+   will connect their own accounts — for beLive's own account, skip it.
 3. **Register the callback** for each product —
    Callback URL: `https://<your-host>/webhook/meta` · Verify token: your `WA_VERIFY_TOKEN`.
    Subscribe these fields:
@@ -102,10 +120,14 @@ everything below is the Meta-side setup.
      &access_token={page-access-token}
    ```
 
-5. **Credentials**: Admin → API credentials → service *Meta Graph API*: paste the token and put
-   `page_id` and `ig_user_id` in the credential's meta JSON (the same credential the content
-   publisher uses). Without it, replies are composed and logged but **not delivered** — the
-   Social auto-reply page badges this state `simulated`.
+5. **Credentials**: Admin → API credentials → Add:
+   - *Meta Graph — Page token*: the token plus `page_id` (and `ig_user_id` if you are on the
+     Facebook-Login Instagram path). Covers Facebook comments, DMs and publishing.
+   - *Instagram Login — Instagram user token*: only on the Instagram-Login path, plus the
+     Instagram account id.
+
+   Without a usable credential, replies are composed and logged but **not delivered** — the
+   Social auto-reply page badges this state `simulated` and names which Instagram path is live.
 6. **Set the WhatsApp number** in Admin → Social auto-reply. Without it the link falls back to the
    shared `wa.link` and attribution is lost.
 7. Comment on a live post from another account → public reply appears, DM arrives, tapping the

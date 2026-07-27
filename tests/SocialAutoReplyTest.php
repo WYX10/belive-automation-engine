@@ -245,6 +245,60 @@ check('a second person using the same token is just a normal lead',
 check('the token still points at the first claimant',
     (int) (SocialReply::first(['object_id' => 'ig.c1'])['claimed_by_lead_id'] ?? 0) === $waLeadId);
 
+// ---- which Instagram API the calls go to --------------------------------------
+// Meta ships two, they take different tokens, and sending a Page token to an
+// Instagram-Login app fails outright. Nothing here touches the network: what is
+// asserted is which base URL and token a request WOULD be built with.
+$http = new GuzzleHttp\Client(['timeout' => 5]);
+
+check('with no credential at all, Instagram is not configured',
+    App\Integrations\Meta\InstagramApi::isConfigured() === false);
+check('and resolves to nothing (caller falls back to dry-run)',
+    App\Integrations\Meta\InstagramApi::resolve($http) === null);
+
+// Facebook-Login install: the Page token on meta_graph covers Instagram too.
+$metaGraphId = App\Models\ApiCredential::store(
+    'meta_graph',
+    'Test page token',
+    'page-token-value',
+    ['page_id' => 'fb-page-1', 'ig_user_id' => 'ig-account-1']
+);
+$legacy = App\Integrations\Meta\InstagramApi::resolve($http);
+check('Facebook-Login install resolves to graph.facebook.com',
+    str_starts_with($legacy['base'] ?? '', 'https://graph.facebook.com'), $legacy['base'] ?? 'null');
+check('...on the page_token path', ($legacy['mode'] ?? '') === 'page_token');
+check('...addressing the ig_user_id from meta_graph', ($legacy['ig_user_id'] ?? '') === 'ig-account-1');
+
+// Instagram-Login install: its own token wins, and the base URL changes.
+$instagramId = App\Models\ApiCredential::store(
+    'instagram',
+    'Test IG login token',
+    'ig-login-token-value',
+    ['ig_user_id' => 'ig-account-2']
+);
+$igLogin = App\Integrations\Meta\InstagramApi::resolve($http);
+check('an active instagram credential switches to graph.instagram.com',
+    str_starts_with($igLogin['base'] ?? '', 'https://graph.instagram.com'), $igLogin['base'] ?? 'null');
+check('...and uses the Instagram token, not the Page token',
+    ($igLogin['token'] ?? '') === 'ig-login-token-value');
+check('...addressing its own account id', ($igLogin['ig_user_id'] ?? '') === 'ig-account-2');
+check('usesInstagramLogin() reports the switch', App\Integrations\Meta\InstagramApi::usesInstagramLogin());
+
+$live = new App\Integrations\Meta\MetaMessenger($http);
+check('MetaMessenger sees Instagram as configured', $live->isConfigured('instagram'));
+check('our own IG account is still recognised on the new path',
+    $live->isOwnAccount('instagram', 'ig-account-2'));
+check('a real commenter is not', $live->isOwnAccount('instagram', 'ig-user-777') === false);
+check('Facebook still resolves through the Page credential', $live->isConfigured('facebook'));
+check('the content publisher follows the same switch',
+    (new App\Integrations\Social\InstagramPublisher($http))->isConfigured());
+
+// Remove them again: a live credential would make later code attempt real HTTP.
+App\Models\ApiCredential::delete($instagramId);
+App\Models\ApiCredential::delete($metaGraphId);
+check('teardown leaves no active Meta credential behind',
+    App\Integrations\Meta\InstagramApi::resolve($http) === null);
+
 // ---- disabled means silent ----------------------------------------------------
 Settings::set('social_autoreply_enabled', '0');
 $before = count($messenger->private);
