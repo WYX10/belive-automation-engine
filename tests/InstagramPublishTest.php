@@ -46,6 +46,8 @@ $publisherWith = static function (array $responses): array {
 
 $json = static fn (array $body): Response => new Response(200, ['Content-Type' => 'application/json'], json_encode($body));
 
+$v = App\Integrations\Social\MetaGraph::VERSION;
+
 // ---- happy path: poll until FINISHED, then publish --------------------------
 [$publisher, $sent] = $publisherWith([
     $json(['id' => 'CONTAINER-1']),           // POST /media
@@ -61,11 +63,14 @@ check('IG publish is not a dry run', ($result['dry_run'] ?? true) === false);
 $paths = array_map(static fn ($t) => $t['request']->getMethod() . ' ' . $t['request']->getUri()->getPath(), $sent->getArrayCopy());
 check(
     'container is polled between create and publish',
+    // Built from MetaGraph::VERSION rather than hardcoded: what matters is the
+    // ORDER of the calls, and pinning the version here would fail the suite
+    // every time Meta's deprecation clock forces a bump.
     $paths === [
-        'POST /v20.0/IG-USER-1/media',
-        'GET /v20.0/CONTAINER-1',
-        'GET /v20.0/CONTAINER-1',
-        'POST /v20.0/IG-USER-1/media_publish',
+        "POST /$v/IG-USER-1/media",
+        "GET /$v/CONTAINER-1",
+        "GET /$v/CONTAINER-1",
+        "POST /$v/IG-USER-1/media_publish",
     ],
     implode(' | ', $paths)
 );
