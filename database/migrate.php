@@ -66,8 +66,29 @@ foreach ($files as $file) {
 
     // Strip -- comments, split into individual statements.
     $sql = preg_replace('/^\s*--.*$/m', '', file_get_contents($file));
-    foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
-        $server->exec($statement);
+    $statements = array_values(array_filter(array_map('trim', explode(';', $sql))));
+
+    // A migration is recorded only after its LAST statement succeeds, so a run
+    // that dies half-way replays the whole file next time. Say exactly which
+    // statement failed instead of dumping a stack trace at whoever is watching
+    // the deploy — a raw "Duplicate column name" is a migration that is not
+    // safe to re-run, not a mystery.
+    foreach ($statements as $i => $statement) {
+        try {
+            $server->exec($statement);
+        } catch (PDOException $e) {
+            fwrite(STDERR, sprintf(
+                "\nFAILED   %s — statement %d of %d\n  %s\n  %s\n\n"
+                . "Nothing was recorded for this file, so the next run replays it from the top.\n"
+                . "Make every statement in it safe to re-run before deploying again.\n",
+                $name,
+                $i + 1,
+                count($statements),
+                preg_replace('/\s+/', ' ', mb_substr($statement, 0, 160)),
+                $e->getMessage()
+            ));
+            exit(1);
+        }
     }
 
     $server->prepare('INSERT INTO migrations (filename) VALUES (?)')->execute([$name]);

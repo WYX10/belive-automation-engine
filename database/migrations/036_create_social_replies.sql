@@ -44,9 +44,37 @@ CREATE TABLE IF NOT EXISTS social_replies (
 -- A social lead that has been folded into a WhatsApp lead keeps its row (the
 -- history hangs off it) but points at its successor, so the leads list can
 -- hide it instead of showing the same person twice.
-ALTER TABLE leads
-    ADD COLUMN merged_into_lead_id INT UNSIGNED NULL AFTER referral_code_used,
-    ADD KEY idx_lead_merged (merged_into_lead_id);
+--
+-- Guarded rather than a bare ALTER: the runner records a migration only after
+-- its LAST statement, so a run interrupted part-way (a killed deploy, a closed
+-- SSH console) replays the whole file next time. MySQL has no
+-- "ADD COLUMN IF NOT EXISTS" -- only MariaDB does -- so the check goes through
+-- information_schema, which both understand.
+SET @has_merge_col := (
+    SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leads' AND COLUMN_NAME = 'merged_into_lead_id'
+);
+SET @ddl := IF(
+    @has_merge_col > 0,
+    'DO 0',
+    'ALTER TABLE leads ADD COLUMN merged_into_lead_id INT UNSIGNED NULL AFTER referral_code_used'
+);
+PREPARE add_merge_col FROM @ddl;
+EXECUTE add_merge_col;
+DEALLOCATE PREPARE add_merge_col;
+
+SET @has_merge_key := (
+    SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leads' AND INDEX_NAME = 'idx_lead_merged'
+);
+SET @ddl := IF(
+    @has_merge_key > 0,
+    'DO 0',
+    'ALTER TABLE leads ADD KEY idx_lead_merged (merged_into_lead_id)'
+);
+PREPARE add_merge_key FROM @ddl;
+EXECUTE add_merge_key;
+DEALLOCATE PREPARE add_merge_key;
 
 -- Reply copy is admin-editable (Admin -> Social auto-reply), not hardcoded:
 -- the wording is marketing's call, and Meta's policies on what you may send
