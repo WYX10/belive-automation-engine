@@ -16,6 +16,7 @@ use App\AI\Skills\UnderstandSkill;
 use App\Integrations\WhatsApp\WhatsAppClient;
 use App\Models\Interaction;
 use App\Models\Lead;
+use App\Pipeline\LeadGeneration\SocialRefMerger;
 
 /**
  * Orchestrates one inbound WhatsApp message through Eve's full pipeline:
@@ -42,6 +43,16 @@ final class ConversationManager
 
         $lead = Lead::findOrCreate($message['wa_phone'], $message['name'], 'whatsapp');
         $leadId = (int) $lead['id'];
+
+        // Arrived from an Instagram/Facebook auto-reply? The wa.me link we DM'd
+        // prefilled a one-time token into this very message: redeem it, absorb
+        // the social lead's history, then strip the code so the AI never sees
+        // it. Done BEFORE recall, so Eve's first line can already reference
+        // what they asked under the post.
+        if (SocialRefMerger::claim($message['text'], $leadId) !== null) {
+            $lead = Lead::find($leadId) + ['is_returning' => true];
+        }
+        $message['text'] = SocialRefMerger::strip($message['text']);
 
         // Fast pre-route: pure pleasantries get an instant ack, no model calls.
         $pre = IntentClassifier::preClassify($message['text']);

@@ -52,6 +52,7 @@ function admin_header(string $title, string $active = ''): void
         'learning_log' => ['/admin/learning_log', '🧠', 'Learning log'],
         'activity_log' => ['/admin/activity_log', '📜', 'Activity log'],
         'content'      => ['/admin/content',      '📣', 'Content'],
+        'social'       => ['/admin/social',       '🔁', 'Social auto-reply'],
         'bookings'     => ['/admin/bookings',     '📅', 'Bookings'],
         'agreements'   => ['/admin/agreements',   '📄', 'Agreements'],
         'staff'        => ['/admin/staff',        '🧑‍💼', 'Staff schedule'],

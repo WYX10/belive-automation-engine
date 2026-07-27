@@ -42,6 +42,11 @@ final class Settings
 
     public static function set(string $key, string $value, ?string $by = null): void
     {
+        // Warm the cache FIRST. Writing into a null cache would leave it
+        // holding this one key and looking loaded, so every later get() in the
+        // same request would skip the database and return its default.
+        self::load();
+
         Database::run(
             'INSERT INTO app_settings (setting_key, setting_value, updated_by) VALUES (?, ?, ?)
              ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_by = VALUES(updated_by)',

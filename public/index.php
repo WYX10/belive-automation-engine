@@ -35,7 +35,7 @@ date_default_timezone_set('Asia/Kuala_Lumpur');
 // are for the human-facing panels (including the manual-intake form, which
 // lives under /webhook/tiktok_fallback but is an admin page).
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-if (!in_array($path, ['/webhook/whatsapp', '/webhook/verify'], true)) {
+if (!in_array($path, ['/webhook/whatsapp', '/webhook/meta', '/webhook/verify'], true)) {
     session_start();
 }
 
@@ -98,6 +98,7 @@ $router->get('/admin/learning_log/rule', "$pages/admin/learning_log/rule_detail.
 
 $router->get('/admin/activity_log', "$pages/admin/activity_log/index.php");
 
+$router->any('/admin/social', "$pages/admin/social/index.php");
 $router->any('/admin/content', "$pages/admin/content/index.php");
 $router->any('/admin/content/preview', "$pages/admin/content/preview.php");
 
@@ -113,6 +114,11 @@ $router->any('/admin/listing_reviews/view', "$pages/admin/listing_reviews/view.p
 // --- Webhooks (Meta calls GET for verification, POST for events) ---------------
 $router->get('/webhook/whatsapp', "$pages/webhook/verify.php");
 $router->post('/webhook/whatsapp', "$pages/webhook/whatsapp.php");
+// Same receiver, second URL: the Messenger/Instagram products are configured
+// separately in the Meta App dashboard, and pointing them at /webhook/meta
+// reads better there than reusing the WhatsApp path. Both accept all objects.
+$router->get('/webhook/meta', "$pages/webhook/verify.php");
+$router->post('/webhook/meta', "$pages/webhook/whatsapp.php");
 $router->get('/webhook/verify', "$pages/webhook/verify.php");
 $router->any('/webhook/tiktok_fallback', "$pages/webhook/tiktok_fallback.php");
 

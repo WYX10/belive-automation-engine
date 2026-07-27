@@ -11,7 +11,11 @@ namespace App\Integrations\Meta;
 final class CommentWebhookParser
 {
     /**
-     * @return array<int, array{platform:string, user_id:string, user_name:?string, text:string, comment_id:string}>
+     * parent_id is carried because Instagram only allows a public reply on a
+     * TOP-LEVEL comment: replying to a reply is an API error, so the responder
+     * targets the parent when there is one. It is empty for top-level comments.
+     *
+     * @return array<int, array{platform:string, user_id:string, user_name:?string, text:string, comment_id:string, parent_id:string}>
      */
     public static function parse(array $payload): array
     {
@@ -44,7 +48,9 @@ final class CommentWebhookParser
                     'user_id'    => $userId,
                     'user_name'  => $value['from']['name'] ?? $value['from']['username'] ?? null,
                     'text'       => $text,
-                    'comment_id' => $value['comment_id'] ?? $value['id'] ?? '',
+                    'comment_id' => (string) ($value['comment_id'] ?? $value['id'] ?? ''),
+                    // FB nests it as parent_id, IG as parent.id.
+                    'parent_id'  => (string) ($value['parent_id'] ?? $value['parent']['id'] ?? ''),
                 ];
             }
         }

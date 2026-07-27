@@ -78,6 +78,48 @@ Meta-side setup and a public URL:
 **Free-tier note (budget)**: replies inside the 24-hour customer-service window to user-initiated
 messages are free on the Cloud API — the demo flow costs nothing per message.
 
+## 5b. Going live on Facebook / Instagram auto-reply
+
+Someone comments on a beLive post → they get a public reply and a private DM holding a WhatsApp
+link → the conversation continues with Eve. Copy and toggles live in **Admin → Social auto-reply**;
+everything below is the Meta-side setup.
+
+1. **Prerequisites.** The Instagram account must be a **Professional** account linked to the
+   Facebook Page. In the Instagram app: Settings → Privacy → Messages →
+   **Allow access to messages** must be ON, or Meta silently never sends message webhooks.
+2. **Add the products** to the same Meta app: **Messenger** and **Instagram**.
+3. **Register the callback** for each product —
+   Callback URL: `https://<your-host>/webhook/meta` · Verify token: your `WA_VERIFY_TOKEN`.
+   Subscribe these fields:
+   - Messenger (Page): `feed` (comments on posts) and `messages` (DMs)
+   - Instagram: `comments` and `messages`
+4. **Subscribe the Page to the app** — the step everyone misses, and the reason a correctly
+   configured webhook delivers nothing:
+
+   ```
+   POST https://graph.facebook.com/v20.0/{page-id}/subscribed_apps
+     ?subscribed_fields=feed,messages
+     &access_token={page-access-token}
+   ```
+
+5. **Credentials**: Admin → API credentials → service *Meta Graph API*: paste the token and put
+   `page_id` and `ig_user_id` in the credential's meta JSON (the same credential the content
+   publisher uses). Without it, replies are composed and logged but **not delivered** — the
+   Social auto-reply page badges this state `simulated`.
+6. **Set the WhatsApp number** in Admin → Social auto-reply. Without it the link falls back to the
+   shared `wa.link` and attribution is lost.
+7. Comment on a live post from another account → public reply appears, DM arrives, tapping the
+   link opens WhatsApp with the message prefilled. The event and its outcome show up in the
+   Answered events table.
+
+**Permissions / App Review.** `pages_messaging` and `instagram_manage_messages` need App Review
+before they work for the public. In Development mode they already work for anyone holding a role
+on the app — enough for the demo, not enough for real tenants.
+
+**Meta's rules the engine enforces for you**: exactly one private reply per comment (within 7
+days), a 24-hour window to answer a direct message, and no reply to our own comments — which
+would otherwise loop forever.
+
 ## 6. Demo data notes
 
 - Seed room photo URLs are **public placeholders** (picsum.photos) so image sends genuinely work
