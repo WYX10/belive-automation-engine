@@ -8,20 +8,24 @@ use App\AI\Memory\EpisodicLogger;
 use App\Models\Lead;
 
 /**
- * Captures FB/IG comments as leads. Social users have no WhatsApp number yet,
- * so identity is a 'fb:<id>' / 'ig:<id>' pseudo-handle — when they later
- * message on WhatsApp the conversation continues under their real number.
- * Every captured comment is scored by LeadScorer so the pipeline downstream
- * is identical to every other channel.
+ * Captures FB/IG comments and direct messages as leads. Social users have no
+ * WhatsApp number yet, so identity is a 'fb:<id>' / 'ig:<id>' pseudo-handle —
+ * when they later message on WhatsApp, SocialRefMerger folds this lead into
+ * their real number. Every capture is scored by LeadScorer so the pipeline
+ * downstream is identical to every other channel.
  */
 final class CommentScanner
 {
-    /** @param array{platform:string, user_id:string, user_name:?string, text:string, comment_id:string} $comment */
-    public static function capture(array $comment): ?int
+    /**
+     * @param array{platform:string, user_id:string, user_name:?string, text:string, comment_id?:string, message_id?:string} $comment
+     * @param string $kind 'comment' or 'direct_message'
+     */
+    public static function capture(array $comment, string $kind = 'comment'): ?int
     {
         // Only comments that look like rental interest become leads; pure
-        // chatter ("nice!") is logged but not captured.
-        if (!self::looksLikeEnquiry($comment['text'])) {
+        // chatter ("nice!") is logged but not captured. A DM is never filtered:
+        // opening a private conversation IS the intent signal.
+        if ($kind === 'comment' && !self::looksLikeEnquiry($comment['text'])) {
             EpisodicLogger::activity(
                 'social_comment_skipped',
                 'lead_gen',
@@ -37,6 +41,7 @@ final class CommentScanner
         $lead = Lead::findOrCreate($handle, $comment['user_name'], 'social');
         $leadId = (int) $lead['id'];
 
+        $objectId = (string) ($comment['comment_id'] ?? $comment['message_id'] ?? '');
         EpisodicLogger::log([
             'lead_id'      => $leadId,
             'phase'        => 'lead_gen',
@@ -44,8 +49,8 @@ final class CommentScanner
             'model_used'   => 'webhook-capture',
             'direction'    => 'inbound',
             'message_in'   => $comment['text'],
-            'message_kind' => 'social_comment',
-            'reasoning'    => "Captured from {$comment['platform']} comment {$comment['comment_id']}.",
+            'message_kind' => $kind === 'comment' ? 'social_comment' : 'social_dm',
+            'reasoning'    => "Captured from {$comment['platform']} " . str_replace('_', ' ', $kind) . " $objectId.",
         ]);
 
         // Score it like any other lead (uses the lead_gen phase model).

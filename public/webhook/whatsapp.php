@@ -3,9 +3,13 @@
 declare(strict_types=1);
 
 /**
- * Inbound Meta webhook receiver (POST). Two event families arrive here:
+ * Inbound Meta webhook receiver (POST). Three event families arrive here:
  *  - object=whatsapp_business_account → WhatsApp messages → conversation pipeline
- *  - object=page / instagram          → FB/IG comments   → lead capture (Phase 6)
+ *  - object=page / instagram, changes → FB/IG comments    → capture + auto-reply
+ *  - object=page / instagram, messaging → FB/IG DMs       → capture + auto-reply
+ *
+ * The social half answers publicly and then privately with a wa.me link, so
+ * the conversation continues where Eve actually works. See CommentResponder.
  *
  * Always answers 200 quickly: Meta retries non-200 deliveries aggressively,
  * and a processing bug must not cause webhook deregistration mid-demo.
@@ -15,8 +19,11 @@ defined('APP_BOOTED') || exit('No direct access.');
 
 use App\Core\Database;
 use App\Integrations\Meta\CommentWebhookParser;
+use App\Integrations\Meta\MessageWebhookParser;
+use App\Integrations\Meta\MetaMessenger;
 use App\Integrations\WhatsApp\WebhookParser;
 use App\Pipeline\Conversion\ConversationManager;
+use App\Pipeline\LeadGeneration\CommentResponder;
 use App\Pipeline\LeadGeneration\CommentScanner;
 
 $payload = json_decode(file_get_contents('php://input') ?: '', true);
@@ -74,8 +81,22 @@ try {
     }
 
     if ($object === 'page' || $object === 'instagram') {
+        $messenger = new MetaMessenger();
+
         foreach (CommentWebhookParser::parse($payload) as $comment) {
-            CommentScanner::capture($comment);
+            // Our own auto-reply comes back as a new comment webhook. Answering
+            // it would have Eve talking to herself in a loop, forever.
+            if ($messenger->isOwnAccount($comment['platform'], $comment['user_id'])) {
+                continue;
+            }
+            CommentResponder::handleComment($comment, CommentScanner::capture($comment), $messenger);
+        }
+
+        foreach (MessageWebhookParser::parse($payload) as $dm) {
+            if ($messenger->isOwnAccount($dm['platform'], $dm['user_id'])) {
+                continue;
+            }
+            CommentResponder::handleDirectMessage($dm, CommentScanner::capture($dm, 'direct_message'), $messenger);
         }
     }
 } catch (\Throwable $e) {

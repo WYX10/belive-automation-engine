@@ -14,7 +14,8 @@ single entry point, one bootstrap.
 | POST | `/enquire` | Room enquiry (channel #2): `name`, `wa_phone`, `room_id`, `tenure`, `message?` → lead with room context + instant AI WhatsApp follow-up |
 | GET | `/health` | Liveness check — JSON `{ok, app, time}` |
 | GET | `/webhook/whatsapp` | Meta verification handshake (`hub.mode`, `hub.verify_token`, `hub.challenge`) — echoes the challenge iff the token matches `WA_VERIFY_TOKEN` |
-| POST | `/webhook/whatsapp` | Meta event receiver. `object=whatsapp_business_account` → conversation pipeline; `object=page/instagram` → comment capture. Always answers 200 immediately, then processes |
+| POST | `/webhook/whatsapp` | Meta event receiver. `object=whatsapp_business_account` → conversation pipeline; `object=page/instagram` → comment/DM capture + social auto-reply. Always answers 200 immediately, then processes |
+| GET/POST | `/webhook/meta` | The same handshake and receiver at a second URL, so the Messenger and Instagram products can be configured separately in the Meta App dashboard |
 | GET | `/webhook/verify` | Same handshake handler at its spec-fixed path |
 | GET/POST | `/enquiry` | Website smart enquiry form (channel #2). POST fields: `name`, `wa_phone`, `message`, optional `ref_code`. Creates a lead + instant AI WhatsApp follow-up |
 | GET | `/r/{code}` | Refer & Earn share link — counts the click, forwards to `/enquiry?ref={code}` |
@@ -44,6 +45,7 @@ single entry point, one bootstrap.
 | GET | `/admin/learning_log` · `/admin/learning_log/rule?id=` | Mistake \| Correction \| Rule \| Reinforced \| Status · rule detail with source feedback + shaped replies |
 | GET | `/admin/activity_log` | Every AI action with the model that handled it |
 | GET/POST | `/admin/content` · `/admin/content/preview?id=` | Generate caption drafts from room metrics · approve / mark posted |
+| GET/POST | `/admin/social` | Social auto-reply: on/off, who gets a DM, the WhatsApp number and link prefill, the three reply templates, and the answered-events receipt (which comment, which reply, who actually landed on WhatsApp) |
 | GET/POST | `/admin/bookings` | Zero-touch bookings; complete/cancel controls |
 | GET/POST | `/admin/staff` | Viewing-staff roster: weekly shifts, time off, per-agent viewing modes and daily caps; 7-day coverage grid and manual assignment of unstaffed viewings |
 | GET/POST | `/admin/property_reviews` | Review owner-submitted properties; approve before room creation or reject with an owner-facing reason |
@@ -113,6 +115,25 @@ The agreement signing workflow (035) adds the stage machine (`status`, `stage_ve
 snapshotted `monthly_rent_rm` / `deposit_rm`, the landlord's particulars — NRIC and bank
 account number encrypted at rest, last four digits in the clear — and `agreement_events`,
 one row per hand-off.
+
+### Social auto-reply (036)
+
+`social_replies` records every FB/IG comment or DM Eve has answered, one row per event, with a
+unique key on `(platform, object_id)`. That key is load-bearing twice over: Meta redelivers
+webhooks, and Meta allows exactly **one** private reply per comment — a second attempt is an API
+error, so the row is claimed before anything is sent. `leads.merged_into_lead_id` points a social
+lead at the WhatsApp lead it became.
+
+Flow: `CommentWebhookParser` / `MessageWebhookParser` normalize the payload → `CommentScanner`
+captures the lead (comments are filtered to rental enquiries, a DM never is) → `CommentResponder`
+sends the public reply and the private reply → `MetaMessenger` is the transport, with the same
+dry-run behaviour as `WhatsAppClient` when no `meta_graph` credential is active.
+
+Attribution closes the loop: the `wa.me` link carries a single-use token (`BL7A3F2C`) inside the
+prefilled first message. `SocialRefMerger` redeems it on the first inbound WhatsApp message,
+moves the social lead's history onto the real lead, marks the lead's `source_channel` as
+`social`, and strips the code before the AI ever reads the text. A forwarded link is just a
+normal new lead — the token is spent.
 
 ### Agreement workflow (035)
 
