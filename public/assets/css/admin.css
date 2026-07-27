@@ -261,13 +261,51 @@ body.admin-login {
 .admin-room-edit > summary { min-height: 44px; padding: 11px 14px; border: 1.5px solid var(--belive-line); border-radius: 10px; cursor: pointer; font-weight: 700; list-style-position: inside; }
 .admin-room-edit > .admin-room-form { margin-top: 12px; background: var(--belive-cream); }
 
+/* Property → house → room drill-down: breadcrumbs, level cards, tenant lists. */
+.admin-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; font-size: 13px; }
+.admin-crumbs a { color: var(--belive-teal); font-weight: 700; text-decoration: none; }
+.admin-crumbs a:hover { text-decoration: underline; }
+.admin-crumbs span[aria-hidden] { color: var(--belive-muted); }
+.admin-crumbs [aria-current] { color: var(--belive-muted); font-weight: 700; }
+
+.admin-hier-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.admin-hier-card { display: block; border-top: 4px solid var(--belive-orange); color: inherit; text-decoration: none; }
+/* The whole card is the link, so hovering it must not underline its contents. */
+a.admin-hier-card:hover,
+a.admin-hier-card:hover * { text-decoration: none; }
+a.admin-hier-card:hover { box-shadow: var(--belive-shadow-lift); transform: translateY(-1px); }
+a.admin-hier-card:focus-visible { outline: 3px solid var(--belive-teal); outline-offset: 2px; }
+.admin-hier-card.is-static { border-top-color: var(--belive-teal); }
+.admin-hier-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.admin-hier-card-head h2 { margin-top: 4px; font-size: 18px; }
+.admin-hier-card-head h2 a { color: inherit; text-decoration: none; }
+.admin-hier-card-head h2 a:hover { text-decoration: underline; }
+.admin-hier-card-head p { margin-top: 3px; color: var(--belive-muted); font-size: 13px; }
+.admin-hier-card-head .belive-btn-secondary { flex: none; white-space: nowrap; }
+.admin-hier-go { color: var(--belive-orange-dark); font-size: 24px; line-height: 1; }
+.admin-hier-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--belive-line); }
+.admin-hier-stats dt { color: var(--belive-muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.admin-hier-stats dd { margin-top: 2px; font-size: 20px; font-weight: 800; }
+.admin-hier-context { min-width: 0; }
+.admin-hier-context strong { display: block; margin-top: 4px; font-size: 18px; }
+.admin-hier-context .belive-muted { font-size: 13px; }
+
+.admin-room-tenants { margin-top: 16px; padding: 14px; border-radius: 12px; background: var(--belive-cream); }
+.admin-room-tenants h3 { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--belive-muted); }
+.admin-room-tenants p { margin-top: 6px; font-size: 13px; }
+.admin-room-tenants ul { margin-top: 8px; display: grid; gap: 6px; list-style: none; }
+.admin-room-tenants li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 13.5px; }
+
 @media (max-width: 900px) {
   .admin-room-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 700px) {
   .admin-room-toolbar,
+  .admin-hier-card-head,
   .admin-room-card-head { flex-direction: column; }
+  .admin-hier-list { grid-template-columns: 1fr; }
+  .admin-hier-go { display: none; }
   .admin-room-add { width: 100%; }
   .admin-room-add > summary { justify-content: center; }
   .admin-room-add > .admin-room-form,
