@@ -109,6 +109,27 @@ plus the portal tables `verified_listings`, `move_in_logs`, `digital_agreements`
 with listing review/audit extensions in 018–019 and nullable structured agreement `tenure`,
 `starts_on`, and `ends_on` fields in 020; all are included in a default migrate run). Legacy
 agreements remain undated rather than receiving inferred contract dates.
+The agreement signing workflow (035) adds the stage machine (`status`, `stage_version`), the
+snapshotted `monthly_rent_rm` / `deposit_rm`, the landlord's particulars — NRIC and bank
+account number encrypted at rest, last four digits in the clear — and `agreement_events`,
+one row per hand-off.
+
+### Agreement workflow (035)
+
+An agreement travels `draft` → `owner_review` → `admin_review` → `tenant_review` →
+`completed` (`cancelled` is available to admin from any live stage). Admin drafts it once a
+tenant has a confirmed booking against a room; the owner supplies their particulars and
+signs; admin checks the returned document and releases it; the tenant signs. Admin can send
+it back to the owner (which voids the owner's signature) and the tenant can ask for a change
+instead of signing (which returns it to admin).
+
+`App\Agreements\AgreementWorkflow` owns every transition and enforces two rules: a stage can
+only be reached from the stage before it, and each form carries the `stage_version` it was
+rendered from, so a stale tab cannot overwrite newer state. `DigitalAgreementGenerator`
+writes the body with `{{LANDLORD_NAME}}`-style tokens — a model is never asked to guess an
+NRIC or an account number — and `AgreementRenderer` merges the owner's stored particulars in
+at read time, appending Schedule A and the execution block deterministically. Screens:
+`/admin/agreements`, `/admin/agreements/view`, `/owner/agreements`, `/tenant/agreement`.
 
 Catalog surfaces: `App\Catalog\RoomRepository` (all page reads), `PricingCalculator`
 (price per tenure + saving vs flexible), `RoomRecommender` (candidate block for DecideSkill;

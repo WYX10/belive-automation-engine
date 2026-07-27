@@ -24,7 +24,7 @@ Dotenv\Dotenv::createImmutable(APP_ROOT)->safeLoad();
 
 $cfg = require APP_ROOT . '/config/database.php';
 $includeBonus = !in_array('--core-only', $argv, true);
-$bonusMigrations = [11, 12, 13, 18, 19, 20, 21, 22, 23, 24, 25];
+$bonusMigrations = [11, 12, 13, 18, 19, 20, 21, 22, 23, 24, 25, 35];
 
 // Connect server-level first so we can create the database itself.
 $server = new PDO(
