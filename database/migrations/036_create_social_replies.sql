@@ -76,6 +76,32 @@ PREPARE add_merge_key FROM @ddl;
 EXECUTE add_merge_key;
 DEALLOCATE PREPARE add_merge_key;
 
+-- app_settings (030) was created without an explicit charset, so it inherited
+-- whatever the DATABASE default was. Locally that is utf8mb4 because
+-- migrate.php creates the database itself; on a server where the database was
+-- provisioned for us it can be utf8mb3, and a 4-byte character is then
+-- rejected outright:
+--
+--   1366 Incorrect string value: '\xF0\x9F\x8F\xA0 J...' for column 'setting_value'
+--
+-- The reply copy below is the first thing to store an emoji there, and admins
+-- can type one into any template from the panel, so the column is repaired
+-- here -- before the INSERT that needs it -- rather than left to fail again at
+-- runtime. 030 now declares the charset too, for installs built from scratch.
+SET @settings_needs_utf8mb4 := (
+    SELECT COUNT(*) FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'app_settings'
+      AND TABLE_COLLATION NOT LIKE 'utf8mb4%'
+);
+SET @ddl := IF(
+    @settings_needs_utf8mb4 > 0,
+    'ALTER TABLE app_settings CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+    'DO 0'
+);
+PREPARE fix_settings_charset FROM @ddl;
+EXECUTE fix_settings_charset;
+DEALLOCATE PREPARE fix_settings_charset;
+
 -- Reply copy is admin-editable (Admin -> Social auto-reply), not hardcoded:
 -- the wording is marketing's call, and Meta's policies on what you may send
 -- change faster than a deploy cycle.
