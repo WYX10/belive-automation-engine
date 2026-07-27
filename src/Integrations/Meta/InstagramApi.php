@@ -29,11 +29,11 @@ use GuzzleHttp\Client;
  */
 final class InstagramApi
 {
-    /** Instagram Login. Bump when Meta retires the version (~2 years). */
-    public const LOGIN_BASE = 'https://graph.instagram.com/v21.0';
+    /** Instagram Login. Version lives on MetaGraph — one place for all of Meta. */
+    public const LOGIN_BASE = MetaGraph::INSTAGRAM_BASE;
 
     /** Facebook Login — the same base the Page publishers use. */
-    public const PAGE_BASE = 'https://graph.facebook.com/v20.0';
+    public const PAGE_BASE = MetaGraph::BASE;
 
     public static function usesInstagramLogin(): bool
     {

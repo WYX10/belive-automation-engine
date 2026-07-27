@@ -22,7 +22,7 @@ use RuntimeException;
  */
 class WhatsAppClient
 {
-    private const GRAPH = 'https://graph.facebook.com/v20.0';
+    private const GRAPH = \App\Integrations\Social\MetaGraph::BASE;
 
     private Client $http;
 
