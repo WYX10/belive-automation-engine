@@ -80,7 +80,11 @@ define('ELECTRIC_BILL_STATUSES', ['unpaid', 'paid', 'waived']);
 define('ELECTRIC_READING_SOURCES', ['smart_meter', 'manual']);
 
 // API credential service identifiers.
-define('CREDENTIAL_SERVICES', ['whatsapp', 'anthropic', 'gemini', 'meta_graph', 'openai', 'openrouter', 'tiktok']);
+// 'instagram' is the Instagram-Login token (graph.instagram.com); 'meta_graph'
+// is the Facebook Page token that also covers the older Instagram Graph API
+// path. Which one is present decides how Instagram calls are made — see
+// App\Integrations\Meta\InstagramApi.
+define('CREDENTIAL_SERVICES', ['whatsapp', 'anthropic', 'gemini', 'meta_graph', 'instagram', 'openai', 'openrouter', 'tiktok']);
 
 // Services that supply LLMs (subset of CREDENTIAL_SERVICES; drives the model registry).
 define('LLM_PROVIDERS', ['anthropic', 'gemini', 'openai', 'openrouter']);

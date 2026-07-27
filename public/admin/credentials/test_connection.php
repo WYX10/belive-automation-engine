@@ -77,6 +77,15 @@ $http = new Client(['timeout' => 15, 'http_errors' => false]);
                 );
                 break;
 
+            case 'instagram':
+                // Instagram Login tokens are rejected by graph.facebook.com,
+                // so this has to be verified where it will actually be used.
+                $res = $http->get(
+                    \App\Integrations\Meta\InstagramApi::LOGIN_BASE . '/me?fields=id,username',
+                    ['headers' => ['Authorization' => "Bearer {$key}"]]
+                );
+                break;
+
             case 'tiktok':
                 $res = $http->get('https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name', [
                     'headers' => ['Authorization' => "Bearer {$key}"],

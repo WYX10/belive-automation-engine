@@ -16,7 +16,8 @@ $serviceOptions = [
     'gemini'     => 'Gemini — Google AI API key',
     'openai'     => 'OpenAI (ChatGPT) — API key',
     'openrouter' => 'OpenRouter — API key',
-    'meta_graph' => 'Meta Graph — Page token (FB/IG publishing + comment capture)',
+    'meta_graph' => 'Meta Graph — Page token (Facebook publishing, comments + DMs)',
+    'instagram'  => 'Instagram Login — Instagram user token (graph.instagram.com)',
     'tiktok'     => 'TikTok — Content Posting API access token',
 ];
 
@@ -24,6 +25,7 @@ $serviceOptions = [
 $serviceMetaFields = [
     'whatsapp'   => ['phone_number_id', 'waba_id'],
     'meta_graph' => ['page_id', 'ig_user_id'],
+    'instagram'  => ['ig_user_id'],
     'tiktok'     => ['open_id'],
 ];
 
@@ -111,6 +113,24 @@ admin_header('Add credential', 'credentials');
                 meta_graph credential is active at a time, so keep the comment-capture scopes on the
                 same token if that feature is in use. Without an active credential, approvals publish
                 in clearly-badged dry-run mode.
+            </div>
+        </div>
+
+        <div data-service-fields="instagram" style="display:none">
+            <div class="belive-field">
+                <label for="ig_login_user_id">Instagram account ID</label>
+                <input id="ig_login_user_id" name="ig_user_id" type="text" placeholder="From Meta App → Instagram → Generate access tokens">
+            </div>
+            <div class="hint">
+                For apps set up with the <strong>“Manage messaging &amp; content on Instagram”</strong> use case —
+                the one whose permissions are named <code>instagram_business_*</code>. Meta issues an
+                <strong>Instagram user token</strong> there, not a Page token, and it is used against
+                <code>graph.instagram.com</code>. Paste the token from
+                <em>Generate access tokens → Add account</em>.
+                <br><br>
+                When this credential is active it takes over every Instagram call — replies, DMs and
+                content publishing. Leave it out entirely if your app uses the older Facebook-Login
+                path, where the Page token on <code>meta_graph</code> covers Instagram too.
             </div>
         </div>
 

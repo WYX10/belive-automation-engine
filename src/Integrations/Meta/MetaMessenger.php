@@ -29,8 +29,12 @@ use RuntimeException;
  *    caller enforces once-only through social_replies (Meta returns an error
  *    on the second attempt, and an error is a worse way to find out).
  *  - A direct message may be answered inside a 24-hour window.
- *  - Everything runs on a PAGE access token, even Instagram — MetaGraph
- *    derives it, so a user or system-user token in the credential works too.
+ *
+ * Facebook always runs on a PAGE access token, which MetaGraph derives so a
+ * user or system-user token in the credential works too. Instagram runs on
+ * whichever of Meta's two Instagram APIs this app was set up for — InstagramApi
+ * resolves the base URL and token, because an Instagram-Login app talks to
+ * graph.instagram.com and will reject the Page token outright.
  *
  * DRY-RUN MODE mirrors WhatsAppClient: with no active 'meta_graph' credential
  * the exact payload is written to ai_activity_log as 'social_dry_run_reply'
@@ -53,6 +57,10 @@ class MetaMessenger
     /** True when this platform can actually send (credential + account id). */
     public function isConfigured(string $platform): bool
     {
+        if ($platform === 'instagram') {
+            return InstagramApi::isConfigured();
+        }
+
         return $this->accountId($platform) !== ''
             && ApiCredential::activeFor('meta_graph') !== null;
     }
@@ -70,7 +78,8 @@ class MetaMessenger
         $meta = $this->credentialMeta();
 
         return $userId === (string) ($meta['page_id'] ?? '')
-            || $userId === (string) ($meta['ig_user_id'] ?? '');
+            || $userId === (string) ($meta['ig_user_id'] ?? '')
+            || $userId === InstagramApi::accountId();
     }
 
     /**
@@ -131,13 +140,20 @@ class MetaMessenger
             return $this->dryRun($platform, $path, $payload);
         }
 
-        $meta = $this->credentialMeta();
-        $stored = ApiCredential::decryptedKeyFor('meta_graph')
-            ?? throw new RuntimeException('No active Meta Graph credential.');
-        $token = MetaGraph::pageAccessToken($this->http, $stored, (string) ($meta['page_id'] ?? ''));
+        if ($platform === 'instagram') {
+            $resolved = InstagramApi::resolve($this->http)
+                ?? throw new RuntimeException('No usable Instagram credential.');
+            [$base, $token] = [$resolved['base'], $resolved['token']];
+        } else {
+            $meta = $this->credentialMeta();
+            $stored = ApiCredential::decryptedKeyFor('meta_graph')
+                ?? throw new RuntimeException('No active Meta Graph credential.');
+            $base = self::GRAPH;
+            $token = MetaGraph::pageAccessToken($this->http, $stored, (string) ($meta['page_id'] ?? ''));
+        }
 
         try {
-            $response = $this->http->post(self::GRAPH . $path, [
+            $response = $this->http->post($base . $path, [
                 'headers' => ['Authorization' => "Bearer {$token}", 'Content-Type' => 'application/json'],
                 'json'    => $payload,
             ]);
@@ -158,12 +174,17 @@ class MetaMessenger
         ];
     }
 
-    /** page_id for Facebook, ig_user_id for Instagram — both live on the credential. */
+    /**
+     * page_id for Facebook; for Instagram the id may sit on either credential,
+     * so InstagramApi decides.
+     */
     private function accountId(string $platform): string
     {
-        $meta = $this->credentialMeta();
+        if ($platform === 'instagram') {
+            return InstagramApi::accountId();
+        }
 
-        return (string) ($platform === 'instagram' ? ($meta['ig_user_id'] ?? '') : ($meta['page_id'] ?? ''));
+        return (string) ($this->credentialMeta()['page_id'] ?? '');
     }
 
     private function credentialMeta(): array
