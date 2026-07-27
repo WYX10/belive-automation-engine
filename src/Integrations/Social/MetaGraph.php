@@ -8,11 +8,28 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\BadResponseException;
 
 /**
- * Shared Meta Graph helpers for the Facebook/Instagram publishers.
+ * Shared Meta Graph helpers and the single source of truth for the API
+ * version every Meta integration calls — WhatsApp, the publishers, and the
+ * social auto-reply alike.
+ *
+ * Keep this current. Meta deprecates a version roughly every two years and
+ * then silently auto-upgrades calls for a grace period, announcing it only in
+ * a response header:
+ *
+ *   x-ad-api-version-warning: The call has been auto-upgraded to v25.0
+ *                             as v20.0 has been deprecated.
+ *
+ * Nothing breaks while that lasts, which is exactly why it goes unnoticed
+ * until the grace period ends and live calls start failing instead.
  */
 final class MetaGraph
 {
-    public const BASE = 'https://graph.facebook.com/v20.0';
+    public const VERSION = 'v25.0';
+
+    public const BASE = 'https://graph.facebook.com/' . self::VERSION;
+
+    /** Instagram Login talks to its own host, same version numbering. */
+    public const INSTAGRAM_BASE = 'https://graph.instagram.com/' . self::VERSION;
 
     /**
      * Publishing to a Page (feed/photos) and to a Page-linked IG account must

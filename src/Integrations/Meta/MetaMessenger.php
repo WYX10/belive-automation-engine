@@ -45,7 +45,7 @@ use RuntimeException;
  */
 class MetaMessenger
 {
-    private const GRAPH = 'https://graph.facebook.com/v20.0';
+    private const GRAPH = MetaGraph::BASE;
 
     private Client $http;
 

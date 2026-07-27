@@ -50,7 +50,7 @@ $http = new Client(['timeout' => 15, 'http_errors' => false]);
                 if ($phoneId === '') {
                     return [false, 'Missing phone_number_id — edit the credential and add it.'];
                 }
-                $res = $http->get("https://graph.facebook.com/v20.0/{$phoneId}", [
+                $res = $http->get(\App\Integrations\Social\MetaGraph::BASE . "/{$phoneId}", [
                     'headers' => ['Authorization' => "Bearer {$key}"],
                 ]);
                 break;
@@ -71,10 +71,25 @@ $http = new Client(['timeout' => 15, 'http_errors' => false]);
                 // Prefer verifying against the Page when a page_id is stored —
                 // publishing needs a Page token, and /me alone can't tell.
                 $pageId = $meta['page_id'] ?? '';
+                $base = \App\Integrations\Social\MetaGraph::BASE;
                 $res = $http->get(
-                    'https://graph.facebook.com/v20.0/' . ($pageId !== '' ? "{$pageId}?fields=id,name" : 'me'),
+                    $base . '/' . ($pageId !== '' ? "{$pageId}?fields=id,name" : 'me'),
                     ['headers' => ['Authorization' => "Bearer {$key}"]]
                 );
+
+                // Reading the Page needs pages_read_engagement, which the
+                // auto-reply itself does NOT — comments arrive by webhook.
+                // Refusing to activate a token that would work fine is worse
+                // than not being able to name the Page, so fall back to /me
+                // and say plainly what could not be confirmed.
+                if ($res->getStatusCode() === 400 && $pageId !== '') {
+                    $me = $http->get($base . '/me', ['headers' => ['Authorization' => "Bearer {$key}"]]);
+                    if ($me->getStatusCode() < 300) {
+                        return [true, 'Token accepted, but the Page could not be read'
+                            . ' (needs pages_read_engagement) — so it is unconfirmed that this token'
+                            . " belongs to Page $pageId. Messaging and webhooks do not require it."];
+                    }
+                }
                 break;
 
             case 'instagram':

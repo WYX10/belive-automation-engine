@@ -25,6 +25,12 @@ use RuntimeException;
  */
 class InstagramPublisher implements SocialPublisherInterface
 {
+    /** error_subcode Meta returns while a container is still being fetched. */
+    private const NOT_READY_SUBCODE = '2207027';
+
+    /** Seconds to wait before each readiness re-check — 42s total, images are usually ready inside 5s. */
+    private const POLL_DELAYS = [1, 2, 3, 5, 5, 8, 8, 10];
+
     private Client $http;
 
     /** @var int[] overridable so tests don't actually sleep */
@@ -64,10 +70,11 @@ class InstagramPublisher implements SocialPublisherInterface
         if ($creationId === '') {
             throw new RuntimeException('Instagram media container returned no creation id.');
         }
-        $published = $this->post($api, "/{$igUserId}/media_publish", ['creation_id' => $creationId]);
+
+        $this->awaitContainerReady($api, $creationId);
 
         return [
-            'external_id' => (string) ($this->publishContainer($igUserId, $creationId, $token)['id'] ?? ''),
+            'external_id' => (string) ($this->publishContainer($api, $igUserId, $creationId)['id'] ?? ''),
             'dry_run'     => false,
         ];
     }
@@ -79,13 +86,13 @@ class InstagramPublisher implements SocialPublisherInterface
      * pulled the image server-side; publishing too early is what returns
      * "Media ID is not available" (code 9007, subcode 2207027).
      */
-    private function awaitContainerReady(string $creationId, string $token): void
+    private function awaitContainerReady(array $api, string $creationId): void
     {
         $status = 'IN_PROGRESS';
 
         foreach ($this->pollDelays as $delay) {
             $this->pause($delay);
-            $container = $this->get("/{$creationId}?fields=status_code,status", $token);
+            $container = $this->get($api, "/{$creationId}?fields=status_code,status");
             $status = (string) ($container['status_code'] ?? '');
 
             if ($status === 'FINISHED') {
@@ -111,10 +118,10 @@ class InstagramPublisher implements SocialPublisherInterface
      * media_publish, with one extra wait-and-retry: FINISHED occasionally still
      * races the publish endpoint, and that residual case is exactly subcode 2207027.
      */
-    private function publishContainer(string $igUserId, string $creationId, string $token): array
+    private function publishContainer(array $api, string $igUserId, string $creationId): array
     {
         try {
-            return $this->post("/{$igUserId}/media_publish", ['creation_id' => $creationId], $token);
+            return $this->post($api, "/{$igUserId}/media_publish", ['creation_id' => $creationId]);
         } catch (RuntimeException $e) {
             if (!str_contains($e->getMessage(), self::NOT_READY_SUBCODE)) {
                 throw $e;
@@ -123,7 +130,7 @@ class InstagramPublisher implements SocialPublisherInterface
 
         $this->pause(5);
 
-        return $this->post("/{$igUserId}/media_publish", ['creation_id' => $creationId], $token);
+        return $this->post($api, "/{$igUserId}/media_publish", ['creation_id' => $creationId]);
     }
 
     /** Seam for tests — a zero delay must not actually sleep. */
@@ -134,11 +141,12 @@ class InstagramPublisher implements SocialPublisherInterface
         }
     }
 
-    private function get(string $path, string $token): array
+    /** @param array{base:string, token:string, ig_user_id:string, mode:string} $api */
+    private function get(array $api, string $path): array
     {
         try {
-            $response = $this->http->get(self::GRAPH . $path, [
-                'headers' => ['Authorization' => "Bearer {$token}"],
+            $response = $this->http->get($api['base'] . $path, [
+                'headers' => ['Authorization' => "Bearer {$api['token']}"],
             ]);
         } catch (BadResponseException $e) {
             $body = mb_substr((string) $e->getResponse()->getBody(), 0, 400);
@@ -148,7 +156,8 @@ class InstagramPublisher implements SocialPublisherInterface
         return json_decode((string) $response->getBody(), true) ?? [];
     }
 
-    private function post(string $path, array $payload, string $token): array
+    /** @param array{base:string, token:string, ig_user_id:string, mode:string} $api */
+    private function post(array $api, string $path, array $payload): array
     {
         try {
             $response = $this->http->post($api['base'] . $path, [
