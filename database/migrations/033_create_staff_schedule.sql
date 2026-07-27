@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS staff (
     active TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_staff_active (active)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS staff_shifts (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS staff_shifts (
     UNIQUE KEY uniq_staff_shift (staff_id, weekday, starts_at),
     KEY idx_shift_weekday (weekday),
     CONSTRAINT fk_shift_staff FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS staff_time_off (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS staff_time_off (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_time_off_window (staff_id, starts_at, ends_at),
     CONSTRAINT fk_time_off_staff FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Which agent is running this viewing. NULL = no roster configured yet, or
 -- the booking predates staff scheduling.
