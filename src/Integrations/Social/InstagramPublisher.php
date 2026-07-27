@@ -27,9 +27,14 @@ class InstagramPublisher implements SocialPublisherInterface
 {
     private Client $http;
 
-    public function __construct(?Client $http = null)
+    /** @var int[] overridable so tests don't actually sleep */
+    private array $pollDelays;
+
+    /** @param int[] $pollDelays */
+    public function __construct(?Client $http = null, array $pollDelays = self::POLL_DELAYS)
     {
         $this->http = $http ?? new Client(['timeout' => 30]);
+        $this->pollDelays = $pollDelays;
     }
 
     public function isConfigured(): bool
@@ -62,13 +67,88 @@ class InstagramPublisher implements SocialPublisherInterface
         $published = $this->post($api, "/{$igUserId}/media_publish", ['creation_id' => $creationId]);
 
         return [
-            'external_id' => (string) ($published['id'] ?? ''),
+            'external_id' => (string) ($this->publishContainer($igUserId, $creationId, $token)['id'] ?? ''),
             'dry_run'     => false,
         ];
     }
 
-    /** @param array{base:string, token:string, ig_user_id:string, mode:string} $api */
-    private function post(array $api, string $path, array $payload): array
+    /**
+     * Block until Meta has finished fetching image_url into the container.
+     *
+     * A container is created instantly but is NOT publishable until Meta has
+     * pulled the image server-side; publishing too early is what returns
+     * "Media ID is not available" (code 9007, subcode 2207027).
+     */
+    private function awaitContainerReady(string $creationId, string $token): void
+    {
+        $status = 'IN_PROGRESS';
+
+        foreach ($this->pollDelays as $delay) {
+            $this->pause($delay);
+            $container = $this->get("/{$creationId}?fields=status_code,status", $token);
+            $status = (string) ($container['status_code'] ?? '');
+
+            if ($status === 'FINISHED') {
+                return;
+            }
+            if ($status === 'ERROR' || $status === 'EXPIRED') {
+                $detail = mb_substr((string) ($container['status'] ?? 'no detail given'), 0, 200);
+                throw new RuntimeException(
+                    "Instagram could not fetch the image ($status): $detail — check that the image URL is publicly reachable (APP_URL) and is a JPEG under 8MB."
+                );
+            }
+        }
+
+        // Still IN_PROGRESS after the whole budget — leave it failed so the
+        // admin Retry button (and cron/publish_retry) can try a fresh container.
+        throw new RuntimeException(
+            'Instagram was still preparing the image after ' . array_sum($this->pollDelays)
+            . "s (status $status) — the image host may be slow. Hit Retry in a minute."
+        );
+    }
+
+    /**
+     * media_publish, with one extra wait-and-retry: FINISHED occasionally still
+     * races the publish endpoint, and that residual case is exactly subcode 2207027.
+     */
+    private function publishContainer(string $igUserId, string $creationId, string $token): array
+    {
+        try {
+            return $this->post("/{$igUserId}/media_publish", ['creation_id' => $creationId], $token);
+        } catch (RuntimeException $e) {
+            if (!str_contains($e->getMessage(), self::NOT_READY_SUBCODE)) {
+                throw $e;
+            }
+        }
+
+        $this->pause(5);
+
+        return $this->post("/{$igUserId}/media_publish", ['creation_id' => $creationId], $token);
+    }
+
+    /** Seam for tests — a zero delay must not actually sleep. */
+    private function pause(int $seconds): void
+    {
+        if ($seconds > 0) {
+            sleep($seconds);
+        }
+    }
+
+    private function get(string $path, string $token): array
+    {
+        try {
+            $response = $this->http->get(self::GRAPH . $path, [
+                'headers' => ['Authorization' => "Bearer {$token}"],
+            ]);
+        } catch (BadResponseException $e) {
+            $body = mb_substr((string) $e->getResponse()->getBody(), 0, 400);
+            throw new RuntimeException("Instagram container status check failed ({$e->getResponse()->getStatusCode()}): $body", 0, $e);
+        }
+
+        return json_decode((string) $response->getBody(), true) ?? [];
+    }
+
+    private function post(string $path, array $payload, string $token): array
     {
         try {
             $response = $this->http->post($api['base'] . $path, [
@@ -97,6 +177,7 @@ class InstagramPublisher implements SocialPublisherInterface
                         'platform' => 'instagram',
                         'steps' => [
                             ['endpoint' => '/{ig_user_id}/media', 'payload' => $containerPayload],
+                            ['endpoint' => '/{creation_id}?fields=status_code', 'payload' => ['note' => 'polled until status_code=FINISHED']],
                             ['endpoint' => '/{ig_user_id}/media_publish', 'payload' => ['creation_id' => '<from step 1>']],
                         ],
                     ],

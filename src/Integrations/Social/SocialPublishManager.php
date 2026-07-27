@@ -155,6 +155,9 @@ final class SocialPublishManager
     private static function attemptPublish(array $post): array
     {
         $postId = (int) $post['id'];
+        // Instagram polls its media container until Meta finishes fetching the
+        // image, so a publish can legitimately outlive the default 30s limit.
+        set_time_limit(120);
 
         try {
             $result = self::publisherFor($post['platform'])
