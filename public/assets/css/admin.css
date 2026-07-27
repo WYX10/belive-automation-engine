@@ -470,3 +470,114 @@ body.admin-login {
   .staff-form .span-2, .staff-form .span-4 { grid-column: auto; }
   .staff-assign { flex-direction: column; align-items: stretch; }
 }
+
+/* Agreement workflow — the stage track, the document preview and the
+   hand-off trail on /admin/agreements. */
+.agreement-start-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.agreement-start-form label { font-size: 12px; }
+.agreement-start-form input[type="date"] { width: auto; margin: 0; }
+
+.agreement-track {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  counter-reset: none;
+}
+.agreement-track li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 150px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--belive-line);
+  border-radius: 12px;
+  background: var(--belive-white);
+  color: var(--belive-muted);
+  font-size: 12.5px;
+}
+.agreement-track li.done { border-color: var(--belive-teal); color: var(--belive-ink); }
+.agreement-track li.current {
+  border-color: var(--belive-orange);
+  background: var(--belive-orange-soft);
+  color: var(--belive-ink);
+  font-weight: 600;
+}
+.agreement-track-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--belive-line);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.agreement-track li.done .agreement-track-dot { background: var(--belive-teal); color: var(--belive-white); }
+.agreement-track li.current .agreement-track-dot { background: var(--belive-orange); color: var(--belive-white); }
+.agreement-track-label { min-width: 0; overflow-wrap: anywhere; }
+
+.agreement-draft-editor {
+  width: 100%;
+  font-family: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.agreement-preview > summary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.agreement-document {
+  background: var(--belive-cream);
+  border-radius: 12px;
+  padding: 18px;
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.7;
+  max-height: 520px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+.agreement-particulars { margin: 0; }
+.agreement-particulars > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--belive-line);
+  font-size: 13.5px;
+}
+.agreement-particulars > div:last-child { border-bottom: 0; }
+.agreement-particulars dt { color: var(--belive-muted); flex-shrink: 0; }
+.agreement-particulars dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+
+.agreement-trail { list-style: none; margin: 0; padding: 0; }
+.agreement-trail li {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--belive-line);
+  font-size: 13.5px;
+}
+.agreement-trail li:last-child { border-bottom: 0; }
+.agreement-trail-when { color: var(--belive-muted); font-size: 12.5px; }
+
+@media (max-width: 560px) {
+  .agreement-trail li { grid-template-columns: 1fr; gap: 4px; }
+  .agreement-particulars > div { flex-direction: column; gap: 2px; }
+  .agreement-particulars dd { text-align: left; }
+}

@@ -276,3 +276,29 @@ body.portal-login { display: flex; align-items: center; justify-content: center;
   background: var(--belive-orange-soft);
   border-radius: 6px; padding: 3px 8px; margin-bottom: 10px;
 }
+
+/* Owner agreement signing — the landlord's particulars form, and the
+   collapsible document both portals read before signing. */
+.agreement-preview > summary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.owner-agreement-card h3 {
+  font-size: 15px;
+  margin: 20px 0 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--belive-line);
+}
+.owner-agreement-card h3:first-of-type { border-top: 0; padding-top: 0; }
+.owner-agreement-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+.owner-agreement-form .belive-field { min-width: 0; }
+
+@media (max-width: 620px) {
+  .owner-agreement-grid { grid-template-columns: 1fr; }
+}

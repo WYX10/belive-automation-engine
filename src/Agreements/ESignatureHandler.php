@@ -4,43 +4,39 @@ declare(strict_types=1);
 
 namespace App\Agreements;
 
-use App\AI\Memory\EpisodicLogger;
-use App\Models\DigitalAgreement;
+use Throwable;
 
 /**
- * Captures the tenant's acknowledgement: typed full name + explicit checkbox,
+ * The tenant's side of the signing step: typed full name + explicit checkbox,
  * with a server-side timestamp. NOT a cryptographic e-signature — an
  * acknowledgement trail, framed exactly that way to judges.
+ *
+ * The stage rules live in AgreementWorkflow; this is the thin, forgiving
+ * wrapper the tenant page posts into, so a tenant never meets an exception page.
  */
 final class ESignatureHandler
 {
     /** @return array{ok:bool, error?:string} */
-    public static function acknowledge(int $agreementId, string $typedName, bool $checkboxTicked): array
+    public static function sign(int $agreementId, string $typedName, bool $checkboxTicked, int $expectedVersion): array
     {
-        $agreement = DigitalAgreement::find($agreementId);
-        if ($agreement === null) {
-            return ['ok' => false, 'error' => 'Agreement not found.'];
-        }
-        if ($agreement['status'] === 'acknowledged') {
-            return ['ok' => false, 'error' => 'This agreement is already acknowledged.'];
-        }
+        try {
+            AgreementWorkflow::tenantSign($agreementId, $typedName, $checkboxTicked, $expectedVersion);
 
-        $typedName = trim($typedName);
-        if (mb_strlen($typedName) < 3) {
-            return ['ok' => false, 'error' => 'Type your full name as the acknowledgement.'];
+            return ['ok' => true];
+        } catch (Throwable $e) {
+            return ['ok' => false, 'error' => $e->getMessage()];
         }
-        if (!$checkboxTicked) {
-            return ['ok' => false, 'error' => 'Tick the confirmation box to acknowledge.'];
+    }
+
+    /** The tenant read it and wants something changed before signing. */
+    public static function requestChange(int $agreementId, string $note, int $expectedVersion): array
+    {
+        try {
+            AgreementWorkflow::tenantRequestChange($agreementId, $note, $expectedVersion);
+
+            return ['ok' => true];
+        } catch (Throwable $e) {
+            return ['ok' => false, 'error' => $e->getMessage()];
         }
-
-        DigitalAgreement::update($agreementId, [
-            'status'            => 'acknowledged',
-            'acknowledged_name' => $typedName,
-            'acknowledged_at'   => date('Y-m-d H:i:s'),
-        ]);
-
-        EpisodicLogger::activity('agreement_acknowledged', null, null, (int) $agreement['lead_id'], "agreement #$agreementId by \"$typedName\"");
-
-        return ['ok' => true];
     }
 }

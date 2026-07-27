@@ -223,6 +223,10 @@ final class MockClient implements LlmClient
         return json_encode(['flags' => $flags, 'reasoning' => '[MOCK] Heuristic screen — offline stub, not a real model.'], JSON_UNESCAPED_UNICODE);
     }
 
+    /**
+     * Mirrors the real prompt's clause order and, importantly, its {{TOKEN}}
+     * contract — so the owner-particulars merge is exercised offline too.
+     */
     private function mockAgreement(string $prompt): string
     {
         $get = function (string $key) use ($prompt): string {
@@ -230,15 +234,25 @@ final class MockClient implements LlmClient
         };
         $rm = preg_match('/"monthly_rm":(\d+(?:\.\d+)?)/', $prompt, $m) ? $m[1] : '—';
 
-        return "[MOCK AGREEMENT — offline stub]\n\n1. Parties: BeLive (landlord's agent) and {$get('tenant_name')} ({$get('tenant_phone')}).\n"
-            . "2. Tenancy term: {$get('starts_on')} through {$get('ends_on')} ({$get('tenure')}).\n"
-            . "3. The room: {$get('room')}, {$get('area')} ({$get('room_type')} room).\n"
-            . "4. Monthly rental: RM $rm, including furnishings, WiFi and weekly cleaning.\n"
+        return "[MOCK AGREEMENT — offline stub]\n\n"
+            . "1. Parties: the Landlord, {{LANDLORD_NAME}} (NRIC/passport {{LANDLORD_IC}}) of {{LANDLORD_ADDRESS}},\n"
+            . "   contactable at {{LANDLORD_EMAIL}} / {{LANDLORD_PHONE}}, and the Tenant, {$get('tenant_name')} ({$get('tenant_phone')}).\n"
+            . "2. The premises: {$get('room')} at {$get('property_address')}, {$get('area')} ({$get('room_type')} room), with shared common areas.\n"
+            . "3. Term: {$get('starts_on')} through {$get('ends_on')} ({$get('tenure')}). Renewal requires a fresh written agreement.\n"
+            . "4. Rent: RM $rm per month, payable in advance on or before the 1st of each month to\n"
+            . "   {{BANK_ACCOUNT_NAME}}, {{BANK_NAME}}, account {{BANK_ACCOUNT_NO}}.\n"
             . "5. Deposit: zero deposit — BeLive standard.\n"
-            . "6. House rules: no smoking indoors; respect quiet hours 11pm–7am.\n"
-            . "7. Cleaning: weekly common-area cleaning included.\n"
-            . "8. Notice period: 30 days written notice either side.\n"
-            . "9. This document is acknowledged digitally with a typed name and timestamp.";
+            . "6. Utilities: electricity is billed on this room's own submeter. WiFi and weekly cleaning are included in the rent.\n"
+            . "7. Tenant's covenants: pay rent on time, keep the room clean, no illegal use, no subletting without written consent,\n"
+            . "   no structural alteration, no smoking indoors, quiet hours 11pm–7am.\n"
+            . "8. Landlord's covenants: quiet enjoyment, structural repairs, building insurance, quit rent and assessment.\n"
+            . "9. Access: inspection with at least 24 hours' notice, except in an emergency.\n"
+            . "10. Termination: 30 days' written notice either side.\n"
+            . "11. Default: unpaid rent or breach of covenant entitles the Landlord to the remedies at law.\n"
+            . "12. Stamping: to be stamped under the Stamp Act 1949.\n"
+            . "13. Personal data: processed for administering this tenancy under the PDPA 2010.\n"
+            . "14. Governing law: the laws of Malaysia.\n"
+            . "15. Signing: each party types their own full name, recorded with a timestamp.";
     }
 
     /** True iff the prompt carries an injected LEARNED RULES block with a photos-before-price rule. */
