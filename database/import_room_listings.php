@@ -178,11 +178,22 @@ $propertyFind = $pdo->prepare(
     'SELECT id FROM properties WHERE owner_name = ? AND name = ? AND location = ?'
 );
 
+// The CSV has no unit column, so every imported room lands in the property's
+// default house. Admin splits them into the real units from /admin/rooms —
+// but they are inside the hierarchy from the first import, never dangling.
+$unitStmt = $pdo->prepare(
+    'INSERT INTO property_units (property_id, name, notes)
+     VALUES (:property_id, :name, :notes)
+     ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)'
+);
+$unitFind = $pdo->prepare('SELECT id FROM property_units WHERE property_id = ? AND name = ?');
+
 $roomStmt = $pdo->prepare(
-    'INSERT INTO rooms (property_id, room_code, name, property_name, location, room_type, owner_name, address, description, status)
-     VALUES (:property_id, :room_code, :name, :property_name, :location, :room_type, :owner, :address, :description, \'available\')
+    'INSERT INTO rooms (property_id, unit_id, room_code, name, property_name, location, room_type, owner_name, address, description, status)
+     VALUES (:property_id, :unit_id, :room_code, :name, :property_name, :location, :room_type, :owner, :address, :description, \'available\')
      ON DUPLICATE KEY UPDATE
         property_id   = VALUES(property_id),
+        unit_id       = VALUES(unit_id),
         name          = VALUES(name),
         property_name = VALUES(property_name),
         location      = VALUES(location),
@@ -201,6 +212,7 @@ $amenityWipe = $pdo->prepare('DELETE FROM room_amenities WHERE room_id = ?');
 $amenityStmt = $pdo->prepare('INSERT INTO room_amenities (room_id, amenity) VALUES (?, ?)');
 
 $properties = [];
+$units = [];
 $roomCount = 0;
 
 foreach ($rows as $i => $row) {
@@ -231,6 +243,20 @@ foreach ($rows as $i => $row) {
         $properties[$propKey] = $propertyId;
     }
 
+    if (!isset($units[$propKey])) {
+        $unitStmt->execute([
+            ':property_id' => $properties[$propKey],
+            ':name'        => 'Main house',
+            ':notes'       => 'Imported rooms land here — split them into the real units from the admin room page.',
+        ]);
+        $unitId = (int) $pdo->lastInsertId();
+        if ($unitId === 0) {
+            $unitFind->execute([$properties[$propKey], 'Main house']);
+            $unitId = (int) $unitFind->fetchColumn();
+        }
+        $units[$propKey] = $unitId;
+    }
+
     $label = ucwords(strtolower(trim($row['Room Type'])));
     $name  = $totals[$condo . '|' . $row['Room Type']] > 1
         ? sprintf('%s Room #%d', $label, $row['_seq'])
@@ -249,6 +275,7 @@ foreach ($rows as $i => $row) {
 
     $roomStmt->execute([
         ':property_id'   => $properties[$propKey],
+        ':unit_id'       => $units[$propKey],
         ':room_code'     => $roomCode,
         ':name'          => $name,
         ':property_name' => $condo,

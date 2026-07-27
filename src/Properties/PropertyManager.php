@@ -6,6 +6,7 @@ namespace App\Properties;
 
 use App\Core\Database;
 use App\Models\Property;
+use App\Models\PropertyUnit;
 use App\Models\Room;
 use InvalidArgumentException;
 use RuntimeException;
@@ -101,6 +102,75 @@ final class PropertyManager
         return $resubmitted;
     }
 
+    /**
+     * Add a house (unit) to an approved property. The house is the level
+     * between the development and its rooms, so it exists before any room can
+     * be filed under it.
+     */
+    public static function addUnit(string $ownerName, int $propertyId, array $input): array
+    {
+        $property = Property::find($propertyId);
+        if ($property === null || $property['owner_name'] !== $ownerName) {
+            throw new RuntimeException('That property is not on your account.');
+        }
+        if ($property['review_status'] !== 'approved') {
+            throw new RuntimeException('Admin must approve this property before you can add houses to it.');
+        }
+
+        $name = self::unitName($input['name'] ?? null);
+        $notes = trim((string) ($input['notes'] ?? ''));
+
+        if ((int) Database::run(
+            'SELECT COUNT(*) FROM property_units WHERE property_id = ? AND name = ?',
+            [$propertyId, $name]
+        )->fetchColumn() > 0) {
+            throw new RuntimeException('This property already has a house called ' . $name . '.');
+        }
+
+        $unitId = PropertyUnit::create([
+            'property_id' => $propertyId,
+            'name' => $name,
+            'notes' => $notes !== '' ? $notes : null,
+        ]);
+
+        return PropertyUnit::find($unitId) ?? throw new RuntimeException('House could not be loaded.');
+    }
+
+    public static function addUnitForAdmin(int $propertyId, array $input): array
+    {
+        $property = Property::find($propertyId);
+        if ($property === null) {
+            throw new RuntimeException('Property not found.');
+        }
+
+        return self::addUnit((string) $property['owner_name'], $propertyId, $input);
+    }
+
+    public static function updateUnitForAdmin(int $unitId, array $input): array
+    {
+        $unit = PropertyUnit::find($unitId);
+        if ($unit === null) {
+            throw new RuntimeException('House not found.');
+        }
+
+        $name = self::unitName($input['name'] ?? null);
+        $notes = trim((string) ($input['notes'] ?? ''));
+
+        if ((int) Database::run(
+            'SELECT COUNT(*) FROM property_units WHERE property_id = ? AND name = ? AND id <> ?',
+            [(int) $unit['property_id'], $name, $unitId]
+        )->fetchColumn() > 0) {
+            throw new RuntimeException('This property already has a house called ' . $name . '.');
+        }
+
+        PropertyUnit::update($unitId, [
+            'name' => $name,
+            'notes' => $notes !== '' ? $notes : null,
+        ]);
+
+        return PropertyUnit::find($unitId) ?? throw new RuntimeException('House could not be loaded.');
+    }
+
     public static function addRoom(string $ownerName, array $input): array
     {
         $propertyId = (int) ($input['property_id'] ?? 0);
@@ -161,9 +231,15 @@ final class PropertyManager
                 throw new RuntimeException('Admin must approve this property before you can add rooms.');
             }
             $property = $lockedProperty;
+            // Callers that don't know about houses yet (owner portal, imports)
+            // still land in one, so no room hangs outside the hierarchy.
+            $unitId = isset($input['unit_id']) && (int) $input['unit_id'] > 0
+                ? self::unitOnProperty((int) $input['unit_id'], $propertyId)
+                : PropertyUnit::defaultForProperty($propertyId);
 
             $roomId = Room::create([
                 'property_id' => $propertyId,
+                'unit_id' => $unitId,
                 'room_code' => $roomCode,
                 'name' => $name,
                 'property_name' => $property['name'],
@@ -266,7 +342,21 @@ final class PropertyManager
                 throw new RuntimeException('Rooms can only be managed under an approved property.');
             }
 
+            // A room can move between houses, but only within its own
+            // property — moving it to another development would silently
+            // change its address, price context and owner.
+            $requestedUnitId = (int) ($input['unit_id'] ?? 0);
+            if ($requestedUnitId > 0) {
+                $unitId = self::unitOnProperty($requestedUnitId, (int) $room['property_id']);
+            } else {
+                $unitId = (int) ($room['unit_id'] ?? 0);
+                if ($unitId === 0) {
+                    $unitId = PropertyUnit::defaultForProperty((int) $room['property_id']);
+                }
+            }
+
             Room::update($roomId, [
+                'unit_id' => $unitId,
                 'room_code' => $roomCode,
                 'name' => $name,
                 'room_type' => $roomType,
@@ -311,6 +401,30 @@ final class PropertyManager
 
         Room::update($roomId, ['referral_reward_points' => $points]);
         return Room::find($roomId) ?? throw new RuntimeException('Room could not be loaded.');
+    }
+
+    private static function unitName(mixed $value): string
+    {
+        $name = trim((string) ($value ?? ''));
+        if ($name === '') {
+            throw new InvalidArgumentException('House name is required, for example "Unit A-12-3".');
+        }
+        if (mb_strlen($name) > 120) {
+            throw new InvalidArgumentException('House name must be 120 characters or fewer.');
+        }
+
+        return $name;
+    }
+
+    /** Resolve a house id, rejecting one that belongs to a different property. */
+    private static function unitOnProperty(int $unitId, int $propertyId): int
+    {
+        $unit = PropertyUnit::find($unitId);
+        if ($unit === null || (int) $unit['property_id'] !== $propertyId) {
+            throw new RuntimeException('That house is not part of this property.');
+        }
+
+        return $unitId;
     }
 
     private static function validatePoints(mixed $value): int

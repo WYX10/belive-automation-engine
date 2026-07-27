@@ -49,7 +49,7 @@ single entry point, one bootstrap.
 | GET/POST | `/admin/bookings` | Zero-touch bookings; complete/cancel controls |
 | GET/POST | `/admin/staff` | Viewing-staff roster: weekly shifts, time off, per-agent viewing modes and daily caps; 7-day coverage grid and manual assignment of unstaffed viewings |
 | GET/POST | `/admin/property_reviews` | Review owner-submitted properties; approve before room creation or reject with an owner-facing reason |
-| GET/POST | `/admin/rooms` | Filter owner inventory, add/edit rooms under approved properties, and upload validated room gallery photos |
+| GET/POST | `/admin/rooms` | Drill down property → house → room (`?property=` / `?unit=`): add/rename houses, add/edit rooms inside a house, see who is renting each room, and upload validated gallery photos |
 | GET | `/admin/listing_reviews` | Filterable queue for pending, verified and rejected ownership/location reviews |
 | GET/POST | `/admin/listing_reviews/view?id={id}` | Open evidence, approve/reject ownership or GPS, and record reviewer notes |
 | GET/POST | `/admin/credentials` · `/admin/credentials/add` · POST `/admin/credentials/test` | Encrypted key management, masked display, test-before-activate |
@@ -104,7 +104,8 @@ Default schema name: `belive_eve` (set via `DB_NAME` in `.env`). Tables:
 request ledger), `properties` plus room-level `referral_reward_points` and referral
 `reward_room_id` attribution (022), immutable referral attribution snapshots (023), property
 admin-review status and audit fields (024), stale-decision review versions (025),
-`migrations` (runner bookkeeping),
+`property_units` — the house level between a property and its rooms, with `rooms.unit_id`
+(039), `migrations` (runner bookkeeping),
 per-room electricity submetering `electric_meters` + `electric_bills` (034, read by the tenant
 portal's electricity view),
 plus the portal tables `verified_listings`, `move_in_logs`, `digital_agreements` (011–013,

@@ -64,6 +64,42 @@ final class Room extends BaseModel
         return $rows;
     }
 
+    /**
+     * A booking only means somebody is renting once it is confirmed or the
+     * stay is done. A pending viewing is an appointment and a cancelled one is
+     * nothing at all — neither is a tenant.
+     */
+    public const TENANCY_BOOKING_STATUSES = ['confirmed', 'completed'];
+
+    /**
+     * The people renting this room: distinct leads holding a confirmed or
+     * completed booking on it.
+     *
+     * booked_at is the earliest such booking — the date the tenancy was agreed,
+     * not a move-in date, which this schema does not record.
+     *
+     * @return array<int, array{id: int, name: string, wa_phone: string, booked_at: ?string}>
+     */
+    public static function tenants(int $roomId): array
+    {
+        $rows = Database::run(
+            "SELECT l.id, l.name, l.wa_phone, MIN(b.viewing_datetime) AS booked_at
+             FROM bookings b
+             JOIN leads l ON l.id = b.lead_id
+             WHERE b.room_id = ? AND b.status IN ('confirmed', 'completed')
+             GROUP BY l.id, l.name, l.wa_phone
+             ORDER BY booked_at, l.id",
+            [$roomId]
+        )->fetchAll();
+
+        return array_map(static fn (array $row): array => [
+            'id' => (int) $row['id'],
+            'name' => (string) ($row['name'] ?? ''),
+            'wa_phone' => (string) $row['wa_phone'],
+            'booked_at' => $row['booked_at'] !== null ? (string) $row['booked_at'] : null,
+        ], $rows);
+    }
+
     /** @return array<string, array{price: float, is_best_value: bool}> keyed by tenure */
     public static function prices(int $roomId): array
     {
