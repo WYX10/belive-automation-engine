@@ -85,15 +85,19 @@ body.admin-login {
 .content-caption-edit > summary::-webkit-details-marker { display: none; }
 .content-caption-edit textarea { font-family: inherit; line-height: 1.55; }
 
-/* Dashboard live-lead list: ten leads, each hiding its own transcript. */
-.dash-lead-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-top: 14px; }
-.dash-lead { padding: 16px; border: 1px solid var(--belive-line); border-radius: 12px; background: var(--belive-white); }
+/* Dashboard live-lead list: ten leads, each hiding its own transcript.
+   Cards in a row share a height and pin their buttons to the bottom, so the
+   row reads as one line however much Eve had to say about each lead. */
+.dash-lead-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-top: 14px; align-items: stretch; }
+.dash-lead { display: flex; flex-direction: column; padding: 16px; border: 1px solid var(--belive-line); border-radius: 12px; background: var(--belive-white); }
 .dash-lead-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.dash-lead-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.dash-lead-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 14px; }
 .dash-lead-convo { min-width: 0; flex: 1 1 auto; }
 .dash-lead-convo > summary { display: inline-flex; align-items: center; min-height: 40px; cursor: pointer; list-style: none; }
 .dash-lead-convo > summary::-webkit-details-marker { display: none; }
 .dash-lead-convo[open] { flex-basis: 100%; }
+/* A long thread scrolls inside the card instead of stretching its whole row. */
+.dash-lead-convo .chat-thread { max-height: 300px; overflow-y: auto; overscroll-behavior: contain; padding: 2px 6px 2px 2px; }
 .dash-lead-convo .chat-bubble { max-width: 88%; }
 
 /* Reasoning box under interactions */
