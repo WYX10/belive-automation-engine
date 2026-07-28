@@ -79,6 +79,23 @@ body.admin-login {
 .chat-bubble .meta { font-size: 11px; color: var(--belive-muted); margin-top: 5px; display: flex; gap: 8px; flex-wrap: wrap; }
 .chat-bubble.flagged { outline: 2px solid var(--belive-danger); }
 
+/* Content studio: rewrite the AI caption before it leaves for the platform. */
+.content-caption-edit { margin-top: 12px; }
+.content-caption-edit > summary { display: inline-flex; align-items: center; min-height: 40px; cursor: pointer; list-style: none; }
+.content-caption-edit > summary::-webkit-details-marker { display: none; }
+.content-caption-edit textarea { font-family: inherit; line-height: 1.55; }
+
+/* Dashboard live-lead list: ten leads, each hiding its own transcript. */
+.dash-lead-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-top: 14px; }
+.dash-lead { padding: 16px; border: 1px solid var(--belive-line); border-radius: 12px; background: var(--belive-white); }
+.dash-lead-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.dash-lead-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.dash-lead-convo { min-width: 0; flex: 1 1 auto; }
+.dash-lead-convo > summary { display: inline-flex; align-items: center; min-height: 40px; cursor: pointer; list-style: none; }
+.dash-lead-convo > summary::-webkit-details-marker { display: none; }
+.dash-lead-convo[open] { flex-basis: 100%; }
+.dash-lead-convo .chat-bubble { max-width: 88%; }
+
 /* Reasoning box under interactions */
 .reasoning-box {
   font-size: 12.5px;

@@ -109,10 +109,24 @@ final class Lead extends BaseModel
         ]);
     }
 
-    public static function capturedToday(): int
+    /** Calendar month to date — a day's count is too spiky to steer on. */
+    public static function capturedThisMonth(): int
     {
         return (int) Database::run(
-            'SELECT COUNT(*) FROM leads WHERE DATE(created_at) = CURDATE()'
+            "SELECT COUNT(*) FROM leads WHERE created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"
         )->fetchColumn();
+    }
+
+    /**
+     * The dashboard's "live leads": most recently active first, so the lead
+     * Eve is talking to right now sits at the top.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function mostRecentlyActive(int $limit = 10): array
+    {
+        return Database::run(
+            'SELECT * FROM leads ORDER BY last_contact_at DESC, id DESC LIMIT ' . max(1, $limit)
+        )->fetchAll();
     }
 }

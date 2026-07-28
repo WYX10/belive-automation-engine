@@ -6,6 +6,8 @@ namespace App\AI\Skills;
 
 use App\AI\Memory\EpisodicLogger;
 use App\AI\ModelRouter;
+use App\Core\Settings;
+use App\Integrations\WhatsApp\WhatsAppLink;
 use App\Models\Room;
 
 /**
@@ -51,7 +53,7 @@ PROMPT;
 
 You write BeLive's social media captions. Convert the room metrics you are given into ONE ready-to-post caption for the stated platform.
 
-Rules: hook first line; benefits as short phrases; end with a call to action to WhatsApp us; 3–6 relevant hashtags on the final line (e.g. #BeLive #RoomForRent + area tag). No invented facts — only what the metrics say. If an ADMIN BRIEF is given, follow its angle, tone and any campaign detail — but never let it override the no-invented-facts rule. Return ONLY the caption text.
+Rules: hook first line; benefits as short phrases; then a call to action to WhatsApp us that includes the WHATSAPP LINK you are given, copied character for character on its own line; 3–6 relevant hashtags on the final line (e.g. #BeLive #RoomForRent + area tag). No invented facts — only what the metrics say. If an ADMIN BRIEF is given, follow its angle, tone and any campaign detail — but never let it override the no-invented-facts rule. Return ONLY the caption text.
 PROMPT;
 
     /** @return array{text:string, model:string, interaction_id:int} */
@@ -137,9 +139,15 @@ PROMPT;
             'features'          => Room::amenities($roomId),
         ];
 
+        // The whole point of a post is the tap that follows it, so the caption
+        // ships with the link that opens a WhatsApp chat with Eve — prefilled
+        // with the room, so her first reply already knows what they saw.
+        $whatsappLink = self::captionWhatsappLink($room, $platform);
+
         $brief = $brief !== null ? trim($brief) : '';
         $prompt = implode("\n\n", array_filter([
             'ROOM METRICS: ' . json_encode($metrics, JSON_UNESCAPED_UNICODE),
+            "WHATSAPP LINK (include verbatim in the call to action):\n$whatsappLink",
             $brief !== '' ? "ADMIN BRIEF (what this post should be about):\n" . mb_substr($brief, 0, 1000) : '',
         ]));
 
@@ -148,6 +156,8 @@ PROMPT;
             [['role' => 'user', 'content' => $prompt]],
             ['max_tokens' => 350, 'temperature' => 0.6, 'mock_hint' => 'caption']
         ));
+
+        $result['text'] = self::withWhatsappLink(trim($result['text']), $whatsappLink);
 
         EpisodicLogger::log([
             'phase'       => 'content_creation',
@@ -162,5 +172,35 @@ PROMPT;
         ]);
 
         return ['text' => trim($result['text']), 'model' => $result['model']];
+    }
+
+    /**
+     * The tap-to-chat link a caption carries, prefilled with the room being
+     * advertised. Admins can restyle the wording in the content studio's
+     * settings; {room}, {area} and {platform} are filled in here.
+     */
+    public static function captionWhatsappLink(array $room, string $platform): string
+    {
+        return WhatsAppLink::to(strtr(
+            Settings::get('content_wa_prefill', 'Hi beLive! I saw your {platform} post about {room} in {area} — is it still available?'),
+            [
+                '{room}'     => (string) ($room['name'] ?? 'a room'),
+                '{area}'     => (string) ($room['location'] ?? ''),
+                '{platform}' => ucfirst($platform),
+            ]
+        ));
+    }
+
+    /**
+     * The model is asked for the link, but a caption without one is a dead end
+     * for every reader — so a missing link is appended rather than trusted.
+     */
+    private static function withWhatsappLink(string $caption, string $link): string
+    {
+        if (str_contains($caption, $link)) {
+            return $caption;
+        }
+
+        return $caption . "\n\n💬 WhatsApp us: " . $link;
     }
 }
