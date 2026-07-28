@@ -8,9 +8,40 @@ use App\Agreements\AgreementRenderer;
 use App\Agreements\ESignatureHandler;
 use App\Core\Auth;
 use App\Models\DigitalAgreement;
+use App\Models\RenewalOffer;
+use App\Models\Room;
+use App\Renewals\RenewalOfferManager;
 
 require dirname(__DIR__) . '/_portal_layout.php';
 $lead = require_tenant();
+
+// Answering a renewal offer is its own action: it belongs to the tenant, not to
+// the document, so it must not depend on there being an agreement to sign.
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && in_array($_POST['do'] ?? '', ['accept_renewal', 'decline_renewal'], true)) {
+    Auth::requireCsrf();
+    $decision = $_POST['do'] === 'accept_renewal' ? 'accepted' : 'declined';
+
+    try {
+        RenewalOfferManager::respond(
+            (int) $lead['id'],
+            (int) ($_POST['offer_id'] ?? 0),
+            $decision,
+            $_POST['response_note'] ?? null
+        );
+        set_flash('success', $decision === 'accepted'
+            ? 'Accepted — your owner can see it. BeLive will send you the renewal agreement to sign at that price; nothing about your current agreement changes until you both sign it.'
+            : 'Declined — your owner can see it. Your current agreement runs to its end date as normal.');
+    } catch (\InvalidArgumentException|\RuntimeException $e) {
+        set_flash('danger', $e->getMessage());
+    } catch (\Throwable $e) {
+        error_log('[tenant renewal offer] ' . $e->getMessage());
+        set_flash('danger', 'Your answer could not be saved. Please try again.');
+    }
+
+    header('Location: /tenant/agreement');
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Auth::requireCsrf();
@@ -50,6 +81,15 @@ $inPreparation = $latest !== null
     ? DigitalAgreement::stage($latest['status'])
     : null;
 
+// The renewal price the owner has offered, if any — plus the last answered one,
+// so a tenant who already decided can still see what they decided.
+$offer = RenewalOffer::openForTenant((int) $lead['id']);
+$pastOffers = array_values(array_filter(
+    RenewalOffer::forTenant((int) $lead['id']),
+    static fn (array $row): bool => $offer === null || (int) $row['id'] !== (int) $offer['id']
+));
+$lastAnswered = $pastOffers[0] ?? null;
+
 portal_header('tenant', 'My agreement', 'agreement');
 ?>
 <div class="portal-hero">
@@ -68,6 +108,77 @@ portal_header('tenant', 'My agreement', 'agreement');
         </p>
         <p class="belive-muted" style="font-size:12.5px">
             You only ever sign a document that the owner has already signed and BeLive has checked.
+        </p>
+    </div>
+<?php endif; ?>
+
+<?php if ($offer !== null): ?>
+    <div class="belive-card renewal-offer-card state-offered" style="max-width:720px; margin-bottom:16px">
+        <div class="renewal-offer-title">🎁 Your owner has offered you a renewal price</div>
+        <p class="belive-muted" style="font-size:13.5px">
+            Your term is nearly up. Stay on<?= $offer['room_name'] !== null ? ' in ' . e($offer['room_name']) : '' ?>
+            and this is what you would pay instead.
+        </p>
+        <div class="renewal-price-compare">
+            <div><span>You pay now</span><strong>RM <?= e(number_format((float) $offer['current_rent_rm'], 2)) ?></strong></div>
+            <div class="promo"><span>Renewal price</span><strong>RM <?= e(number_format((float) $offer['promo_rent_rm'], 2)) ?></strong></div>
+            <div><span>You save</span><strong>RM <?= e(number_format(RenewalOffer::monthlySaving($offer), 2)) ?>/mo</strong></div>
+        </div>
+        <div class="agreement-date-range" style="margin-top:14px">
+            <div>
+                <span>New term starts</span>
+                <time datetime="<?= e((string) $offer['starts_on']) ?>"><?= e(date('j M Y', strtotime((string) $offer['starts_on']))) ?></time>
+            </div>
+            <div>
+                <span>New term ends</span>
+                <time datetime="<?= e((string) $offer['ends_on']) ?>"><?= e(date('j M Y', strtotime((string) $offer['ends_on']))) ?></time>
+            </div>
+        </div>
+        <p class="belive-muted" style="font-size:13px; margin-top:10px">
+            <?= e(Room::TENURE_LABELS[$offer['tenure']] ?? $offer['tenure']) ?> ·
+            answer by <?= e(date('j M Y', strtotime((string) $offer['expires_on']))) ?>
+        </p>
+        <?php if ($offer['message'] !== null): ?>
+            <p class="renewal-offer-message">Your owner says: “<?= e($offer['message']) ?>”</p>
+        <?php endif; ?>
+
+        <form method="post" action="/tenant/agreement" class="renewal-offer-actions">
+            <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+            <input type="hidden" name="offer_id" value="<?= (int) $offer['id'] ?>">
+            <div class="belive-field">
+                <label for="response_note">Anything to say back? <span class="belive-muted">(optional)</span></label>
+                <textarea id="response_note" name="response_note" rows="2" maxlength="500"
+                          placeholder="Your owner sees this with your answer"></textarea>
+            </div>
+            <div class="renewal-offer-buttons">
+                <button type="submit" name="do" value="accept_renewal" class="belive-btn-primary">Accept this price</button>
+                <button type="submit" name="do" value="decline_renewal" class="belive-btn-ghost">No thanks</button>
+            </div>
+        </form>
+        <p class="belive-muted" style="font-size:12px; margin-top:12px">
+            Accepting tells your owner you want to stay at this price. BeLive then prepares the renewal
+            agreement for you both to sign — your current agreement is unchanged until that is signed, and
+            declining leaves it running to its end date either way.
+        </p>
+    </div>
+<?php elseif ($lastAnswered !== null): ?>
+    <?php $lastState = RenewalOffer::state($lastAnswered); ?>
+    <div class="belive-card renewal-offer-card state-<?= e($lastState) ?>" style="max-width:720px; margin-bottom:16px">
+        <div class="renewal-offer-title">
+            <?= match ($lastState) {
+                'accepted' => '🎉 You accepted a renewal price',
+                'declined' => '🙁 You declined a renewal price',
+                'withdrawn' => '↩️ Your owner withdrew a renewal offer',
+                default => '⌛ A renewal offer expired',
+            } ?>
+            — RM <?= e(number_format((float) $lastAnswered['promo_rent_rm'], 2)) ?>/month
+        </div>
+        <p class="belive-muted" style="font-size:13.5px">
+            <?= e(Room::TENURE_LABELS[$lastAnswered['tenure']] ?? $lastAnswered['tenure']) ?> from
+            <?= e(date('j M Y', strtotime((string) $lastAnswered['starts_on']))) ?>.
+            <?= $lastState === 'accepted'
+                ? 'BeLive is preparing the renewal agreement — it will appear here for your signature.'
+                : 'Nothing changed about your current agreement.' ?>
         </p>
     </div>
 <?php endif; ?>
@@ -121,7 +232,8 @@ portal_header('tenant', 'My agreement', 'agreement');
                 ],
             };
             ?>
-            <section class="agreement-timeline state-<?= e($timeline['state']) ?>" aria-labelledby="agreement-time-heading">
+            <?php /* CSS state classes are hyphenated; the timeline states are not. */ ?>
+            <section class="agreement-timeline state-<?= e(str_replace('_', '-', $timeline['state'])) ?>" aria-labelledby="agreement-time-heading">
                 <div class="agreement-time-summary">
                     <span class="agreement-time-badge"><?= e($timelineCopy['badge']) ?></span>
                     <div class="agreement-time-count" id="agreement-time-heading">

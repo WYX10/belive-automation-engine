@@ -6,14 +6,19 @@ defined('APP_BOOTED') || exit('No direct access.');
 
 /**
  * Owner dashboard — mirrors the four things belive.asia already promises
- * owners: repairs, expenses, occupancy, returns. Occupancy + returns are real
- * aggregates over live tables. Repairs + utility/access panels would be fed
- * by BeLive's EXISTING IoT/ops systems, so they ship as integration-ready
- * panels with clearly-labelled sample values and a documented input contract
+ * owners: repairs, expenses, occupancy, returns.
+ *
+ * Occupancy, returns and utilities are real aggregates over live tables:
+ * electricity comes from the per-room submeters (electric_meters /
+ * electric_bills), shown against the house each room sits in. Door access and
+ * repairs would be fed by BeLive's EXISTING IoT/ops systems, so they stay as
+ * integration-ready surfaces with a documented input contract
  * (docs/api_reference.md) — never simulated live readings.
  */
 
 use App\Core\Database;
+use App\Models\DigitalAgreement;
+use App\Models\ElectricBill;
 
 require dirname(__DIR__) . '/_portal_layout.php';
 $owner = require_owner();
@@ -37,6 +42,18 @@ $monthlyActual = array_sum(array_map(fn ($r) => $r['status'] === 'occupied' ? (f
 $upcomingViewings = (int) Database::run(
     "SELECT COUNT(*) FROM bookings WHERE room_id IN ($idList) AND status IN ('pending','confirmed') AND viewing_datetime >= NOW()"
 )->fetchColumn();
+
+// Tenancies running out — the same rule the Tenants & renewals page groups by.
+$endingSoon = 0;
+foreach (DigitalAgreement::tenanciesForOwner($owner) as $tenancy) {
+    $state = DigitalAgreement::timeline($tenancy)['state'] ?? null;
+    if ($state === 'ending_soon' || $state === 'ending_today') {
+        $endingSoon++;
+    }
+}
+
+// Per-room electricity, with the house each room sits in. No tenant identity.
+$utilities = ElectricBill::latestForOwnerRooms($owner);
 
 portal_header('owner', 'Overview', 'dashboard');
 ?>
@@ -63,6 +80,10 @@ portal_header('owner', 'Overview', 'dashboard');
         <div class="belive-stat-icon teal">📅</div>
         <div><div class="belive-stat-number teal"><?= $upcomingViewings ?></div><div class="belive-stat-label">upcoming viewings (Eve-booked)</div></div>
     </div>
+    <a class="belive-stat" href="/owner/tenancies">
+        <div class="belive-stat-icon">⏳</div>
+        <div><div class="belive-stat-number"><?= $endingSoon ?></div><div class="belive-stat-label">tenancies ending within <?= DigitalAgreement::ENDING_SOON_DAYS ?> days — offer a renewal price</div></div>
+    </a>
 </div>
 
 <div class="belive-row">
@@ -111,19 +132,51 @@ portal_header('owner', 'Overview', 'dashboard');
     </div>
 
     <div class="belive-col">
-        <div class="belive-card sample-panel">
-            <div class="belive-card-title">⚡ Utilities &amp; access</div>
-            <table class="belive-table">
-                <thead><tr><th>Unit</th><th>Electricity (kWh, mo.)</th><th>Last door access</th></tr></thead>
+        <div class="belive-card">
+            <div class="belive-card-title">⚡ Utilities &amp; access <span class="belive-badge">live data</span></div>
+            <table class="belive-table utilities-table">
+                <thead><tr><th>House</th><th>Room</th><th>Electricity (kWh)</th><th>Last door access</th></tr></thead>
                 <tbody>
-                    <tr><td>A-12-3</td><td>182</td><td>2026-07-15 21:40</td></tr>
-                    <tr><td>B-8-1</td><td>95</td><td>2026-07-16 07:12</td></tr>
+                <?php foreach ($utilities as $unit): ?>
+                    <tr>
+                        <td>
+                            <?= e($unit['house_name'] ?? 'No house set') ?>
+                            <?php if ($unit['property_name'] !== null): ?>
+                                <div class="belive-muted" style="font-size:11.5px"><?= e($unit['property_name']) ?></div>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?= e($unit['room_name']) ?>
+                            <?php if ($unit['room_code'] !== null): ?>
+                                <div class="belive-muted" style="font-size:11.5px"><?= e($unit['room_code']) ?></div>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($unit['units_kwh'] !== null): ?>
+                                <strong><?= e(number_format((float) $unit['units_kwh'], 1)) ?></strong>
+                                <div class="belive-muted" style="font-size:11.5px">
+                                    <?= e(date('j M', strtotime((string) $unit['period_start']))) ?>–<?= e(date('j M Y', strtotime((string) $unit['period_end']))) ?>
+                                    · <?= $unit['reading_source'] === 'smart_meter' ? 'smart meter' : 'manual read' ?>
+                                </div>
+                            <?php elseif ($unit['meter_serial'] !== null): ?>
+                                <span class="belive-muted">No bill issued yet</span>
+                            <?php else: ?>
+                                <span class="belive-muted">No meter registered</span>
+                            <?php endif; ?>
+                        </td>
+                        <td><span class="belive-muted">Not connected</span></td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if ($utilities === []): ?>
+                    <tr><td colspan="4" class="belive-muted">No rooms yet — add one on Properties &amp; rooms.</td></tr>
+                <?php endif; ?>
                 </tbody>
             </table>
             <p class="belive-muted" style="font-size:12px; margin-top:8px">
-                BeLive already runs smart meters and smart locks. Input contract:
-                <code>{unit, meter_kwh_month, last_access_at}</code> from the existing IoT feed —
-                designed to plug straight into that stack. We build zero hardware.
+                Electricity is live: every room has its own submeter, so these are the units that room actually
+                used in its last closed billing period — the same figures the tenant sees. Door access is not
+                wired up yet; BeLive's existing smart locks plug in through
+                <code>{room_code, last_access_at}</code> and fill that column. We build zero hardware.
             </p>
         </div>
 

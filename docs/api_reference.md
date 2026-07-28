@@ -93,6 +93,11 @@ All admin POSTs require the session CSRF token (`csrf_token` field, provided by 
   `::summaryForTenant(int $leadId)` is the read side `/tenant/electric` renders; both scope by
   `lead_id`, so a new tenant never sees the previous occupant's consumption. Overdue is derived
   (`::isOverdue`), never stored.
+  `::latestForOwnerRooms(string $ownerName)` feeds the owner dashboard's Utilities & access
+  panel: every room the owner has, the house it sits in (`property_units`), and the newest
+  closed billing period on its meter. It deliberately does **not** join `leads` — an owner sees
+  the room's consumption, never who was billed for it. Door access has no data source yet and
+  is left blank behind the documented `{room_code, last_access_at}` contract.
 
 ## Database (dev/demo names)
 
@@ -115,7 +120,9 @@ agreements remain undated rather than receiving inferred contract dates.
 The agreement signing workflow (035) adds the stage machine (`status`, `stage_version`), the
 snapshotted `monthly_rent_rm` / `deposit_rm`, the landlord's particulars — NRIC and bank
 account number encrypted at rest, last four digits in the clear — and `agreement_events`,
-one row per hand-off.
+one row per hand-off. `renewal_offers` (040) hangs off a completed agreement: the promotional
+rent an owner offers a tenant whose term is nearly up, with the snapshotted `current_rent_rm`,
+the proposed term, and the tenant's answer.
 
 ### Social auto-reply (036)
 
@@ -160,6 +167,28 @@ writes the body with `{{LANDLORD_NAME}}`-style tokens — a model is never asked
 NRIC or an account number — and `AgreementRenderer` merges the owner's stored particulars in
 at read time, appending Schedule A and the execution block deterministically. Screens:
 `/admin/agreements`, `/admin/agreements/view`, `/owner/agreements`, `/tenant/agreement`.
+
+### Renewal offers (040)
+
+`/owner/tenancies` ("Tenants & renewals") lists every rental period the owner has running —
+tenant, property · house · room, start and end date, days left and a progress bar — read from
+completed agreements via `DigitalAgreement::tenanciesForOwner()`. Only a `completed` agreement
+counts as a tenancy; anything earlier is a document still being signed.
+
+In the last `DigitalAgreement::ENDING_SOON_DAYS` (30) of a tenancy the owner can offer that
+tenant a promotional rent for a new term. The same constant drives the `ending_soon` timeline
+badge, so the countdown and the offer button always agree.
+`App\Renewals\RenewalOfferManager` owns the rules: the tenancy must be `ending_soon` or
+`ending_today`, the promo must be **below** the rent snapshotted on the agreement, the offer
+expires on or before the tenancy's end date, and only one offer per tenancy may be open at a
+time (checked under `FOR UPDATE`). The new term starts the day after the current one ends.
+
+The tenant sees it on `/tenant/agreement` (teaser on `/tenant/dashboard`) and answers with
+`accepted` / `declined`; `::respond()` scopes by `lead_id`, so only the person the offer was
+made to can answer it. **Accepting records intent only** — it never edits `digital_agreements`.
+BeLive drafts the renewal agreement afterwards through the usual admin → owner → tenant round
+trip. `expired` is derived (`RenewalOffer::isOpen`), never stored, and `current_rent_rm` is
+snapshotted so re-pricing the room cannot rewrite a saving the tenant has already been shown.
 
 Catalog surfaces: `App\Catalog\RoomRepository` (all page reads), `PricingCalculator`
 (price per tenure + saving vs flexible), `RoomRecommender` (candidate block for DecideSkill;

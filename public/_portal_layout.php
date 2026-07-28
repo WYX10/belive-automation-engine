@@ -71,6 +71,7 @@ function portal_header(string $audience, string $title, string $active = ''): vo
             'properties' => ['/owner/properties', 'Properties & rooms'],
             'listings'   => ['/owner/listings', 'Listing tools'],
             'agreements' => ['/owner/agreements', 'Agreements'],
+            'tenancies'  => ['/owner/tenancies', 'Tenants & renewals'],
             'pricing'    => ['/owner/pricing_guard', 'Pricing guard'],
         ];
     ?>

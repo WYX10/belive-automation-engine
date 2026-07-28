@@ -6,12 +6,14 @@ defined('APP_BOOTED') || exit('No direct access.');
 
 use App\Models\Booking;
 use App\Models\ElectricBill;
+use App\Models\RenewalOffer;
 
 require dirname(__DIR__) . '/_portal_layout.php';
 $lead = require_tenant();
 $room = tenant_room($lead);
 $bookings = Booking::forLead((int) $lead['id']);
 $electric = ElectricBill::summaryForTenant((int) $lead['id']);
+$renewalOffer = RenewalOffer::openForTenant((int) $lead['id']);
 
 portal_header('tenant', 'My stay', 'dashboard');
 ?>
@@ -20,6 +22,18 @@ portal_header('tenant', 'My stay', 'dashboard');
     <h1>Hi <?= e($lead['name'] ?: 'there') ?> 👋</h1>
     <p>Everything about your BeLive stay — bookings, your room, and the trust tools that protect you.</p>
 </div>
+
+<?php if ($renewalOffer !== null): ?>
+    <a class="belive-card renewal-offer-teaser" href="/tenant/agreement">
+        <div>
+            <div class="renewal-offer-title">🎁 Your owner has offered you a renewal price</div>
+            <p class="belive-muted">RM <?= e(number_format((float) $renewalOffer['promo_rent_rm'], 2)) ?>/month
+            to stay on — RM <?= e(number_format(RenewalOffer::monthlySaving($renewalOffer), 2)) ?> a month less than you pay now.
+            Answer by <?= e(date('j M Y', strtotime((string) $renewalOffer['expires_on']))) ?>.</p>
+        </div>
+        <span class="belive-btn-primary">See the offer</span>
+    </a>
+<?php endif; ?>
 
 <div class="belive-row">
     <div class="belive-col">

@@ -255,6 +255,45 @@ final class ElectricBill extends BaseModel
         ];
     }
 
+    // ---- owner reads -------------------------------------------------------
+
+    /**
+     * Every room this owner has, with the house it sits in and the newest
+     * closed billing period on its meter — what the owner dashboard's
+     * utilities panel renders.
+     *
+     * Rows come back for rooms with no meter and meters with no bill yet
+     * (units_kwh null), because an owner needs to see the gap as much as the
+     * reading.
+     *
+     * PRIVACY: this deliberately does not join leads. Bills are the tenant's,
+     * scoped by lead_id everywhere else in this class; an owner sees how much
+     * electricity their room used, never who was billed for it.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function latestForOwnerRooms(string $ownerName): array
+    {
+        return Database::run(
+            'SELECT r.id AS room_id, r.name AS room_name, r.room_code,
+                    COALESCE(p.name, r.property_name) AS property_name,
+                    u.name AS house_name,
+                    m.meter_serial,
+                    b.units_kwh, b.period_start, b.period_end, b.reading_source
+             FROM rooms r
+             LEFT JOIN properties p ON p.id = r.property_id
+             LEFT JOIN property_units u ON u.id = r.unit_id
+             LEFT JOIN electric_meters m ON m.room_id = r.id
+             LEFT JOIN electric_bills b ON b.meter_id = m.id
+                  AND b.period_start = (
+                      SELECT MAX(b2.period_start) FROM electric_bills b2 WHERE b2.meter_id = m.id
+                  )
+             WHERE r.owner_name = ?
+             ORDER BY house_name IS NULL, house_name, r.room_code, r.name',
+            [$ownerName]
+        )->fetchAll();
+    }
+
     /**
      * Oldest-first slice for the usage chart.
      *

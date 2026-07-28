@@ -76,6 +76,13 @@ define('RENT_REWARD_STATUSES', ['requested', 'approved', 'applied', 'rejected'])
 // due date in the past, derived at read time (ElectricBill::isOverdue).
 define('ELECTRIC_BILL_STATUSES', ['unpaid', 'paid', 'waived']);
 
+// renewal_offers.status — the promotional rent an owner offers a tenant whose
+// term is running out. 'expired' is absent for the same reason as 'overdue'
+// above: it is 'offered' past its expires_on, derived at read time
+// (RenewalOffer::isOpen).
+define('RENEWAL_OFFER_STATUSES', ['offered', 'accepted', 'declined', 'withdrawn']);
+define('RENEWAL_OFFER_DECISIONS', ['accepted', 'declined']); // what a tenant may answer
+
 // Where a meter reading pair came from. Never a live-feed simulation.
 define('ELECTRIC_READING_SOURCES', ['smart_meter', 'manual']);
 
