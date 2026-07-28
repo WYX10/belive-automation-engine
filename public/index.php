@@ -147,6 +147,7 @@ $router->any('/owner/properties', "$pages/owner/properties.php");
 $router->any('/owner/listings', "$pages/owner/listings/index.php");
 $router->any('/owner/listings/verify', "$pages/owner/listings/verify.php");
 $router->any('/owner/agreements', "$pages/owner/agreements.php");
+$router->any('/owner/tenancies', "$pages/owner/tenancies.php");
 $router->get('/owner/pricing_guard', "$pages/owner/pricing_guard.php");
 
 // --- Public lead-capture endpoints ----------------------------------------------

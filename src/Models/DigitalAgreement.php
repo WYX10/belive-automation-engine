@@ -20,6 +20,14 @@ final class DigitalAgreement extends BaseModel
     /** Stages in the order the document travels through them. */
     public const STAGES = ['draft', 'owner_review', 'admin_review', 'tenant_review', 'completed'];
 
+    /**
+     * Days left that make a tenancy "ending soon". One number, two consumers:
+     * the timeline badge below and the window in which an owner may offer a
+     * renewal price (App\Renewals\RenewalOfferManager) — so the badge and the
+     * offer button can never disagree about when a tenancy is running out.
+     */
+    public const ENDING_SOON_DAYS = 30;
+
     public const STAGE_LABELS = [
         'draft'         => 'AI draft — with admin',
         'owner_review'  => 'With owner — details & signature',
@@ -75,6 +83,39 @@ final class DigitalAgreement extends BaseModel
              LEFT JOIN rooms r ON r.id = a.room_id
              WHERE a.owner_name = ?
              ORDER BY a.id DESC',
+            [$ownerName]
+        )->fetchAll();
+    }
+
+    /**
+     * The owner's live tenancies: who is renting, where, and for how long.
+     *
+     * Only a completed agreement counts — anything earlier is a document still
+     * being signed, not a tenancy — and only one carrying both dates, since a
+     * rental period with no end is nothing to show a countdown for. Ordered by
+     * the date they end, so whoever is closest to leaving comes first.
+     *
+     * The room's house comes from property_units and its development from
+     * properties; rooms.property_name is the fallback for a room imported
+     * before the hierarchy existed.
+     */
+    public static function tenanciesForOwner(string $ownerName): array
+    {
+        return Database::run(
+            "SELECT a.*, l.name AS tenant_name, l.wa_phone,
+                    r.name AS room_name, r.room_code, r.location, r.status AS room_status,
+                    COALESCE(p.name, r.property_name) AS property_name,
+                    u.name AS house_name
+             FROM digital_agreements a
+             JOIN leads l ON l.id = a.lead_id
+             LEFT JOIN rooms r ON r.id = a.room_id
+             LEFT JOIN properties p ON p.id = r.property_id
+             LEFT JOIN property_units u ON u.id = r.unit_id
+             WHERE a.owner_name = ?
+               AND a.status = 'completed'
+               AND a.starts_on IS NOT NULL
+               AND a.ends_on IS NOT NULL
+             ORDER BY a.ends_on ASC, a.id ASC",
             [$ownerName]
         )->fetchAll();
     }
@@ -181,7 +222,7 @@ final class DigitalAgreement extends BaseModel
         } elseif ($today == $end) {
             $state = 'ending_today';
         } else {
-            $state = $daysRemaining <= 30 ? 'ending_soon' : 'active';
+            $state = $daysRemaining <= self::ENDING_SOON_DAYS ? 'ending_soon' : 'active';
         }
 
         $totalDays = max(1, (int) $start->diff($end)->days + 1);
