@@ -73,6 +73,69 @@ final class SocialPublishManager
     }
 
     /**
+     * Rewrite a caption before it goes out. The AI draft is a starting point,
+     * not a verdict — the admin owns the words that get published.
+     *
+     * Editing takes the same version bump as a review decision: whoever
+     * approves next must have seen the caption they are approving.
+     *
+     * @return array<string, mixed> the post row after the edit
+     */
+    public static function updateCaption(int $postId, string $caption, string $editor, int $expectedVersion): array
+    {
+        $caption = trim($caption);
+        $editor = trim($editor);
+        if ($caption === '') {
+            throw new InvalidArgumentException('The caption cannot be empty.');
+        }
+        if (mb_strlen($caption) > CONTENT_CAPTION_MAX) {
+            throw new InvalidArgumentException('The caption must be ' . CONTENT_CAPTION_MAX . ' characters or fewer.');
+        }
+        if ($editor === '') {
+            throw new InvalidArgumentException('The admin editor is required.');
+        }
+        if ($expectedVersion < 1) {
+            throw new InvalidArgumentException('The review version is missing. Reload the content studio.');
+        }
+
+        $pdo = Database::pdo();
+        $pdo->beginTransaction();
+        try {
+            $post = Database::run('SELECT * FROM content_posts WHERE id = ? FOR UPDATE', [$postId])->fetch();
+            if (!$post) {
+                throw new RuntimeException('Post not found.');
+            }
+            if ((int) $post['review_version'] !== $expectedVersion) {
+                throw new RuntimeException('This post changed after you opened the page. Reload before editing.');
+            }
+            // Once it is live on the platform, the platform holds the copy —
+            // rewriting our row would only make the two disagree.
+            if (in_array($post['publish_status'], ['published', 'simulated'], true) || $post['status'] === 'posted') {
+                throw new RuntimeException('This post has already gone out — its caption can no longer be edited.');
+            }
+            if ($post['status'] === 'rejected') {
+                throw new RuntimeException('A rejected draft cannot be edited.');
+            }
+
+            Database::run(
+                'UPDATE content_posts SET caption = ?, review_version = ? WHERE id = ?',
+                [$caption, $expectedVersion + 1, $postId]
+            );
+            $fresh = Database::run('SELECT * FROM content_posts WHERE id = ?', [$postId])->fetch();
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        EpisodicLogger::activity('content_caption_edited', 'content_creation', $fresh['generated_by_model'], null, "post #$postId on {$fresh['platform']} edited by $editor");
+
+        return $fresh;
+    }
+
+    /**
      * Publish an approved post whose publish failed — or never ran (legacy
      * rows approved under the old copy-paste flow have publish_status NULL).
      *

@@ -15,6 +15,7 @@ defined('APP_BOOTED') || exit('No direct access.');
 use App\AI\Skills\CreateSkill;
 use App\Core\Auth;
 use App\Integrations\Social\SocialPublishManager;
+use App\Integrations\WhatsApp\WhatsAppLink;
 use App\Models\Room;
 use App\Core\Database;
 use App\Core\Settings;
@@ -37,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'settings'
         Settings::set('content_auto_max', (string) $max, $by);
         Settings::set('content_auto_platforms', implode(',', $platforms), $by);
         Settings::set('content_brief', mb_substr($brief, 0, 1000), $by);
+        Settings::set('content_wa_prefill', mb_substr(trim((string) ($_POST['content_wa_prefill'] ?? '')), 0, 200), $by);
         set_flash('success', "Automation saved — up to $max draft(s) per run across " . implode(', ', $platforms) . '.');
     }
     header('Location: /admin/content');
@@ -92,6 +94,10 @@ $counts = SocialPublishManager::counts();
 $autoMax = Settings::getInt('content_auto_max', 3);
 $autoPlatforms = Settings::getList('content_auto_platforms', CONTENT_PLATFORMS);
 $standingBrief = Settings::get('content_brief', '');
+$waPrefill = Settings::get('content_wa_prefill', '');
+// Exactly what a reader taps, built from a real room so the preview is honest.
+$sampleWaLink = CreateSkill::captionWhatsappLink($rooms[0] ?? ['name' => 'a room', 'location' => 'KL'], 'facebook');
+$waNumber = WhatsAppLink::number();
 
 $platformIcons = ['facebook' => '📘', 'instagram' => '📷', 'tiktok' => '🎵'];
 $filterTabs = [
@@ -175,6 +181,18 @@ admin_header('Content', 'content');
             <label>Standing content brief <span class="belive-muted" style="font-weight:400">(what the AI should write about by default)</span></label>
             <textarea name="content_brief" rows="3" maxlength="1000"
                       placeholder="e.g. lead with zero deposit and fully furnished; keep it upbeat for young professionals in KL; always mention flexible monthly tenure"><?= e($standingBrief) ?></textarea>
+        </div>
+        <div class="belive-field" style="flex:1 1 100%; margin-bottom:0">
+            <label>WhatsApp call to action <span class="belive-muted" style="font-weight:400">(the message already typed when a reader taps the link — <code>{room}</code>, <code>{area}</code>, <code>{platform}</code> are filled in)</span></label>
+            <input type="text" name="content_wa_prefill" value="<?= e($waPrefill) ?>" maxlength="200"
+                   placeholder="Hi beLive! I saw your {platform} post about {room} in {area} — is it still available?">
+            <div class="hint">
+                Every AI caption ends with this link: <code><?= e($sampleWaLink) ?></code>
+                <?php if ($waNumber === ''): ?>
+                    — no WhatsApp number set yet, so captions fall back to the shared link and lose the prefill.
+                    Set it in <a href="/admin/social">Social replies</a>.
+                <?php endif; ?>
+            </div>
         </div>
         <button type="submit" class="belive-btn-secondary">Save automation</button>
     </form>

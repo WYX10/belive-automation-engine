@@ -53,6 +53,10 @@ final class ConfirmationSender
             $agent !== null ? "👤 Your host: {$agent['name']}" : null,
             '',
             $closing,
+            '',
+            '🔑 Your tenant portal is open — agreement, move-in log, electric bill and rewards, all in one place:',
+            self::tenantPortalLink(),
+            'Log in with this same WhatsApp number.',
         ], fn ($line) => $line !== null));
 
         // Reward attribution is durable booking state. Record it before either
@@ -77,5 +81,15 @@ final class ConfirmationSender
             'reasoning'    => 'Automated booking confirmation for booking #' . $booking['id']
                 . ($sent['dry_run'] ? ' (dry-run: no WhatsApp credential configured)' : ''),
         ]);
+    }
+
+    /**
+     * The tenant portal sign-in page. The confirmation is the one message we
+     * know reaches the number that IS the portal identity, so it is also where
+     * the login link belongs — no separate "how do I get in?" round trip.
+     */
+    private static function tenantPortalLink(): string
+    {
+        return rtrim($_ENV['APP_URL'] ?? 'http://localhost:8080', '/') . '/tenant/login';
     }
 }

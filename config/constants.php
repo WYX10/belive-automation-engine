@@ -60,6 +60,9 @@ define('BOOKING_STATUSES', ['pending', 'confirmed', 'cancelled', 'completed']);
 
 define('CONTENT_POST_STATUSES', ['draft', 'approved', 'rejected', 'posted']);
 define('CONTENT_PLATFORMS', ['facebook', 'instagram', 'tiktok']);
+// Admin-edited caption ceiling — comfortably under Instagram's 2,200-character
+// limit, the tightest of the three platforms we publish to.
+define('CONTENT_CAPTION_MAX', 2000);
 
 // content_posts.publish_status — outcome of the auto-publish attempt.
 // 'simulated' = dry-run (no active credential), clearly badged, never passed

@@ -25,6 +25,7 @@ $hasPhoto = static fn (array $files): bool => isset($files['room_photo'])
 $levelUrl = static function (array $params): string {
     $query = array_filter([
         'owner' => (string) ($params['owner'] ?? ''),
+        'location' => (string) ($params['location'] ?? ''),
         'property' => ($params['property'] ?? 0) > 0 ? (string) (int) $params['property'] : '',
         'unit' => ($params['unit'] ?? 0) > 0 ? (string) (int) $params['unit'] : '',
     ], static fn (string $value): bool => $value !== '');
@@ -84,6 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     header('Location: ' . $levelUrl([
         'owner' => trim((string) ($_POST['return_owner'] ?? '')),
+        'location' => trim((string) ($_POST['return_location'] ?? '')),
         'property' => (int) ($_POST['return_property'] ?? 0),
         'unit' => (int) ($_POST['return_unit'] ?? 0),
     ]));
@@ -96,6 +98,17 @@ $owners = Database::run(
 )->fetchAll(PDO::FETCH_COLUMN);
 if ($ownerFilter !== '' && !in_array($ownerFilter, $owners, true)) {
     $ownerFilter = '';
+}
+
+// Location is the question owners actually ask first ("what do we have in
+// Setapak?"), so it filters the property list alongside the owner.
+$locationFilter = trim((string) ($_GET['location'] ?? ''));
+$locations = Database::run(
+    "SELECT DISTINCT location FROM properties
+     WHERE review_status = 'approved' AND location <> '' ORDER BY location"
+)->fetchAll(PDO::FETCH_COLUMN);
+if ($locationFilter !== '' && !in_array($locationFilter, $locations, true)) {
+    $locationFilter = '';
 }
 
 // Which level of the hierarchy is open. A stale or hand-typed id drops back to
@@ -224,12 +237,12 @@ admin_header('Rooms', 'rooms');
 
 <?php if ($level !== 'properties'): ?>
     <nav class="admin-crumbs" aria-label="Breadcrumb">
-        <a href="<?= e($levelUrl(['owner' => $ownerFilter])) ?>">All properties</a>
+        <a href="<?= e($levelUrl(['owner' => $ownerFilter, 'location' => $locationFilter])) ?>">All properties</a>
         <span aria-hidden="true">›</span>
         <?php if ($level === 'houses'): ?>
             <span aria-current="page"><?= e($property['name']) ?></span>
         <?php else: ?>
-            <a href="<?= e($levelUrl(['owner' => $ownerFilter, 'property' => (int) $property['id']])) ?>"><?= e($property['name']) ?></a>
+            <a href="<?= e($levelUrl(['owner' => $ownerFilter, 'location' => $locationFilter, 'property' => (int) $property['id']])) ?>"><?= e($property['name']) ?></a>
             <span aria-hidden="true">›</span>
             <span aria-current="page"><?= e($house['name']) ?></span>
         <?php endif; ?>
@@ -245,6 +258,10 @@ if ($level === 'properties'):
         $propertySql .= ' AND owner_name = ?';
         $propertyParams[] = $ownerFilter;
     }
+    if ($locationFilter !== '') {
+        $propertySql .= ' AND location = ?';
+        $propertyParams[] = $locationFilter;
+    }
     $properties = Database::run($propertySql . ' ORDER BY owner_name, name', $propertyParams)->fetchAll();
     $counts = Property::portfolioCounts(array_map(static fn (array $row): int => (int) $row['id'], $properties));
     ?>
@@ -257,7 +274,14 @@ if ($level === 'properties'):
                     <option value="<?= e($ownerName) ?>" <?= $ownerFilter === $ownerName ? 'selected' : '' ?>><?= e($ownerName) ?></option>
                 <?php endforeach; ?>
             </select>
-            <noscript><button class="belive-btn-ghost" type="submit">Apply filter</button></noscript>
+            <label for="room-location-filter">Location</label>
+            <select id="room-location-filter" name="location" onchange="this.form.submit()">
+                <option value="">All locations</option>
+                <?php foreach ($locations as $locationName): ?>
+                    <option value="<?= e($locationName) ?>" <?= $locationFilter === $locationName ? 'selected' : '' ?>><?= e($locationName) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <noscript><button class="belive-btn-ghost" type="submit">Apply filters</button></noscript>
         </form>
         <span class="belive-badge orange"><?= count($properties) ?> propert<?= count($properties) === 1 ? 'y' : 'ies' ?></span>
     </div>
@@ -265,13 +289,23 @@ if ($level === 'properties'):
     <?php if ($properties === []): ?>
         <div class="belive-card review-empty-state">
             <h2>No approved properties</h2>
-            <p class="belive-muted"><?= $ownerFilter !== '' ? 'This owner has no approved properties yet.' : 'Approve a property in Property reviews before adding houses and rooms.' ?></p>
+            <p class="belive-muted">
+                <?php if ($ownerFilter !== '' && $locationFilter !== ''): ?>
+                    <?= e($ownerFilter) ?> has no approved properties in <?= e($locationFilter) ?>.
+                <?php elseif ($ownerFilter !== ''): ?>
+                    This owner has no approved properties yet.
+                <?php elseif ($locationFilter !== ''): ?>
+                    No approved properties in <?= e($locationFilter) ?> yet.
+                <?php else: ?>
+                    Approve a property in Property reviews before adding houses and rooms.
+                <?php endif; ?>
+            </p>
         </div>
     <?php else: ?>
         <div class="admin-hier-list">
             <?php foreach ($properties as $row): ?>
                 <?php $stat = $counts[(int) $row['id']] ?? ['houses' => 0, 'rooms' => 0, 'tenants' => 0, 'available' => 0]; ?>
-                <a class="belive-card admin-hier-card" href="<?= e($levelUrl(['owner' => $ownerFilter, 'property' => (int) $row['id']])) ?>">
+                <a class="belive-card admin-hier-card" href="<?= e($levelUrl(['owner' => $ownerFilter, 'location' => $locationFilter, 'property' => (int) $row['id']])) ?>">
                     <div class="admin-hier-card-head">
                         <div>
                             <div class="admin-room-owner"><?= e($row['owner_name']) ?></div>
@@ -310,6 +344,7 @@ elseif ($level === 'houses'):
                 <input type="hidden" name="do" value="add_house">
                 <input type="hidden" name="property_id" value="<?= (int) $property['id'] ?>">
                 <input type="hidden" name="return_owner" value="<?= e($ownerFilter) ?>">
+                <input type="hidden" name="return_location" value="<?= e($locationFilter) ?>">
                 <input type="hidden" name="return_property" value="<?= (int) $property['id'] ?>">
                 <div class="belive-field admin-room-form-wide">
                     <label for="admin-add-house-name">House name</label>
@@ -337,10 +372,10 @@ elseif ($level === 'houses'):
                     <div class="admin-hier-card-head">
                         <div>
                             <div class="admin-room-owner">House</div>
-                            <h2><a href="<?= e($levelUrl(['owner' => $ownerFilter, 'property' => (int) $property['id'], 'unit' => (int) $row['id']])) ?>"><?= e($row['name']) ?></a></h2>
+                            <h2><a href="<?= e($levelUrl(['owner' => $ownerFilter, 'location' => $locationFilter, 'property' => (int) $property['id'], 'unit' => (int) $row['id']])) ?>"><?= e($row['name']) ?></a></h2>
                             <p><?= e($row['notes'] ?: 'No notes for this house.') ?></p>
                         </div>
-                        <a class="belive-btn-secondary" href="<?= e($levelUrl(['owner' => $ownerFilter, 'property' => (int) $property['id'], 'unit' => (int) $row['id']])) ?>">View rooms</a>
+                        <a class="belive-btn-secondary" href="<?= e($levelUrl(['owner' => $ownerFilter, 'location' => $locationFilter, 'property' => (int) $property['id'], 'unit' => (int) $row['id']])) ?>">View rooms</a>
                     </div>
                     <?php $renderStats([
                         'Rooms' => $stat['rooms'],
@@ -354,6 +389,7 @@ elseif ($level === 'houses'):
                             <input type="hidden" name="do" value="update_house">
                             <input type="hidden" name="unit_id" value="<?= (int) $row['id'] ?>">
                             <input type="hidden" name="return_owner" value="<?= e($ownerFilter) ?>">
+                            <input type="hidden" name="return_location" value="<?= e($locationFilter) ?>">
                             <input type="hidden" name="return_property" value="<?= (int) $property['id'] ?>">
                             <div class="belive-field admin-room-form-wide">
                                 <label for="house-name-<?= (int) $row['id'] ?>">House name</label>
@@ -393,6 +429,7 @@ else:
                 <input type="hidden" name="do" value="add_room">
                 <input type="hidden" name="property_id" value="<?= (int) $property['id'] ?>">
                 <input type="hidden" name="return_owner" value="<?= e($ownerFilter) ?>">
+                <input type="hidden" name="return_location" value="<?= e($locationFilter) ?>">
                 <input type="hidden" name="return_property" value="<?= (int) $property['id'] ?>">
                 <input type="hidden" name="return_unit" value="<?= (int) $house['id'] ?>">
                 <?php $renderRoomFields(null, [], 'admin-add-room', $houses, (int) $house['id']); ?>
@@ -465,6 +502,7 @@ else:
                         <input type="hidden" name="do" value="upload_photo">
                         <input type="hidden" name="room_id" value="<?= (int) $room['id'] ?>">
                         <input type="hidden" name="return_owner" value="<?= e($ownerFilter) ?>">
+                        <input type="hidden" name="return_location" value="<?= e($locationFilter) ?>">
                         <input type="hidden" name="return_property" value="<?= (int) $property['id'] ?>">
                         <input type="hidden" name="return_unit" value="<?= (int) $house['id'] ?>">
                         <input type="hidden" name="MAX_FILE_SIZE" value="5242880">
@@ -483,6 +521,7 @@ else:
                             <input type="hidden" name="do" value="update_room">
                             <input type="hidden" name="room_id" value="<?= (int) $room['id'] ?>">
                             <input type="hidden" name="return_owner" value="<?= e($ownerFilter) ?>">
+                            <input type="hidden" name="return_location" value="<?= e($locationFilter) ?>">
                             <input type="hidden" name="return_property" value="<?= (int) $property['id'] ?>">
                             <input type="hidden" name="return_unit" value="<?= (int) $house['id'] ?>">
                             <?php $renderRoomFields($room, $prices, 'admin-edit-room-' . (int) $room['id'], $houses, (int) $room['unit_id']); ?>

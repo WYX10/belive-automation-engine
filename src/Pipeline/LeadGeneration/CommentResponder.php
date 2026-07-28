@@ -7,6 +7,7 @@ namespace App\Pipeline\LeadGeneration;
 use App\AI\Memory\EpisodicLogger;
 use App\Core\Settings;
 use App\Integrations\Meta\MetaMessenger;
+use App\Integrations\WhatsApp\WhatsAppLink;
 use App\Models\SocialReply;
 
 /**
@@ -108,19 +109,13 @@ final class CommentResponder
      */
     public static function whatsappLink(string $token, string $platform): string
     {
-        $number = preg_replace('/\D/', '', Settings::get('social_wa_number', $_ENV['EVE_WA_NUMBER'] ?? ''));
-        if ($number === '') {
-            // No number configured: the portal's shared fallback still reaches
-            // us, but it cannot carry a prefill, so attribution is lost.
-            return 'https://wa.link/hg32ho';
-        }
-
+        // No number configured means no prefill either, so attribution is lost.
         $prefill = strtr(Settings::get('social_wa_prefill', 'Hi beLive! I saw your {platform} post [{token}]'), [
             '{token}'    => $token,
             '{platform}' => ucfirst($platform),
         ]);
 
-        return 'https://wa.me/' . $number . '?text=' . rawurlencode($prefill);
+        return WhatsAppLink::to($prefill);
     }
 
     /** @return array{name:string, link:string, platform:string, token:string} */
