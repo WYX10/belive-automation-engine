@@ -44,7 +44,7 @@ single entry point, one bootstrap.
 | POST | `/admin/chat_history/flag` | Flag a reply (`interaction_id`, `error_type`, `comment`) → **synchronous** rule learning |
 | GET | `/admin/learning_log` · `/admin/learning_log/rule?id=` | Mistake \| Correction \| Rule \| Reinforced \| Status · rule detail with source feedback + shaped replies |
 | GET | `/admin/activity_log` | Every AI action with the model that handled it |
-| GET/POST | `/admin/content` · `/admin/content/preview?id=` | Generate caption drafts — or a rendered 9:16 promo video — from room metrics, mascot-branded and carrying `#BeLiveSolopreneur` · preview the reel and its shot list · approve → auto-publish |
+| GET/POST | `/admin/content` · `/admin/content/preview?id=` | Generate caption drafts — or a rendered 9:16 promo video — from room metrics, mascot-branded and carrying `#BeLiveSolopreneur` · preview the reel and its shot list · one-week best-time-to-post heatmap built from our own engagement (`?heat=facebook\|instagram\|tiktok`) · approve → publish now, or schedule for a suggested slot and let the publisher cron post it |
 | GET/POST | `/admin/social` | Social auto-reply: on/off, who gets a DM, the WhatsApp number and link prefill, the three reply templates, and the answered-events receipt (which comment, which reply, who actually landed on WhatsApp) |
 | GET/POST | `/admin/bookings` | Zero-touch bookings; complete/cancel controls |
 | GET/POST | `/admin/staff` | Viewing-staff roster: weekly shifts, time off, per-agent viewing modes and daily caps; 7-day coverage grid and manual assignment of unstaffed viewings |
@@ -66,6 +66,8 @@ All admin POSTs require the session CSRF token (`csrf_token` field, provided by 
 | `php database/seed_electric_bills.php` | Idempotent: a tagged demo tenant with a room meter and six months of bills for `/tenant/electric` |
 | `php cron/learning_job.php [--quiet-hours=4]` | Drop-off pattern detection + batch rule distillation + reinforcement |
 | `php cron/memory_decay.php [--stale-days=30]` | Confidence decay + below-threshold retirement |
+| `php cron/publish_scheduled.php [--max=10] [--dry-run]` | Publish content posts whose scheduled slot has arrived (`--dry-run` lists the queue without sending) |
+| `php cron/publish_retry.php [--max=10]` | Retry approved posts whose platform publish errored |
 | `php tests/run.php` | 23-check learning/retrieval suite on a throwaway DB |
 | `php tests/concurrency_test.php [--url=]` | 6 simultaneous conversations, isolation assertions |
 | `php tests/simulate_whatsapp.php "<text>" [phone] [name] [--url=]` | One Meta-shaped inbound message |

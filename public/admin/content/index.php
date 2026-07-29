@@ -15,6 +15,7 @@ defined('APP_BOOTED') || exit('No direct access.');
 use App\AI\Skills\CreateSkill;
 use App\Content\MascotLibrary;
 use App\Content\PhotoPostDrafter;
+use App\Content\PostTimingAdvisor;
 use App\Content\PromoVideoDrafter;
 use App\Content\RoomVideoComposer;
 use App\Core\Auth;
@@ -25,6 +26,7 @@ use App\Core\Database;
 use App\Core\Settings;
 
 require dirname(__DIR__) . '/_layout.php';
+require __DIR__ . '/_timing.php';
 Auth::requireAdmin();
 
 // Automation controls: drafts per cron run, platforms covered, standing brief.
@@ -47,6 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'settings'
         Settings::set('content_auto_media', $mediaKind, $by);
         Settings::set('content_brief', mb_substr($brief, 0, 1000), $by);
         Settings::set('content_wa_prefill', mb_substr(trim((string) ($_POST['content_wa_prefill'] ?? '')), 0, 200), $by);
+        // What the preview page pre-selects when an admin approves a draft.
+        Settings::set('content_schedule_default', ($_POST['content_schedule_default'] ?? '') === 'now' ? 'now' : 'suggested', $by);
         set_flash('success', "Automation saved — up to $max " . ($mediaKind === 'video' ? 'reel' : 'caption')
             . "(s) per run across " . implode(', ', $platforms) . '.');
     }
@@ -91,19 +95,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate'
 
 $filter = $_GET['status'] ?? 'all';
 $filterWhere = match ($filter) {
-    'draft'    => "WHERE p.status = 'draft'",
-    'failed'   => "WHERE p.status = 'approved'",
-    'posted'   => "WHERE p.status = 'posted'",
-    'rejected' => "WHERE p.status = 'rejected'",
-    default    => '',
+    'draft'     => "WHERE p.status = 'draft'",
+    'scheduled' => "WHERE p.status = 'scheduled'",
+    'failed'    => "WHERE p.status = 'approved'",
+    'posted'    => "WHERE p.status = 'posted'",
+    'rejected'  => "WHERE p.status = 'rejected'",
+    default     => '',
 };
 if ($filterWhere === '') {
     $filter = 'all';
 }
 
+// The scheduled queue reads best in the order it will actually go out.
+$order = $filter === 'scheduled' ? 'p.scheduled_for ASC' : 'p.id DESC';
 $posts = Database::run(
     "SELECT p.*, r.name AS room_name, r.location AS area FROM content_posts p
-     LEFT JOIN rooms r ON r.id = p.room_id $filterWhere ORDER BY p.id DESC LIMIT 100"
+     LEFT JOIN rooms r ON r.id = p.room_id $filterWhere ORDER BY $order LIMIT 100"
 )->fetchAll();
 $rooms = \App\Catalog\RoomRepository::filter(['tenure' => 'monthly'], 100);
 $counts = SocialPublishManager::counts();
@@ -121,20 +128,27 @@ $waPrefill = Settings::get('content_wa_prefill', '');
 $sampleWaLink = CreateSkill::captionWhatsappLink($rooms[0] ?? ['name' => 'a room', 'location' => 'KL'], 'facebook');
 $waNumber = WhatsAppLink::number();
 
+// Best time to post: one week of our own engagement data, per platform.
+$heatPlatform = in_array($_GET['heat'] ?? '', CONTENT_PLATFORMS, true) ? $_GET['heat'] : null;
+$heatmap = PostTimingAdvisor::heatmap($heatPlatform);
+$suggestions = PostTimingAdvisor::suggestions($heatPlatform, 3, $heatmap);
+$scheduleDefault = Settings::get('content_schedule_default', 'suggested');
+
 $platformIcons = ['facebook' => '📘', 'instagram' => '📷', 'tiktok' => '🎵'];
 $filterTabs = [
-    'all'      => "All ({$counts['all']})",
-    'draft'    => "Awaiting approval ({$counts['pending']})",
-    'failed'   => "Needs publish ({$counts['failed']})",
-    'posted'   => "Posted ({$counts['posted']})",
-    'rejected' => "Rejected ({$counts['rejected']})",
+    'all'       => "All ({$counts['all']})",
+    'draft'     => "Awaiting approval ({$counts['pending']})",
+    'scheduled' => "Scheduled ({$counts['scheduled']})",
+    'failed'    => "Needs publish ({$counts['failed']})",
+    'posted'    => "Posted ({$counts['posted']})",
+    'rejected'  => "Rejected ({$counts['rejected']})",
 ];
 
 admin_header('Content', 'content');
 ?>
 <div class="belive-page-head">
     <h1>Content studio</h1>
-    <span class="belive-muted" style="font-size:13px">Room metrics in → on-brand captions out. Approve a draft and it publishes to the platform automatically (dry-run when no credential is live).</span>
+    <span class="belive-muted" style="font-size:13px">Room metrics in → on-brand captions out. Approve a draft to publish it now, or schedule it for the slot the data likes best and it goes out on its own (dry-run when no credential is live).</span>
 </div>
 
 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px">
@@ -142,6 +156,49 @@ admin_header('Content', 'content');
         <a class="<?= $filter === $key ? 'belive-btn-secondary' : 'belive-btn-ghost' ?>" style="padding:6px 14px; font-size:13px"
            href="/admin/content<?= $key === 'all' ? '' : '?status=' . e($key) ?>"><?= e($label) ?></a>
     <?php endforeach; ?>
+</div>
+
+<div class="belive-card" style="margin-bottom:16px">
+    <div class="belive-card-title">🕒 Best time to post — one week</div>
+    <p class="belive-muted" style="font-size:13px; margin-top:-4px">
+        When BeLive's audience is actually there, hour by hour, from comments and DMs on our posts, new enquiries,
+        and inbound messages. Pick a slot when you approve a draft and
+        <code>cron/publish_scheduled.php</code> posts it at that minute — you do not have to be awake for it.
+    </p>
+
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px">
+        <?php foreach (['' => '🌐 All channels'] + array_combine(CONTENT_PLATFORMS, array_map(
+            static fn (string $p): string => $platformIcons[$p] . ' ' . ucfirst($p),
+            CONTENT_PLATFORMS
+        )) as $key => $label): ?>
+            <a class="<?= ($heatPlatform ?? '') === $key ? 'belive-btn-secondary' : 'belive-btn-ghost' ?>"
+               style="padding:5px 12px; font-size:12.5px"
+               href="/admin/content?<?= http_build_query(array_filter(['status' => $filter === 'all' ? null : $filter, 'heat' => $key ?: null])) ?>"><?= e($label) ?></a>
+        <?php endforeach; ?>
+    </div>
+
+    <?php timing_heatmap($heatmap, $suggestions); ?>
+
+    <div style="margin-top:14px">
+        <div style="font-size:13px; font-weight:600; margin-bottom:8px">
+            Top <?= count($suggestions) ?> slots<?= $heatPlatform !== null ? ' for ' . e(ucfirst($heatPlatform)) : '' ?>
+        </div>
+        <div class="timing-picks">
+            <?php foreach ($suggestions as $rank => $slot): ?>
+                <div class="timing-pick" style="cursor:default">
+                    <strong>#<?= $rank + 1 ?> · <?= e($slot['label']) ?></strong>
+                    <div class="timing-pick-when">Next: <?= e($slot['next_label']) ?></div>
+                    <div class="timing-pick-why"><?= e($slot['why']) ?></div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+
+    <p class="belive-muted" style="font-size:12px; margin-top:12px; margin-bottom:0">
+        <?= e(timing_basis($heatmap)) ?>
+        An engagement at 21:00 also credits 20:00 at half weight — a post has to already be in the feed to be reacted to,
+        so the advisor leans slightly ahead of the raw peak. All times Asia/Kuala_Lumpur.
+    </p>
 </div>
 
 <div class="belive-card" style="margin-bottom:16px">
@@ -216,6 +273,14 @@ admin_header('Content', 'content');
                 <option value="video"<?= $autoMedia === 'video' ? ' selected' : '' ?><?= $videoReady ? '' : ' disabled' ?>>🎬 Promo videos</option>
             </select>
         </div>
+        <div class="belive-field" style="flex:0 0 240px; margin-bottom:0">
+            <label>On approval, default to</label>
+            <select name="content_schedule_default">
+                <option value="suggested"<?= $scheduleDefault === 'suggested' ? ' selected' : '' ?>>🕒 Scheduling at the best slot</option>
+                <option value="now"<?= $scheduleDefault === 'now' ? ' selected' : '' ?>>⚡ Publishing immediately</option>
+            </select>
+            <div class="hint">Only what the preview page pre-selects — every post still goes out on the choice you confirm there.</div>
+        </div>
         <div class="belive-field" style="flex:1; min-width:200px; margin-bottom:0">
             <label>Platforms</label>
             <div style="display:flex; gap:14px; flex-wrap:wrap; padding-top:6px">
@@ -251,11 +316,15 @@ admin_header('Content', 'content');
 
 <div class="belive-card">
     <?php if ($posts === []): ?>
-        <p class="belive-muted"><?= $filter === 'all' ? 'No drafts yet — generate one above, or let the daily cron draft for you.' : 'Nothing in this state right now.' ?></p>
+        <p class="belive-muted"><?= match ($filter) {
+            'all'       => 'No drafts yet — generate one above, or let the daily cron draft for you.',
+            'scheduled' => 'Nothing is queued. Approve a draft and pick one of the suggested slots to line a post up here.',
+            default     => 'Nothing in this state right now.',
+        } ?></p>
     <?php else: ?>
         <div class="belive-table-wrap">
             <table class="belive-table">
-                <thead><tr><th>Platform</th><th>Type</th><th>Room</th><th>Caption</th><th>Model</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Platform</th><th>Type</th><th>Room</th><th>Caption</th><th>Model</th><th>Goes out</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                 <?php foreach ($posts as $post): ?>
                     <tr>
@@ -264,15 +333,30 @@ admin_header('Content', 'content');
                         <td style="font-size:13px"><?= e($post['room_name'] ? "{$post['room_name']} ({$post['area']})" : '—') ?></td>
                         <td style="font-size:13px; max-width:320px"><?= e(mb_substr($post['caption'], 0, 120)) ?><?= mb_strlen($post['caption']) > 120 ? '…' : '' ?></td>
                         <td style="font-size:12.5px"><code><?= e($post['generated_by_model']) ?></code></td>
+                        <td style="font-size:12.5px; white-space:nowrap">
+                            <?php if ($post['status'] === 'scheduled' && $post['scheduled_for']): ?>
+                                <?php $slot = new DateTimeImmutable((string) $post['scheduled_for']); ?>
+                                🕒 <?= e($slot->format('D j M, H:i')) ?>
+                                <div class="belive-muted" style="font-size:11px">
+                                    <?= $slot <= new DateTimeImmutable() ? 'due — next cron run' : 'in ' . e((new DateTimeImmutable())->diff($slot)->format('%ad %hh %im')) ?>
+                                </div>
+                            <?php elseif ($post['posted_at']): ?>
+                                <?= e((new DateTimeImmutable((string) $post['posted_at']))->format('D j M, H:i')) ?>
+                                <?php if ($post['scheduled_for']): ?>
+                                    <div class="belive-muted" style="font-size:11px">on schedule</div>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <span class="belive-muted">—</span>
+                            <?php endif; ?>
+                        </td>
                         <td>
-                            <span class="belive-badge <?= match ($post['status']) { 'posted' => '', 'rejected' => 'danger', default => 'orange' } ?>"><?= e($post['status']) ?></span>
+                            <span class="belive-badge <?= match ($post['status']) { 'posted', 'scheduled' => '', 'rejected' => 'danger', default => 'orange' } ?>"><?= e($post['status']) ?></span>
                             <?php if ($post['publish_status']): ?>
                                 <span class="belive-badge <?= match ($post['publish_status']) { 'published' => '', 'simulated' => 'orange', default => 'danger' } ?>" style="font-size:11px"><?= e($post['publish_status']) ?></span>
                             <?php endif; ?>
                             <?php if ($post['publish_status'] === 'failed' && $post['publish_error']): ?>
                                 <div class="belive-muted" style="font-size:11px" title="<?= e($post['publish_error']) ?>"><?= e(mb_substr($post['publish_error'], 0, 60)) ?><?= mb_strlen($post['publish_error']) > 60 ? '…' : '' ?></div>
                             <?php endif; ?>
-                            <?php if ($post['posted_at']): ?><div class="belive-muted" style="font-size:11px"><?= e($post['posted_at']) ?></div><?php endif; ?>
                         </td>
                         <td><a class="belive-btn-ghost" style="padding:5px 12px; font-size:13px" href="/admin/content/preview?id=<?= (int) $post['id'] ?>">Preview</a></td>
                     </tr>
