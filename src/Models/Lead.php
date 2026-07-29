@@ -118,15 +118,21 @@ final class Lead extends BaseModel
     }
 
     /**
-     * The dashboard's "live leads": most recently active first, so the lead
-     * Eve is talking to right now sits at the top.
+     * The dashboard's "top 10 live leads": ranked by how likely Eve thinks each
+     * one is to close, so the hottest lead sits at the top rather than merely
+     * the chattiest. Leads Eve has not scored yet fall to the bottom — an
+     * unscored lead is unknown, not promising — and recency breaks ties, which
+     * is what keeps a live conversation ahead of a stale one on equal odds.
      *
      * @return array<int, array<string, mixed>>
      */
-    public static function mostRecentlyActive(int $limit = 10): array
+    public static function hottest(int $limit = 10): array
     {
         return Database::run(
-            'SELECT * FROM leads ORDER BY last_contact_at DESC, id DESC LIMIT ' . max(1, $limit)
+            'SELECT * FROM leads
+              ORDER BY closing_probability IS NULL, closing_probability DESC,
+                       last_contact_at IS NULL, last_contact_at DESC, id DESC
+              LIMIT ' . max(1, $limit)
         )->fetchAll();
     }
 }

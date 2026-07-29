@@ -45,20 +45,72 @@ check('a lead from the first instant of the month does', Lead::capturedThisMonth
 
 // ---- live lead list --------------------------------------------------------
 $total = (int) Database::run('SELECT COUNT(*) FROM leads')->fetchColumn();
-$live = Lead::mostRecentlyActive(10);
+$live = Lead::hottest(10);
 check('the live list never returns more than the ten asked for', count($live) === min(10, $total), (string) count($live));
 
-Database::run('UPDATE leads SET last_contact_at = ? WHERE id = ?', [date('Y-m-d H:i:s', time() + 60), $thisMonthId]);
-$live = Lead::mostRecentlyActive(10);
-check('the most recently active lead leads the list', (int) $live[0]['id'] === $thisMonthId, json_encode($live[0]['name'] ?? null));
+/** Where a given lead sits in the ranking, or null if it missed the list. */
+$rank = static function (array $list, int $id): ?int {
+    foreach ($list as $index => $row) {
+        if ((int) $row['id'] === $id) {
+            return $index;
+        }
+    }
+
+    return null;
+};
+
+// The panel is badged "top 10", so the ranking has to be closing probability,
+// not chatter: a lead Eve just spoke to must not outrank a hotter quiet one.
+Database::run(
+    'UPDATE leads SET closing_probability = 100, last_contact_at = ? WHERE id = ?',
+    [date('Y-m-d H:i:s', time() - 86400), $boundaryId]
+);
+Database::run(
+    'UPDATE leads SET closing_probability = 40, last_contact_at = ? WHERE id = ?',
+    [date('Y-m-d H:i:s', time() + 60), $thisMonthId]
+);
+// Rank the whole table for the ordering checks: the ten-row cut is asserted
+// above, and earlier tests may have left more than ten scored leads behind.
+$live = Lead::hottest(500);
+check('the hotter lead outranks the more recently active one',
+    $rank($live, $boundaryId) < $rank($live, $thisMonthId),
+    json_encode([$rank($live, $boundaryId), $rank($live, $thisMonthId)]));
 
 $ordered = true;
 foreach ($live as $index => $row) {
-    if ($index > 0 && (string) $row['last_contact_at'] > (string) $live[$index - 1]['last_contact_at']) {
+    if ($index > 0 && (int) $row['closing_probability'] > (int) $live[$index - 1]['closing_probability']) {
         $ordered = false;
     }
 }
-check('the list stays in most-recent-first order', $ordered);
+check('the list stays in highest-probability-first order', $ordered);
+
+// An unscored lead is unknown, not promising — it belongs below every scored one.
+Database::run(
+    'UPDATE leads SET closing_probability = NULL, last_contact_at = ? WHERE id = ?',
+    [date('Y-m-d H:i:s', time() + 120), $lastMonthId]
+);
+$live = Lead::hottest(500);
+$firstUnscored = null;
+$scoredAfterUnscored = false;
+foreach ($live as $index => $row) {
+    if ($row['closing_probability'] === null) {
+        $firstUnscored ??= $index;
+    } elseif ($firstUnscored !== null) {
+        $scoredAfterUnscored = true;
+    }
+}
+check('an unscored lead never outranks a scored one, however recent', !$scoredAfterUnscored,
+    json_encode(array_column($live, 'closing_probability')));
+
+// Equal odds: the live conversation is the one worth opening first.
+Database::run(
+    'UPDATE leads SET closing_probability = 40, last_contact_at = ? WHERE id = ?',
+    [date('Y-m-d H:i:s', time() + 120), $lastMonthId]
+);
+$live = Lead::hottest(500);
+check('on equal probability the more recently active lead ranks higher',
+    $rank($live, $lastMonthId) < $rank($live, $thisMonthId),
+    json_encode([$rank($live, $lastMonthId), $rank($live, $thisMonthId)]));
 
 // ---- each row's transcript -------------------------------------------------
 Interaction::create([
