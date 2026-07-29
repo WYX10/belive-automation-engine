@@ -18,9 +18,13 @@ interface SocialPublisherInterface
     public function isConfigured(): bool;
 
     /**
+     * @param ?string $mediaUrl the photo or the rendered promo video, absolute
+     *                          — every platform fetches media by URL.
+     * @param 'image'|'video' $mediaKind which of the two $mediaUrl is; the
+     *                          endpoint and the payload differ per platform.
      * @return array{external_id: string, dry_run: bool}
      * @throws RuntimeException when the platform rejects the post or a
-     *                          precondition fails (e.g. IG without an image).
+     *                          precondition fails (e.g. IG without media).
      */
-    public function publish(string $caption, ?string $imageUrl): array;
+    public function publish(string $caption, ?string $mediaUrl, string $mediaKind = 'image'): array;
 }

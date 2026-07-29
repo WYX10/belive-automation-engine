@@ -19,8 +19,10 @@ use RuntimeException;
  * bytes directly (multipart 'source') so Facebook never has to fetch our URL —
  * that removes the public-tunnel dependency and the transient "(#324) Missing
  * or invalid image file" fetch errors. A truly remote image URL still uses the
- * 'url' parameter. Without any image: text-only POST /{page_id}/feed —
- * Facebook is the only platform that allows it.
+ * 'url' parameter. A promo video posts to POST /{page_id}/videos instead, by
+ * the same rule: our own rendered mp4 uploads as bytes, a remote one as
+ * 'file_url'. Without any media: text-only POST /{page_id}/feed — Facebook is
+ * the only platform that allows it.
  */
 class FacebookPublisher implements SocialPublisherInterface
 {
@@ -44,12 +46,21 @@ class FacebookPublisher implements SocialPublisherInterface
         return ($meta['page_id'] ?? '') !== '';
     }
 
-    public function publish(string $caption, ?string $imageUrl): array
+    public function publish(string $caption, ?string $mediaUrl, string $mediaKind = 'image'): array
     {
-        $endpoint = $imageUrl !== null ? 'photos' : 'feed';
-        $payload = $imageUrl !== null
-            ? ['url' => $imageUrl, 'caption' => $caption]
-            : ['message' => $caption];
+        $isVideo = $mediaKind === 'video';
+        // A Page video is its own edge, and it names the caption 'description'
+        // and the remote source 'file_url' rather than 'caption'/'url'.
+        $endpoint = match (true) {
+            $mediaUrl === null => 'feed',
+            $isVideo           => 'videos',
+            default            => 'photos',
+        };
+        $payload = match (true) {
+            $mediaUrl === null => ['message' => $caption],
+            $isVideo           => ['file_url' => $mediaUrl, 'description' => $caption],
+            default            => ['url' => $mediaUrl, 'caption' => $caption],
+        };
 
         if (!$this->isConfigured()) {
             return $this->dryRun("/{page_id}/$endpoint", $payload);
@@ -63,12 +74,13 @@ class FacebookPublisher implements SocialPublisherInterface
         $token = MetaGraph::pageAccessToken($this->http, $stored, (string) $meta['page_id']);
 
         $options = ['headers' => ['Authorization' => "Bearer {$token}"]];
-        $localFile = $this->localFileFor($imageUrl);
-        if ($imageUrl !== null && $localFile !== null) {
-            // Direct byte upload — no Facebook-side fetch of our URL.
+        $localFile = $this->localFileFor($mediaUrl);
+        if ($mediaUrl !== null && $localFile !== null) {
+            // Direct byte upload — no Facebook-side fetch of our URL. A reel we
+            // rendered ourselves is always local, so this is its normal path.
             $options['multipart'] = [
                 ['name' => 'source', 'contents' => fopen($localFile, 'rb'), 'filename' => basename($localFile)],
-                ['name' => 'caption', 'contents' => $caption],
+                ['name' => $isVideo ? 'description' : 'caption', 'contents' => $caption],
             ];
         } else {
             $options['headers']['Content-Type'] = 'application/json';
@@ -95,16 +107,16 @@ class FacebookPublisher implements SocialPublisherInterface
      * one of our own site-local assets (APP_URL host). Returns null for truly
      * remote URLs, which must be published by 'url' instead.
      */
-    private function localFileFor(?string $imageUrl): ?string
+    private function localFileFor(?string $mediaUrl): ?string
     {
-        if ($imageUrl === null) {
+        if ($mediaUrl === null) {
             return null;
         }
         $appUrl = rtrim($_ENV['APP_URL'] ?? '', '/');
-        if ($appUrl === '' || !str_starts_with($imageUrl, $appUrl)) {
+        if ($appUrl === '' || !str_starts_with($mediaUrl, $appUrl)) {
             return null;
         }
-        $path = parse_url(substr($imageUrl, strlen($appUrl)), PHP_URL_PATH) ?: '';
+        $path = parse_url(substr($mediaUrl, strlen($appUrl)), PHP_URL_PATH) ?: '';
         $file = dirname(__DIR__, 3) . '/public' . $path;
 
         return is_file($file) ? $file : null;

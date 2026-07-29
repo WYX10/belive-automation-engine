@@ -11,13 +11,14 @@ use GuzzleHttp\Exception\BadResponseException;
 use RuntimeException;
 
 /**
- * TikTok publisher (Content Posting API, photo direct post).
+ * TikTok publisher (Content Posting API) — a photo direct post, or a promo
+ * video through the video init endpoint.
  *
  * Requires an active 'tiktok' credential — a user access token with the
  * video.publish scope from an approved TikTok developer app. Unaudited apps
  * are restricted to SELF_ONLY visibility (hence privacy_level below) and may
  * be blocked from Direct Post entirely; PULL_FROM_URL additionally requires
- * the image domain to be verified in the TikTok developer console. Expect the
+ * the media domain to be verified in the TikTok developer console. Expect the
  * dry-run path in the competition demo.
  */
 class TikTokPublisher implements SocialPublisherInterface
@@ -36,38 +37,51 @@ class TikTokPublisher implements SocialPublisherInterface
         return ApiCredential::activeFor('tiktok') !== null;
     }
 
-    public function publish(string $caption, ?string $imageUrl): array
+    public function publish(string $caption, ?string $mediaUrl, string $mediaKind = 'image'): array
     {
+        $isVideo = $mediaKind === 'video';
+
         // TikTok has no text-only post type — same honest-failure rule as IG.
-        if ($imageUrl === null) {
-            throw new RuntimeException('TikTok requires an image — attach a room photo first.');
+        if ($mediaUrl === null) {
+            throw new RuntimeException($isVideo
+                ? 'TikTok requires the rendered video — this reel has none attached.'
+                : 'TikTok requires an image — attach a room photo first.');
         }
 
-        $payload = [
-            'post_info' => [
-                'title'           => mb_substr($caption, 0, 90),
-                'description'     => $caption,
-                'privacy_level'   => 'SELF_ONLY',
-                'disable_comment' => false,
-            ],
-            'source_info' => [
-                'source'            => 'PULL_FROM_URL',
-                'photo_images'      => [$imageUrl],
-                'photo_cover_index' => 0,
-            ],
-            'post_mode'  => 'DIRECT_POST',
-            'media_type' => 'PHOTO',
+        $postInfo = [
+            'title'           => mb_substr($caption, 0, 90),
+            'description'     => $caption,
+            'privacy_level'   => 'SELF_ONLY',
+            'disable_comment' => false,
         ];
 
+        // Video is TikTok's native post and has its own init endpoint; the
+        // photo endpoint is the one that needs the post_mode/media_type pair.
+        [$endpoint, $payload] = $isVideo
+            ? ['/post/publish/video/init/', [
+                'post_info'   => $postInfo,
+                'source_info' => ['source' => 'PULL_FROM_URL', 'video_url' => $mediaUrl],
+            ]]
+            : ['/post/publish/content/init/', [
+                'post_info'   => $postInfo,
+                'source_info' => [
+                    'source'            => 'PULL_FROM_URL',
+                    'photo_images'      => [$mediaUrl],
+                    'photo_cover_index' => 0,
+                ],
+                'post_mode'  => 'DIRECT_POST',
+                'media_type' => 'PHOTO',
+            ]];
+
         if (!$this->isConfigured()) {
-            return $this->dryRun($payload);
+            return $this->dryRun($endpoint, $payload);
         }
 
         $token = ApiCredential::decryptedKeyFor('tiktok')
             ?? throw new RuntimeException('No active TikTok credential.');
 
         try {
-            $response = $this->http->post(self::API . '/post/publish/content/init/', [
+            $response = $this->http->post(self::API . $endpoint, [
                 'headers' => ['Authorization' => "Bearer {$token}", 'Content-Type' => 'application/json'],
                 'json' => $payload,
             ]);
@@ -85,7 +99,7 @@ class TikTokPublisher implements SocialPublisherInterface
     }
 
     /** @return array{external_id: string, dry_run: bool} */
-    private function dryRun(array $payload): array
+    private function dryRun(string $endpoint, array $payload): array
     {
         Database::run(
             'INSERT INTO ai_activity_log (action, phase, detail) VALUES (?, ?, ?)',
@@ -93,7 +107,7 @@ class TikTokPublisher implements SocialPublisherInterface
                 'social_dry_run_publish',
                 'content_creation',
                 json_encode(
-                    ['note' => 'No active tiktok credential — payload logged, NOT published.', 'platform' => 'tiktok', 'endpoint' => '/post/publish/content/init/', 'payload' => $payload],
+                    ['note' => 'No active tiktok credential — payload logged, NOT published.', 'platform' => 'tiktok', 'endpoint' => $endpoint, 'payload' => $payload],
                     JSON_UNESCAPED_UNICODE
                 ),
             ]

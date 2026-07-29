@@ -44,7 +44,7 @@ single entry point, one bootstrap.
 | POST | `/admin/chat_history/flag` | Flag a reply (`interaction_id`, `error_type`, `comment`) → **synchronous** rule learning |
 | GET | `/admin/learning_log` · `/admin/learning_log/rule?id=` | Mistake \| Correction \| Rule \| Reinforced \| Status · rule detail with source feedback + shaped replies |
 | GET | `/admin/activity_log` | Every AI action with the model that handled it |
-| GET/POST | `/admin/content` · `/admin/content/preview?id=` | Generate caption drafts from room metrics · approve / mark posted |
+| GET/POST | `/admin/content` · `/admin/content/preview?id=` | Generate caption drafts — or a rendered 9:16 promo video — from room metrics · preview the reel and its shot list · approve → auto-publish |
 | GET/POST | `/admin/social` | Social auto-reply: on/off, who gets a DM, the WhatsApp number and link prefill, the three reply templates, and the answered-events receipt (which comment, which reply, who actually landed on WhatsApp) |
 | GET/POST | `/admin/bookings` | Zero-touch bookings; complete/cancel controls |
 | GET/POST | `/admin/staff` | Viewing-staff roster: weekly shifts, time off, per-agent viewing modes and daily caps; 7-day coverage grid and manual assignment of unstaffed viewings |

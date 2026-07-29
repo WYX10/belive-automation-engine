@@ -60,6 +60,15 @@ define('BOOKING_STATUSES', ['pending', 'confirmed', 'cancelled', 'completed']);
 
 define('CONTENT_POST_STATUSES', ['draft', 'approved', 'rejected', 'posted']);
 define('CONTENT_PLATFORMS', ['facebook', 'instagram', 'tiktok']);
+// content_posts.media_kind — a photo post or a rendered vertical promo reel.
+define('CONTENT_MEDIA_KINDS', ['image', 'video']);
+// Promo video shape: 9:16 at 1080p, the format all three platforms treat as
+// native short-form. A scene is one shot with its burned-in line.
+define('CONTENT_VIDEO_WIDTH', 1080);
+define('CONTENT_VIDEO_HEIGHT', 1920);
+define('CONTENT_VIDEO_FPS', 30);
+define('CONTENT_VIDEO_SCENE_MAX', 5);
+define('CONTENT_VIDEO_SCENE_SECONDS', ['min' => 2.0, 'max' => 6.0]);
 // Admin-edited caption ceiling — comfortably under Instagram's 2,200-character
 // limit, the tightest of the three platforms we publish to.
 define('CONTENT_CAPTION_MAX', 2000);

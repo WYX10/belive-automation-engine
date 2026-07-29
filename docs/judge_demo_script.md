@@ -134,6 +134,12 @@ generic "hi again".
   downstream AI pipeline (see honest-limitations below).
 - **Content studio** (Admin → Content): pick a room, generate — an on-brand caption from live room
   metrics, by the model shown on the draft. Approve → mark posted → dashboard count updates.
+- **Promo video** (same screen, post type → 🎬): generate again and a 9:16 reel is cut on the spot
+  from that room's *own* photos and tour clips — the AI writes the scenes burned onto each shot and
+  the caption, never the footage, and the studio adds the closing WhatsApp card itself. Preview
+  plays the exact file that publishes, next to the shot list showing what each second says.
+  Needs `ffmpeg` on the box (`FFMPEG_BIN` in `.env` if it's off PATH); without it the option is
+  visibly off rather than silently degrading to a photo post.
 
 ---
 
