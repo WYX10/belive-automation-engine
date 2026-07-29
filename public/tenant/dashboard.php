@@ -10,7 +10,8 @@ use App\Models\RenewalOffer;
 
 require dirname(__DIR__) . '/_portal_layout.php';
 $lead = require_tenant();
-$room = tenant_room($lead);
+$tenancy = tenant_tenancy($lead);
+$room = $tenancy['room'];
 $bookings = Booking::forLead((int) $lead['id']);
 $electric = ElectricBill::summaryForTenant((int) $lead['id']);
 $renewalOffer = RenewalOffer::openForTenant((int) $lead['id']);
@@ -42,11 +43,33 @@ portal_header('tenant', 'My stay', 'dashboard');
             <?php if ($room === null): ?>
                 <p class="belive-muted">No room attached yet — Eve will match you during your next chat.</p>
             <?php else: ?>
-                <?php $roomPrices = \App\Models\Room::prices((int) $room['id']); ?>
+                <?php
+                $roomPrices = $room['prices'];
+                // Development · house · area — only the levels this room has.
+                $roomWhere = array_values(array_filter([
+                    $room['property_name'] ?? null,
+                    $room['house_name'] ?? null,
+                    $room['location'] ?? null,
+                ], static fn ($part): bool => is_string($part) && trim($part) !== ''));
+                ?>
                 <strong style="font-size:16px"><?= e($room['name']) ?></strong>
                 <div class="belive-muted" style="font-size:13.5px">
-                    <?= e($room['location']) ?> · <?= e($room['room_type']) ?> room · RM 0 deposit
+                    <?= e(implode(' · ', $roomWhere)) ?> · <?= e($room['room_type']) ?> room · RM 0 deposit
                 </div>
+                <?php if ($tenancy['timeline'] !== null): ?>
+                    <?php $t = $tenancy['timeline']; ?>
+                    <div class="belive-muted" style="font-size:13.5px; margin-top:6px">
+                        📆 <?= e(date('j M Y', strtotime($t['starts_on']))) ?> →
+                        <?= e(date('j M Y', strtotime($t['ends_on']))) ?>
+                        <?php if ($t['state'] === 'upcoming'): ?>
+                            · starts in <?= (int) $t['days_until_start'] ?> day<?= $t['days_until_start'] === 1 ? '' : 's' ?>
+                        <?php elseif ($t['state'] === 'expired'): ?>
+                            · term ended
+                        <?php else: ?>
+                            · <?= (int) $t['days_remaining'] ?> day<?= $t['days_remaining'] === 1 ? '' : 's' ?> left
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
                 <div style="font-size:13.5px; margin-top:6px">
                     <?php foreach (\App\Models\Room::TENURES as $tenure): ?>
                         <?php if (isset($roomPrices[$tenure])): ?>
@@ -57,10 +80,13 @@ portal_header('tenant', 'My stay', 'dashboard');
                     <?php endforeach; ?>
                 </div>
                 <ul class="belive-check-list" style="margin-top:10px">
-                    <?php foreach (\App\Models\Room::amenities((int) $room['id']) as $feature): ?>
+                    <?php foreach ($room['amenities'] as $feature): ?>
                         <li><?= e($feature) ?></li>
                     <?php endforeach; ?>
                 </ul>
+                <div style="margin-top:14px">
+                    <a class="belive-btn-ghost" href="/tenant/my_room">🏠 My room &amp; rental dates</a>
+                </div>
             <?php endif; ?>
         </div>
 

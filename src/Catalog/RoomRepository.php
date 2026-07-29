@@ -71,6 +71,97 @@ final class RoomRepository
         return $room;
     }
 
+    /**
+     * One room with its place in the portfolio attached: the development it
+     * belongs to and the house inside it. rooms.property_name is the fallback
+     * for a room imported before the hierarchy existed.
+     */
+    public static function findWithHierarchy(int $roomId): ?array
+    {
+        $room = Database::run(
+            'SELECT r.*,
+                    COALESCE(p.name, r.property_name) AS property_name,
+                    p.address AS property_address,
+                    u.name AS house_name
+             FROM rooms r
+             LEFT JOIN properties p ON p.id = r.property_id
+             LEFT JOIN property_units u ON u.id = r.unit_id
+             WHERE r.id = ? LIMIT 1',
+            [$roomId]
+        )->fetch();
+
+        if (!$room) {
+            return null;
+        }
+
+        $room = self::decorate($room);
+        $room['images'] = Room::photoUrls($roomId);
+        $room['videos'] = Room::videoUrls($roomId);
+
+        return $room;
+    }
+
+    /**
+     * Rooms like this one, in the same area — "more like where I live" for a
+     * tenant who is already renting from BeLive.
+     *
+     * Strictly the same location: a room across town is not a similar room, so
+     * unlike Room::matches() this never widens the search when nothing matches.
+     * An empty list is the honest answer.
+     *
+     * Ranked by how near the match really is — the same house first (same front
+     * door, same neighbours), then the same development, then the same room
+     * type, then the closest rent at the tenure the tenant is on.
+     */
+    public static function similarInArea(array $room, string $tenure = '12_month', ?float $referenceRent = null, int $limit = 3): array
+    {
+        if (!in_array($tenure, Room::TENURES, true)) {
+            $tenure = '12_month';
+        }
+
+        $roomId = (int) ($room['id'] ?? 0);
+        $location = trim((string) ($room['location'] ?? ''));
+        if ($roomId === 0 || $location === '') {
+            return [];
+        }
+
+        // What the tenant actually pays anchors "similar price"; the room's own
+        // listed rate stands in when no rent is snapshotted on their agreement.
+        $reference = $referenceRent !== null && $referenceRent > 0
+            ? $referenceRent
+            : (Room::prices($roomId)[$tenure]['price'] ?? 0.0);
+
+        $rows = Database::run(
+            "SELECT r.*, rp.price AS price_at_tenure,
+                    COALESCE(p.name, r.property_name) AS property_name,
+                    u.name AS house_name
+             FROM rooms r
+             JOIN room_pricing rp ON rp.room_id = r.id AND rp.tenure = ?
+             LEFT JOIN properties p ON p.id = r.property_id
+             LEFT JOIN property_units u ON u.id = r.unit_id
+             WHERE r.status = 'available'
+               AND r.id <> ?
+               AND r.location = ?
+             ORDER BY COALESCE(r.unit_id = ?, 0) DESC,
+                      COALESCE(r.property_id = ?, 0) DESC,
+                      (r.room_type = ?) DESC,
+                      ABS(rp.price - ?) ASC,
+                      rp.price ASC, r.id ASC
+             LIMIT " . (int) $limit,
+            [
+                $tenure,
+                $roomId,
+                $location,
+                $room['unit_id'] ?? null,
+                $room['property_id'] ?? null,
+                (string) ($room['room_type'] ?? ''),
+                $reference,
+            ]
+        )->fetchAll();
+
+        return array_map([self::class, 'decorate'], $rows);
+    }
+
     /** Featured rooms for the homepage: cheapest available across locations. */
     public static function featured(int $limit = 6): array
     {

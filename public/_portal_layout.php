@@ -59,6 +59,7 @@ function portal_header(string $audience, string $title, string $active = ''): vo
     $nav = $isTenant
         ? [
             'dashboard'    => ['/tenant/dashboard', 'My stay'],
+            'my_room'      => ['/tenant/my_room', 'My room'],
             'electric'     => ['/tenant/electric', 'Electric bill'],
             'rewards'      => ['/tenant/rewards', 'Rent rewards'],
             'verification' => ['/tenant/listing_verification', 'Verified listing'],
@@ -150,4 +151,57 @@ function tenant_room(array $lead): ?array
     )->fetch();
 
     return $booking ? App\Models\Room::find((int) $booking['room_id']) : null;
+}
+
+/**
+ * The room a tenant actually rents, and for how long: their signed agreement,
+ * the room it is for (with its house and development), and the term countdown.
+ *
+ * Falls back to the room their booking is against so somebody whose agreement
+ * is still being drafted still sees where they are moving — with no dates,
+ * because an unsigned document has no term to count down.
+ *
+ * @return array{agreement: ?array, room: ?array, timeline: ?array, source: string}
+ */
+function tenant_tenancy(array $lead): array
+{
+    $agreement = App\Models\DigitalAgreement::currentForTenant((int) $lead['id']);
+
+    if ($agreement !== null && $agreement['room_id'] !== null) {
+        $room = App\Catalog\RoomRepository::findWithHierarchy((int) $agreement['room_id']);
+        if ($room !== null) {
+            return [
+                'agreement' => $agreement,
+                'room'      => $room,
+                'timeline'  => App\Models\DigitalAgreement::timeline($agreement),
+                'source'    => 'agreement',
+            ];
+        }
+    }
+
+    $booked = tenant_room($lead);
+    $room = $booked !== null ? App\Catalog\RoomRepository::findWithHierarchy((int) $booked['id']) : null;
+
+    return [
+        'agreement' => null,
+        'room'      => $room,
+        'timeline'  => null,
+        'source'    => $room !== null ? 'booking' : 'none',
+    ];
+}
+
+/**
+ * The tenure a tenant's own prices should be read at: what they signed for,
+ * else what they told Eve they were leaning toward, else the 12-month rate the
+ * catalog defaults to.
+ */
+function tenant_tenure(array $lead, ?array $agreement): string
+{
+    foreach ([$agreement['tenure'] ?? null, $lead['preferred_tenure'] ?? null] as $candidate) {
+        if (in_array($candidate, App\Models\Room::TENURES, true)) {
+            return (string) $candidate;
+        }
+    }
+
+    return '12_month';
 }

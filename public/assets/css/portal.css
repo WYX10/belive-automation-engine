@@ -341,6 +341,41 @@ a.belive-stat:hover { box-shadow: var(--belive-shadow-lift); transform: translat
 }
 .renewal-offer-teaser p { margin-top: 4px; font-size: 13.5px; }
 
+/* Tenant "My room" — the room they rent, its term, and what else is free in
+   the same area. The term itself reuses .agreement-timeline, so the countdown
+   reads identically on the dashboard, the agreement and here. */
+.tenant-room-card { border-top: 5px solid var(--belive-teal); }
+.tenant-room-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.tenant-room-heading h2 { margin-top: 3px; font-size: 19px; }
+.tenant-room-heading p { margin-top: 3px; font-size: 13px; }
+.tenant-room-code { color: var(--belive-teal-dark); font-family: var(--font-head); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.tenant-room-where { font-weight: 600; }
+.tenant-room-rent { text-align: right; white-space: nowrap; }
+.tenant-room-rent strong { display: block; font-family: var(--font-head); font-size: 22px; color: var(--belive-teal-dark); font-variant-numeric: tabular-nums; }
+.tenant-room-rent span { color: var(--belive-muted); font-size: 12px; }
+.tenant-room-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 16px; }
+.tenant-room-gallery img { width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border: 1px solid var(--belive-line); border-radius: 10px; background: var(--belive-cream); }
+
+.tenant-similar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; margin-top: 14px; }
+.tenant-similar-card {
+  display: flex; flex-direction: column;
+  overflow: hidden; border: 1px solid var(--belive-line); border-radius: 12px;
+  background: var(--belive-white); color: inherit; text-decoration: none;
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+.tenant-similar-card:hover { box-shadow: var(--belive-shadow-lift); transform: translateY(-2px); }
+.tenant-similar-card .photo { aspect-ratio: 4 / 3; background: var(--belive-cream); }
+.tenant-similar-card .photo img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.tenant-similar-card .body { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; flex: 1; padding: 12px 14px 14px; }
+.tenant-similar-card .title { font-family: var(--font-head); font-size: 14.5px; font-weight: 600; line-height: 1.3; }
+.tenant-similar-price { margin-top: auto; padding-top: 4px; font-family: var(--font-head); font-size: 17px; color: var(--belive-teal-dark); font-variant-numeric: tabular-nums; }
+.tenant-similar-price span { color: var(--belive-muted); font-family: var(--font-body); font-size: 11.5px; }
+
+@media (max-width: 620px) {
+  .tenant-room-heading { flex-direction: column; }
+  .tenant-room-rent { text-align: left; }
+}
+
 .utilities-table td { vertical-align: top; }
 
 @media (max-width: 620px) {

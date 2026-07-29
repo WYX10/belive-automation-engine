@@ -190,6 +190,30 @@ BeLive drafts the renewal agreement afterwards through the usual admin → owner
 trip. `expired` is derived (`RenewalOffer::isOpen`), never stored, and `current_rent_rm` is
 snapshotted so re-pricing the room cannot rewrite a saving the tenant has already been shown.
 
-Catalog surfaces: `App\Catalog\RoomRepository` (all page reads), `PricingCalculator`
-(price per tenure + saving vs flexible), `RoomRecommender` (candidate block for DecideSkill;
-recommendations logged to `ai_activity_log` as `room_recommendation` with the model).
+### Tenant's own room (`/tenant/my_room`)
+
+"My room" is the tenant-side mirror of `/owner/tenancies`: the room they rent, how long they
+have it for, and what else is free in their area.
+
+Which room that is comes from `DigitalAgreement::currentForTenant()` — their **signed**
+agreement (`completed`, both dates set), never a viewing they once booked, with the room's
+development and house joined on. A tenant can hold several tenancies over time, so the one
+closest to today wins: live, then about to start, then most recently ended.
+`tenant_tenancy()` (in `public/_portal_layout.php`) wraps that and falls back to the booked
+room for somebody whose agreement is still being drafted — with **no dates**, because an
+unsigned document has no term to count down. The countdown itself is the shared
+`DigitalAgreement::timeline()` block, so the dashboard, the agreement page, this page and the
+owner's tenancy list can never disagree; `::termLabel()` names the whole term ("12 months").
+
+Recommendations come from `RoomRepository::similarInArea()` and are **strictly same-area**:
+unlike `Room::matches()` it never widens the search, so an empty list is the honest answer
+rather than a room across town. Available rooms only, the tenant's own room excluded, ranked
+same house → same development → same room type → closest rent to what they actually pay
+(the rent snapshotted on their agreement, falling back to the room's listed rate), priced at
+the tenure they signed for. `RoomRepository::findWithHierarchy()` is the room read behind both
+halves. Proven by `tests/TenantRoomViewTest.php`.
+
+Catalog surfaces: `App\Catalog\RoomRepository` (all page reads, incl. `findWithHierarchy` /
+`similarInArea`), `PricingCalculator` (price per tenure + saving vs flexible), `RoomRecommender`
+(candidate block for DecideSkill; recommendations logged to `ai_activity_log` as
+`room_recommendation` with the model).
