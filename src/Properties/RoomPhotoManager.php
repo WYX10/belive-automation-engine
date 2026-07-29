@@ -12,6 +12,8 @@ use Throwable;
 final class RoomPhotoManager
 {
     private const UPLOAD_DIR = '/assets/img/uploads/rooms';
+    /** Where generate_room_placeholders.php puts the "photo coming soon" line art. */
+    private const PLACEHOLDER_DIR = '/assets/img/rooms/placeholders/';
     private const MAX_BYTES = 5 * 1024 * 1024;
     private const MAX_PIXELS = 25_000_000;
     private const MIME_EXTENSIONS = [
@@ -132,7 +134,23 @@ final class RoomPhotoManager
             }
         }
 
+        $pdo = Database::pdo();
+        $owns = !$pdo->inTransaction();
         try {
+            if ($owns) {
+                $pdo->beginTransaction();
+            }
+
+            // A real photograph retires the room's "photo coming soon" line art.
+            // Without this the placeholder keeps sort_order 0 and stays the
+            // room's cover everywhere photoUrls()[0] is read — public cards,
+            // social drafts, WhatsApp sends — so an admin who just uploaded a
+            // photo would still see "photo coming soon" on the live listing.
+            Database::run(
+                'DELETE FROM room_images WHERE room_id = ? AND image_path LIKE ?',
+                [$roomId, self::PLACEHOLDER_DIR . '%']
+            );
+
             $sortOrder = (int) Database::run(
                 'SELECT COALESCE(MAX(sort_order), -1) + 1 FROM room_images WHERE room_id = ?',
                 [$roomId]
@@ -141,8 +159,15 @@ final class RoomPhotoManager
                 'INSERT INTO room_images (room_id, image_path, sort_order) VALUES (?, ?, ?)',
                 [$roomId, self::UPLOAD_DIR . '/' . $filename, $sortOrder]
             );
-            $id = (int) Database::pdo()->lastInsertId();
+            $id = (int) $pdo->lastInsertId();
+
+            if ($owns) {
+                $pdo->commit();
+            }
         } catch (Throwable $e) {
+            if ($owns && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             if (is_file($absolutePath) && !unlink($absolutePath)) {
                 error_log('[room photo] Could not remove orphaned file ' . basename($absolutePath));
             }
