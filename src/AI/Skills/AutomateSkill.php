@@ -18,7 +18,7 @@ use App\Models\Lead;
 final class AutomateSkill
 {
     /**
-     * @return array{sent:bool, dry_run:bool, message_kinds:string[]}
+     * @return array{sent:bool, dry_run:bool, delivered:bool, message_kinds:string[]}
      */
     public static function run(
         array $lead,
@@ -71,8 +71,7 @@ final class AutomateSkill
             'direction'    => 'outbound',
             'message_out'  => $replyText,
             'message_kind' => $kind,
-            'reasoning'    => $decision['reasoning']
-                . ($sent['dry_run'] ? ' (dry-run: no WhatsApp credential configured — logged, not delivered)' : ''),
+            'reasoning'    => $decision['reasoning'] . WhatsAppClient::deliveryNote($sent),
             'memory_used'  => $decision['memory_ids'],
             'response_ms'  => $totalMs,
         ]);
@@ -88,7 +87,12 @@ final class AutomateSkill
             $decision['recommendation']
         );
 
-        return ['sent' => true, 'dry_run' => $dryRun, 'message_kinds' => $kinds];
+        return [
+            'sent'          => true,
+            'dry_run'       => $dryRun,
+            'delivered'     => empty($sent['failed']),
+            'message_kinds' => $kinds,
+        ];
     }
 
     /**

@@ -37,6 +37,22 @@ final class Interaction extends BaseModel
         return $minutes === null || $minutes === false ? null : (int) $minutes;
     }
 
+    /**
+     * Minutes since this lead's last INBOUND message, on the database clock —
+     * the measure WhatsApp's 24-hour customer service window is judged on.
+     * Null when they have never messaged us.
+     */
+    public static function minutesSinceLastInbound(int $leadId): ?int
+    {
+        $minutes = Database::run(
+            "SELECT TIMESTAMPDIFF(MINUTE, MAX(created_at), NOW()) FROM ai_interactions
+             WHERE lead_id = ? AND direction = 'inbound'",
+            [$leadId]
+        )->fetchColumn();
+
+        return $minutes === null || $minutes === false ? null : (int) $minutes;
+    }
+
     /** Chronological conversation transcript (outbound replies + inbound). */
     public static function transcript(int $leadId, int $limit = 50): array
     {

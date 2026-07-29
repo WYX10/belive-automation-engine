@@ -79,7 +79,7 @@ final class ConfirmationSender
             'message_out'  => implode("\n", $lines),
             'message_kind' => 'booking_confirmation',
             'reasoning'    => 'Automated booking confirmation for booking #' . $booking['id']
-                . ($sent['dry_run'] ? ' (dry-run: no WhatsApp credential configured)' : ''),
+                . \App\Integrations\WhatsApp\WhatsAppClient::deliveryNote($sent),
         ]);
     }
 

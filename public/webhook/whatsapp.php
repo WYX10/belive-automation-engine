@@ -58,8 +58,28 @@ try {
     $object = $payload['object'] ?? '';
 
     if ($object === 'whatsapp_business_account') {
+        // A failed delivery is reported here and nowhere else — record it
+        // against the lead so "sent" in the dashboard always means arrived.
+        foreach (WebhookParser::parseFailedStatuses($payload) as $failure) {
+            $lead = \App\Models\Lead::findByPhone($failure['recipient']);
+            \App\AI\Memory\EpisodicLogger::activity(
+                'wa_delivery_failed',
+                'conversion',
+                null,
+                $lead === null ? null : (int) $lead['id'],
+                sprintf(
+                    'WhatsApp could not deliver %s to %s — [%d] %s%s',
+                    $failure['message_id'] !== '' ? 'message ' . $failure['message_id'] : 'a message',
+                    $failure['recipient'],
+                    $failure['code'],
+                    $failure['title'],
+                    $failure['details'] !== '' ? ': ' . $failure['details'] : ''
+                )
+            );
+        }
+
         if (WebhookParser::isStatusOnly($payload)) {
-            return; // delivery/read receipts — nothing to do
+            return; // sent/delivered/read receipts — the failures are handled above
         }
         $manager = new ConversationManager();
         foreach (WebhookParser::parseInboundMessages($payload) as $message) {
