@@ -40,12 +40,15 @@ final class ClaudeClient implements LlmClient
                     'anthropic-version' => self::API_VERSION,
                     'content-type'      => 'application/json',
                 ],
+                // No 'temperature': current Claude models (Sonnet 5, Opus 4.8 and
+                // newer) reject it outright — steer them with the prompt instead.
+                // Callers still pass it; the other providers' clients honour it.
                 'json' => [
                     'model'      => $this->model,
                     'max_tokens' => $opts['max_tokens'] ?? 1024,
                     'system'     => $system,
                     'messages'   => $messages,
-                ] + (isset($opts['temperature']) ? ['temperature' => $opts['temperature']] : []),
+                ],
             ]);
         } catch (BadResponseException $e) {
             $body = mb_substr((string) $e->getResponse()->getBody(), 0, 400);
