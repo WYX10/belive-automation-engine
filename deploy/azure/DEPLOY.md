@@ -93,7 +93,7 @@ php -r "echo password_hash('yourpassword', PASSWORD_BCRYPT);"  # ADMIN_PASSWORD_
 
 ---
 
-## Phase 5 — Run migrations
+## Phase 5 — Run migrations and load the catalog
 In the same SSH/Kudu shell:
 ```bash
 cd /home/site/wwwroot
@@ -103,11 +103,38 @@ MySQL Flexible Server requires TLS by default; if migrate.php can't connect, add
 `?sslmode=require`-equivalent by enabling the server's "Require secure transport
 = OFF" toggle for the demo, or configure the CA — simplest for a demo is OFF.
 
+### Load the room catalog
+Migrations build the schema but leave it empty, so a fresh cloud DB has no rooms
+until these three run — in this order, in the same shell:
+```bash
+php database/import_room_listings.php database/seeds/room_listings.csv
+php database/generate_room_placeholders.php --attach
+php database/attach_real_room_media.php
+```
+1. **Import** — 177 rooms across 47 properties from the listing book.
+2. **Placeholders** — gives every photoless room the "photo coming soon" line art
+   for its room type. Only ever fills a genuine gap; it skips any room that
+   already has an image, so it can't displace real photography.
+3. **Real media** — attaches the Emporis and Riamas photography and the three
+   DJI tour clips to the 7 rooms they actually depict, retiring those rooms'
+   placeholders.
+
+Expect the last script to end with `170 placeholders remaining` — that is the
+correct number, one per room nobody has photographed yet, not a failure.
+
+All three are idempotent, so re-run them freely. Step 3 in particular is easy to
+forget on a redeploy: the image files ship with the repo, but nothing attaches
+them to rooms without it, and the symptom is real units showing "photo coming
+soon" on the live site.
+
 ---
 
 ## Phase 6 — Smoke test
 - Visit `https://belive-engine.azurewebsites.net/` (public site) and
   `/admin/login` (admin panel).
+- On `/rooms`, search "Riamas" and "Emporis". Those 7 rooms must show real
+  photographs — if they show "photo coming soon", step 3 of the catalog load
+  didn't run. Every other property is expected to show placeholders.
 - In Admin -> Credentials, re-add and activate: WhatsApp, Meta Graph (page_id +
   ig_user_id), and your AI provider key.
 
