@@ -58,7 +58,7 @@ define('MEMORY_DECAY_STEP', 0.25);
 
 define('BOOKING_STATUSES', ['pending', 'confirmed', 'cancelled', 'completed']);
 
-define('CONTENT_POST_STATUSES', ['draft', 'approved', 'rejected', 'posted']);
+define('CONTENT_POST_STATUSES', ['draft', 'scheduled', 'approved', 'rejected', 'posted']);
 define('CONTENT_PLATFORMS', ['facebook', 'instagram', 'tiktok']);
 // content_posts.media_kind — a photo post or a rendered vertical promo reel.
 define('CONTENT_MEDIA_KINDS', ['image', 'video']);
@@ -80,6 +80,19 @@ define('CONTENT_CAPTION_MAX', 2000);
 // 'simulated' = dry-run (no active credential), clearly badged, never passed
 // off as a real platform post.
 define('CONTENT_PUBLISH_STATUSES', ['published', 'simulated', 'failed']);
+
+// content_posts.schedule_source — where the publish time came from: a slot the
+// timing advisor suggested, a date the admin typed, or the studio's own default
+// for an auto-drafted post.
+define('CONTENT_SCHEDULE_SOURCES', ['suggested', 'custom', 'auto']);
+// How far back PostTimingAdvisor reads engagement when building the weekly
+// heatmap, and how far ahead a post may be scheduled. A month of runway is
+// plenty for a room listing whose price and availability move.
+define('CONTENT_TIMING_WINDOW_DAYS', 90);
+define('CONTENT_SCHEDULE_MAX_DAYS', 30);
+// A scheduled slot must be far enough out that the five-minute publisher cron
+// actually gets there before it — anything sooner should just publish now.
+define('CONTENT_SCHEDULE_MIN_LEAD_MINUTES', 10);
 
 define('REFERRAL_REWARD_STATUSES', ['pending', 'credited']);
 define('REFERRAL_REWARD_POINTS', 50); // fixed points per successful referral

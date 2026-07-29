@@ -78,11 +78,12 @@ foreach ($platforms as $platform) {
 
     try {
         // Least-recently-featured available room with nothing pending on this
-        // platform — the LEFT JOIN ... IS NULL is the duplicate guard.
+        // platform — the LEFT JOIN ... IS NULL is the duplicate guard. A room
+        // already waiting for its scheduled slot counts as pending too.
         $room = Database::run(
             "SELECT r.* FROM rooms r
              LEFT JOIN content_posts p ON p.room_id = r.id AND p.platform = ?
-                  AND p.status IN ('draft', 'approved')
+                  AND p.status IN ('draft', 'scheduled', 'approved')
              WHERE r.status = 'available' AND p.id IS NULL
              ORDER BY (SELECT MAX(created_at) FROM content_posts WHERE room_id = r.id) IS NOT NULL,
                       (SELECT MAX(created_at) FROM content_posts WHERE room_id = r.id) ASC,

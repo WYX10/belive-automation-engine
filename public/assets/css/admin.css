@@ -655,3 +655,94 @@ a.admin-hier-card:focus-visible { outline: 3px solid var(--belive-teal); outline
   .agreement-particulars > div { flex-direction: column; gap: 2px; }
   .agreement-particulars dd { text-align: left; }
 }
+
+/* ── Best time to post ──────────────────────────────────────────────────────
+   One week at a glance: 7 rows (Mon..Sun) x 24 hourly cells. Intensity is the
+   slot's score, passed per cell as --i, so the grid is pure CSS over data the
+   server already computed — no chart library, no client-side maths. */
+
+.timing-scroll { overflow-x: auto; padding-bottom: 4px; }
+.timing-grid {
+  display: grid;
+  grid-template-columns: 34px repeat(24, minmax(13px, 1fr));
+  gap: 2px;
+  min-width: 560px;
+}
+.timing-grid-label {
+  font-size: 10.5px;
+  color: var(--belive-muted);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+.timing-grid-hour {
+  font-size: 10px;
+  color: var(--belive-muted);
+  text-align: center;
+  padding-bottom: 2px;
+}
+.timing-cell {
+  aspect-ratio: 1 / 1;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  /* Empty slots stay visible as a faint tile rather than disappearing. */
+  background:
+    linear-gradient(rgba(245, 131, 60, var(--i, 0)), rgba(245, 131, 60, var(--i, 0))),
+    var(--belive-cream);
+}
+.timing-cell.is-pick {
+  border-color: var(--belive-teal);
+  box-shadow: 0 0 0 1px var(--belive-teal);
+}
+.timing-cell.is-now { border-color: var(--belive-ink); }
+
+.timing-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--belive-muted);
+  flex-wrap: wrap;
+}
+.timing-legend-scale {
+  display: flex;
+  gap: 2px;
+}
+.timing-legend-scale span {
+  width: 15px;
+  height: 11px;
+  border-radius: 3px;
+  background:
+    linear-gradient(rgba(245, 131, 60, var(--i)), rgba(245, 131, 60, var(--i))),
+    var(--belive-cream);
+}
+
+/* The suggested slots, as pickable cards. The radio itself is the label's
+   input so the whole card is a hit target. */
+.timing-picks { display: flex; gap: 10px; flex-wrap: wrap; }
+.timing-pick {
+  flex: 1 1 200px;
+  border: 1px solid var(--belive-line);
+  border-radius: 12px;
+  padding: 11px 13px;
+  background: var(--belive-white);
+  cursor: pointer;
+  font-weight: 400;
+  display: block;
+  min-width: 0;
+}
+.timing-pick:hover { border-color: var(--belive-teal); }
+.timing-pick:has(input:checked) {
+  border-color: var(--belive-orange);
+  background: var(--belive-orange-soft);
+}
+.timing-pick input { margin-right: 6px; }
+.timing-pick strong { font-size: 13.5px; }
+.timing-pick-when { font-size: 12.5px; color: var(--belive-muted); margin-top: 2px; }
+.timing-pick-why { font-size: 11.5px; color: var(--belive-muted); margin-top: 4px; line-height: 1.45; }
+
+@media (max-width: 560px) {
+  .timing-pick { flex: 1 1 100%; }
+}

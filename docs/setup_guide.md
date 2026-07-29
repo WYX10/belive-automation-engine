@@ -178,6 +178,9 @@ would otherwise loop forever.
 |---|---|---|
 | `php cron/learning_job.php` | every 15–30 min | drop-off pattern detection (aggregate), batch rule distillation, rule reinforcement |
 | `php cron/memory_decay.php` | daily | decay stale rules, retire below-threshold ones |
+| `php cron/publish_scheduled.php` | every 5 min | publish content posts whose scheduled slot has arrived — this is what makes "pick a time" work |
+| `php cron/publish_retry.php` | every 30 min | retry approved posts whose platform publish errored |
+| `php cron/auto_draft_content.php` | daily | draft the day's posts for admin approval |
 
 Windows Task Scheduler or crontab both work — plain CLI PHP scripts. (The synchronous learning
 path — admin flags and customer corrections — needs no cron at all.)

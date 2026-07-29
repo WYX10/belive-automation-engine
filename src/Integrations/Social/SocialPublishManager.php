@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Integrations\Social;
 
 use App\AI\Memory\EpisodicLogger;
+use App\Content\PostTimingAdvisor;
 use App\Core\Database;
 use App\Models\Room;
 use InvalidArgumentException;
@@ -19,7 +20,14 @@ use Throwable;
  *     real success -> status=posted,   publish_status=published
  *     dry-run      -> status=posted,   publish_status=simulated
  *     error        -> status=approved, publish_status=failed (Retry available)
- *   draft --reject--> status=rejected (note required)
+ *   draft --schedule(when)--> status=scheduled, scheduled_for=when
+ *   scheduled --due (cron/publish_scheduled.php)--> the same publish attempt
+ *   scheduled --unschedule--> status=draft
+ *   draft|scheduled --reject--> status=rejected (note required)
+ *
+ * A scheduled post is its own status rather than an approved row with a future
+ * date: cron/publish_retry.php sweeps up every approved row whose publish has
+ * not run, and must not touch one that is waiting for its slot.
  *
  * The approval itself commits inside a short transaction with an optimistic
  * review_version check (same pattern as PropertyReviewManager::review); the
@@ -28,10 +36,10 @@ use Throwable;
  */
 final class SocialPublishManager
 {
-    /** @return array{pending:int, failed:int, posted:int, rejected:int, all:int} */
+    /** @return array{pending:int, scheduled:int, failed:int, posted:int, rejected:int, all:int} */
     public static function counts(): array
     {
-        $counts = ['pending' => 0, 'failed' => 0, 'posted' => 0, 'rejected' => 0, 'all' => 0];
+        $counts = ['pending' => 0, 'scheduled' => 0, 'failed' => 0, 'posted' => 0, 'rejected' => 0, 'all' => 0];
         foreach (Database::run(
             "SELECT status, COALESCE(publish_status, '') AS publish_status, COUNT(*) AS total
              FROM content_posts GROUP BY status, publish_status"
@@ -39,10 +47,11 @@ final class SocialPublishManager
             $total = (int) $row['total'];
             $counts['all'] += $total;
             match (true) {
-                $row['status'] === 'draft'    => $counts['pending'] += $total,
-                $row['status'] === 'approved' => $counts['failed'] += $total,
-                $row['status'] === 'posted'   => $counts['posted'] += $total,
-                $row['status'] === 'rejected' => $counts['rejected'] += $total,
+                $row['status'] === 'draft'     => $counts['pending'] += $total,
+                $row['status'] === 'scheduled' => $counts['scheduled'] += $total,
+                $row['status'] === 'approved'  => $counts['failed'] += $total,
+                $row['status'] === 'posted'    => $counts['posted'] += $total,
+                $row['status'] === 'rejected'  => $counts['rejected'] += $total,
                 default => null,
             };
         }
@@ -50,13 +59,133 @@ final class SocialPublishManager
         return $counts;
     }
 
-    /** @return array<string, mixed> the post row after approval + publish attempt */
+    /**
+     * Publish now. Also the door a scheduled post goes through when its slot
+     * arrives (cron/publish_scheduled.php) or when an admin decides not to wait.
+     *
+     * @return array<string, mixed> the post row after approval + publish attempt
+     */
     public static function approveAndPublish(int $postId, string $reviewer, int $expectedVersion): array
     {
-        $post = self::transition($postId, $reviewer, $expectedVersion, 'approved', null, ['draft']);
+        $post = self::transition($postId, $reviewer, $expectedVersion, 'approved', null, ['draft', 'scheduled']);
         EpisodicLogger::activity('content_approved', 'content_creation', $post['generated_by_model'], null, "post #$postId on {$post['platform']} by $reviewer");
 
         return self::attemptPublish($post);
+    }
+
+    /**
+     * Approve a draft for a time instead of for right now. The time is normally
+     * one of PostTimingAdvisor's suggested slots; whatever it is, the admin
+     * picked it, and cron/publish_scheduled.php is what acts on it.
+     *
+     * @param string $when   'Y-m-d H:i:s' in the app timezone
+     * @param string $source one of CONTENT_SCHEDULE_SOURCES
+     * @return array<string, mixed>
+     */
+    public static function schedule(int $postId, string $reviewer, int $expectedVersion, string $when, string $source = 'custom'): array
+    {
+        if (!in_array($source, CONTENT_SCHEDULE_SOURCES, true)) {
+            throw new InvalidArgumentException('Unknown schedule source.');
+        }
+
+        $at = self::parseScheduleTime($when);
+        $post = self::transition(
+            $postId,
+            $reviewer,
+            $expectedVersion,
+            'scheduled',
+            null,
+            ['draft', 'scheduled'],
+            requireUnpublished: true,
+            set: [
+                'scheduled_for'   => $at->format('Y-m-d H:i:s'),
+                'scheduled_by'    => trim($reviewer),
+                'schedule_source' => $source,
+            ]
+        );
+
+        EpisodicLogger::activity(
+            'content_scheduled',
+            'content_creation',
+            $post['generated_by_model'],
+            null,
+            "post #$postId on {$post['platform']} scheduled for {$at->format('D j M Y H:i')} by $reviewer ($source)"
+        );
+
+        return $post;
+    }
+
+    /**
+     * Take a post back off the schedule — it returns to the drafts queue
+     * untouched, nothing having gone out.
+     *
+     * @return array<string, mixed>
+     */
+    public static function unschedule(int $postId, string $reviewer, int $expectedVersion): array
+    {
+        $post = self::transition(
+            $postId,
+            $reviewer,
+            $expectedVersion,
+            'draft',
+            null,
+            ['scheduled'],
+            set: ['scheduled_for' => null, 'scheduled_by' => null, 'schedule_source' => null]
+        );
+
+        EpisodicLogger::activity('content_unscheduled', 'content_creation', $post['generated_by_model'], null, "post #$postId on {$post['platform']} by $reviewer");
+
+        return $post;
+    }
+
+    /**
+     * Posts whose slot has arrived, oldest first. The publisher cron's queue.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function due(int $max = 10): array
+    {
+        return Database::run(
+            "SELECT id, platform, review_version, scheduled_for FROM content_posts
+             WHERE status = 'scheduled' AND scheduled_for IS NOT NULL AND scheduled_for <= NOW()
+             ORDER BY scheduled_for ASC
+             LIMIT " . max(1, min(100, $max))
+        )->fetchAll();
+    }
+
+    /**
+     * A schedule is only worth setting if the publisher can still get there:
+     * far enough ahead for the cron to see it, and inside the window where the
+     * room's price and availability are still what the caption claims.
+     */
+    private static function parseScheduleTime(string $when): \DateTimeImmutable
+    {
+        $when = trim($when);
+        // <input type="datetime-local"> posts 'Y-m-dTH:i'; normalise it first.
+        $when = str_replace('T', ' ', $when);
+        $zone = new \DateTimeZone(PostTimingAdvisor::TIMEZONE);
+
+        try {
+            $at = new \DateTimeImmutable($when, $zone);
+        } catch (\Throwable) {
+            throw new InvalidArgumentException('That is not a valid date and time.');
+        }
+
+        $now = PostTimingAdvisor::now();
+        if ($at < $now->modify('+' . CONTENT_SCHEDULE_MIN_LEAD_MINUTES . ' minutes')) {
+            throw new InvalidArgumentException(
+                'Pick a time at least ' . CONTENT_SCHEDULE_MIN_LEAD_MINUTES
+                . ' minutes from now — anything sooner should just be published now.'
+            );
+        }
+        if ($at > $now->modify('+' . CONTENT_SCHEDULE_MAX_DAYS . ' days')) {
+            throw new InvalidArgumentException(
+                'Schedule within the next ' . CONTENT_SCHEDULE_MAX_DAYS
+                . ' days — a room\'s price and availability move, and the caption would go stale.'
+            );
+        }
+
+        return $at->setTime((int) $at->format('G'), (int) $at->format('i'));
     }
 
     /** @return array<string, mixed> */
@@ -66,7 +195,7 @@ final class SocialPublishManager
             throw new InvalidArgumentException('Add a rejection reason so the next draft can improve.');
         }
 
-        $post = self::transition($postId, $reviewer, $expectedVersion, 'rejected', trim($note), ['draft']);
+        $post = self::transition($postId, $reviewer, $expectedVersion, 'rejected', trim($note), ['draft', 'scheduled']);
         EpisodicLogger::activity('content_rejected', 'content_creation', $post['generated_by_model'], null, "post #$postId on {$post['platform']}: " . mb_substr(trim($note), 0, 200));
 
         return $post;
@@ -153,6 +282,7 @@ final class SocialPublishManager
      * pattern). Returns the fresh row after commit.
      *
      * @param string[] $fromStatuses
+     * @param array<string, ?string> $set extra columns to write (schedule fields only)
      */
     private static function transition(
         int $postId,
@@ -161,7 +291,8 @@ final class SocialPublishManager
         string $toStatus,
         ?string $note,
         array $fromStatuses,
-        bool $requireUnpublished = false
+        bool $requireUnpublished = false,
+        array $set = []
     ): array {
         $reviewer = trim($reviewer);
         if ($reviewer === '') {
@@ -191,11 +322,23 @@ final class SocialPublishManager
                 throw new RuntimeException('This post already published — nothing to retry.');
             }
 
+            // Only the schedule columns may ride along — the caller passes
+            // column names, so the whitelist is what keeps that safe.
+            $extra = '';
+            $extraValues = [];
+            foreach ($set as $column => $value) {
+                if (!in_array($column, ['scheduled_for', 'scheduled_by', 'schedule_source'], true)) {
+                    throw new InvalidArgumentException("Column '$column' cannot be set by a transition.");
+                }
+                $extra .= ", $column = ?";
+                $extraValues[] = $value;
+            }
+
             Database::run(
                 'UPDATE content_posts
-                 SET status = ?, review_note = ?, reviewed_by = ?, reviewed_at = NOW(), review_version = ?
+                 SET status = ?, review_note = ?, reviewed_by = ?, reviewed_at = NOW(), review_version = ?' . $extra . '
                  WHERE id = ?',
-                [$toStatus, $note, $reviewer, $expectedVersion + 1, $postId]
+                array_merge([$toStatus, $note, $reviewer, $expectedVersion + 1], $extraValues, [$postId])
             );
             $fresh = Database::run('SELECT * FROM content_posts WHERE id = ?', [$postId])->fetch();
             $pdo->commit();
