@@ -28,9 +28,9 @@ $totalEngagement = (int) Database::run(
     "SELECT COUNT(*) FROM ai_interactions WHERE direction IN ('inbound','outbound')"
 )->fetchColumn();
 
-// --- Live lead detail: the ten most recently active leads, each carrying its
+// --- Live lead detail: the ten leads most likely to close, each carrying its
 // own transcript behind a button so the busiest lead never buries the rest.
-$liveLeads = Lead::mostRecentlyActive(10);
+$liveLeads = Lead::hottest(10);
 $transcripts = [];
 foreach ($liveLeads as $lead) {
     $transcripts[(int) $lead['id']] = Interaction::transcript((int) $lead['id'], 6);
@@ -74,8 +74,9 @@ admin_header('Dashboard', 'dashboard');
         <p class="belive-muted">No leads yet — they'll appear here the moment Eve captures one
         (WhatsApp, website form, social, referral, or manual intake).</p>
     <?php else: ?>
-        <p class="belive-muted" style="font-size:13px">The ten most recently active leads. Open a
-        conversation to read exactly what Eve said, without leaving this page.</p>
+        <p class="belive-muted" style="font-size:13px">The ten leads Eve rates most likely to close,
+        highest closing probability first. Open a conversation to read exactly what Eve said,
+        without leaving this page.</p>
         <div class="dash-lead-list">
             <?php foreach ($liveLeads as $lead): ?>
                 <?php
