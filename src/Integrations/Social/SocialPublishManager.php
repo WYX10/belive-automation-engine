@@ -218,13 +218,23 @@ final class SocialPublishManager
     private static function attemptPublish(array $post): array
     {
         $postId = (int) $post['id'];
+        $mediaKind = $post['media_kind'] ?? 'image';
         // Instagram polls its media container until Meta finishes fetching the
-        // image, so a publish can legitimately outlive the default 30s limit.
-        set_time_limit(120);
+        // image, so a publish can legitimately outlive the default 30s limit —
+        // and a reel is transcoded, not just fetched, so it needs longer again.
+        set_time_limit($mediaKind === 'video' ? 300 : 120);
 
         try {
+            $mediaUrl = self::resolveMediaUrl($post);
+            // A reel whose render never landed must fail as a reel. Falling
+            // back to its poster frame would publish a photo the admin never
+            // approved.
+            if ($mediaKind === 'video' && $mediaUrl === null) {
+                throw new RuntimeException('This post is a promo video but has no rendered video attached — regenerate it in the content studio.');
+            }
+
             $result = self::publisherFor($post['platform'])
-                ->publish($post['caption'], self::resolveImageUrl($post));
+                ->publish($post['caption'], $mediaUrl, $mediaKind);
 
             $publishStatus = $result['dry_run'] ? 'simulated' : 'published';
             Database::run(
@@ -263,9 +273,19 @@ final class SocialPublishManager
     }
 
     /**
-     * The post's stored image, else the room's first photo. Site-local paths
-     * (/assets/img/rooms/...) become absolute — platforms fetch media by URL,
-     * so APP_URL must be the public base (same rule as WhatsApp image sends).
+     * What actually gets published: the rendered video for a video post, the
+     * photo for everything else.
+     */
+    public static function resolveMediaUrl(array $post): ?string
+    {
+        return ($post['media_kind'] ?? 'image') === 'video'
+            ? self::absolute($post['video_url'] ?? null)
+            : self::resolveImageUrl($post);
+    }
+
+    /**
+     * The post's stored image, else the room's first photo. For a video post
+     * this is the poster frame the studio previews, not what gets published.
      */
     public static function resolveImageUrl(array $post): ?string
     {
@@ -273,13 +293,23 @@ final class SocialPublishManager
         if (($url === null || $url === '') && !empty($post['room_id'])) {
             $url = Room::photoUrls((int) $post['room_id'])[0] ?? null;
         }
+
+        return self::absolute($url);
+    }
+
+    /**
+     * Site-local paths (/assets/img/rooms/...) become absolute — platforms
+     * fetch media by URL, so APP_URL must be the public base (same rule as
+     * WhatsApp image sends).
+     */
+    private static function absolute(?string $url): ?string
+    {
         if ($url === null || $url === '') {
             return null;
         }
-        if (str_starts_with($url, '/')) {
-            $url = rtrim($_ENV['APP_URL'] ?? 'http://localhost:8080', '/') . $url;
-        }
 
-        return $url;
+        return str_starts_with($url, '/')
+            ? rtrim($_ENV['APP_URL'] ?? 'http://localhost:8080', '/') . $url
+            : $url;
     }
 }

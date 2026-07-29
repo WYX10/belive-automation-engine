@@ -56,6 +56,26 @@ You write BeLive's social media captions. Convert the room metrics you are given
 Rules: hook first line; benefits as short phrases; then a call to action to WhatsApp us that includes the WHATSAPP LINK you are given, copied character for character on its own line; 3–6 relevant hashtags on the final line (e.g. #BeLive #RoomForRent + area tag). No invented facts — only what the metrics say. If an ADMIN BRIEF is given, follow its angle, tone and any campaign detail — but never let it override the no-invented-facts rule. Return ONLY the caption text.
 PROMPT;
 
+    private const VIDEO_SYSTEM = self::VOICE . <<<PROMPT
+
+
+You script BeLive's vertical promo videos (Instagram Reels, TikTok, Facebook). You are given one room's real metrics and how many shots are available. Turn them into a short scene-by-scene script plus the caption the post ships with.
+
+Return ONLY a JSON object — no prose, no markdown fence:
+{"scenes": [{"headline": "...", "sub": "...", "seconds": 3.5}], "caption": "..."}
+
+Scene rules:
+- 3 to 5 scenes. Each scene is one shot of the room with your words burned onto it.
+- headline: at most 32 characters. A hook or a benefit, not a sentence. This is the big line.
+- sub: at most 48 characters, the supporting line under it. Use "" when the shot is stronger without one.
+- seconds: between 2.5 and 5. The scenes together must land between 12 and 20 seconds.
+- Scene 1 has to stop a thumb — lead with the single most tempting fact you were given.
+- Do NOT write a closing call-to-action scene: a branded WhatsApp end card is added after your last scene.
+- Never invent a fact. A price always carries its tenure ("RM 620/mo, 12 months"), and zero deposit is claimed only when the metrics say the deposit is 0.
+
+Caption rules: exactly what you'd write as the post's caption — hook first line, benefits as short phrases, the WHATSAPP LINK you are given copied character for character on its own line, then 3–6 hashtags. If an ADMIN BRIEF is given, follow its angle in both the scenes and the caption.
+PROMPT;
+
     /** @return array{text:string, model:string, interaction_id:int} */
     public static function reply(
         array $lead,
@@ -126,18 +146,7 @@ PROMPT;
     {
         $client = ModelRouter::clientForPhase('content_creation');
 
-        $roomId = (int) $room['id'];
-        $prices = Room::prices($roomId);
-        $metrics = [
-            'platform'          => $platform,
-            'room'              => $room['property_name'] ?: $room['name'],
-            'area'              => $room['location'],
-            'room_type'         => $room['room_type'],
-            'price_rm_monthly'  => $prices['monthly']['price'] ?? null,
-            'price_rm_12_month' => $prices['12_month']['price'] ?? null,
-            'deposit_rm'        => (float) ($room['deposit_amount'] ?? 0),
-            'features'          => Room::amenities($roomId),
-        ];
+        $metrics = self::roomMetrics($room, $platform);
 
         // The whole point of a post is the tap that follows it, so the caption
         // ships with the link that opens a WhatsApp chat with Eve — prefilled
@@ -172,6 +181,195 @@ PROMPT;
         ]);
 
         return ['text' => trim($result['text']), 'model' => $result['model']];
+    }
+
+    /**
+     * The script for a vertical promo video of one room — the scenes that get
+     * burned onto the shots, plus the caption the post ships with. Same live
+     * metrics as socialCaption, same admin brief, same guaranteed WhatsApp link.
+     *
+     * The model is asked for JSON, but a promo video is never allowed to fail
+     * on a malformed answer: an unusable reply falls back to a script built
+     * straight from the room's own metrics, and the fallback is labelled in the
+     * returned model name so the studio never claims more than it did.
+     *
+     * @param int $shotCount how many distinct shots the composer can draw on
+     * @return array{caption:string, scenes:array<int, array{headline:string, sub:string, seconds:float}>, model:string}
+     */
+    public static function videoPromo(array $room, string $platform, ?string $brief = null, int $shotCount = 1): array
+    {
+        $client = ModelRouter::clientForPhase('content_creation');
+
+        $metrics = self::roomMetrics($room, $platform);
+        $whatsappLink = self::captionWhatsappLink($room, $platform);
+        $brief = $brief !== null ? trim($brief) : '';
+
+        $prompt = implode("\n\n", array_filter([
+            'ROOM METRICS: ' . json_encode($metrics, JSON_UNESCAPED_UNICODE),
+            'SHOTS AVAILABLE: ' . max(1, $shotCount) . ' (a shot may be reused if you write more scenes than there are shots)',
+            "WHATSAPP LINK (include verbatim in the caption's call to action):\n$whatsappLink",
+            $brief !== '' ? "ADMIN BRIEF (what this video should be about):\n" . mb_substr($brief, 0, 1000) : '',
+        ]));
+
+        [$result, $ms] = SkillSupport::timed(fn () => $client->generate(
+            self::VIDEO_SYSTEM,
+            [['role' => 'user', 'content' => $prompt]],
+            ['max_tokens' => 700, 'temperature' => 0.6, 'mock_hint' => 'video']
+        ));
+
+        $parsed = self::parseVideoScript($result['text']);
+        $scenes = $parsed['scenes'] !== [] ? $parsed['scenes'] : self::fallbackScenes($metrics);
+        $model = $parsed['scenes'] !== [] ? $result['model'] : $result['model'] . ' (fallback script)';
+
+        $caption = self::withWhatsappLink(
+            $parsed['caption'] !== '' ? $parsed['caption'] : self::fallbackCaption($metrics),
+            $whatsappLink
+        );
+
+        EpisodicLogger::log([
+            'phase'        => 'content_creation',
+            'skill'        => 'create',
+            'model_used'   => $result['model'],
+            'direction'    => 'internal',
+            'message_out'  => $caption,
+            'message_kind' => 'video_script',
+            'reasoning'    => sprintf(
+                'Promo video script (%d scenes, %.1fs) for %s from room #%d metrics.%s%s',
+                count($scenes),
+                array_sum(array_column($scenes, 'seconds')),
+                $platform,
+                (int) $room['id'],
+                $brief !== '' ? ' Admin brief applied.' : '',
+                $parsed['scenes'] === [] ? ' Model returned no usable scenes — metrics fallback used.' : ''
+            ),
+            'response_ms' => $ms,
+        ]);
+
+        return ['caption' => $caption, 'scenes' => $scenes, 'model' => $model];
+    }
+
+    /**
+     * The grounding block both content skills share: only facts that exist in
+     * inventory, prices carrying their tenure.
+     *
+     * @return array<string, mixed>
+     */
+    private static function roomMetrics(array $room, string $platform): array
+    {
+        $roomId = (int) $room['id'];
+        $prices = Room::prices($roomId);
+
+        return [
+            'platform'          => $platform,
+            'room'              => $room['property_name'] ?: $room['name'],
+            'area'              => $room['location'],
+            'room_type'         => $room['room_type'],
+            'price_rm_monthly'  => $prices['monthly']['price'] ?? null,
+            'price_rm_12_month' => $prices['12_month']['price'] ?? null,
+            'deposit_rm'        => (float) ($room['deposit_amount'] ?? 0),
+            'features'          => Room::amenities($roomId),
+        ];
+    }
+
+    /**
+     * Read the model's JSON back into scenes the composer can render. Anything
+     * out of contract is clamped rather than trusted — an over-long headline
+     * would overflow the frame and a 40-second scene would break the reel.
+     *
+     * @return array{caption:string, scenes:array<int, array{headline:string, sub:string, seconds:float}>}
+     */
+    private static function parseVideoScript(string $raw): array
+    {
+        // Models like to wrap JSON in a ```json fence even when told not to.
+        $text = trim($raw);
+        if (preg_match('/\{.*\}/s', $text, $m)) {
+            $text = $m[0];
+        }
+        $decoded = json_decode($text, true);
+        if (!is_array($decoded)) {
+            return ['caption' => '', 'scenes' => []];
+        }
+
+        $scenes = [];
+        foreach ((array) ($decoded['scenes'] ?? []) as $scene) {
+            if (!is_array($scene)) {
+                continue;
+            }
+            $headline = trim((string) ($scene['headline'] ?? ''));
+            if ($headline === '') {
+                continue;
+            }
+            $scenes[] = [
+                'headline' => mb_substr($headline, 0, 40),
+                'sub'      => mb_substr(trim((string) ($scene['sub'] ?? '')), 0, 60),
+                'seconds'  => min(
+                    CONTENT_VIDEO_SCENE_SECONDS['max'],
+                    max(CONTENT_VIDEO_SCENE_SECONDS['min'], (float) ($scene['seconds'] ?? 3.5))
+                ),
+            ];
+            if (count($scenes) === CONTENT_VIDEO_SCENE_MAX) {
+                break;
+            }
+        }
+
+        return ['caption' => trim((string) ($decoded['caption'] ?? '')), 'scenes' => $scenes];
+    }
+
+    /**
+     * A script assembled from the metrics alone, for when the model's answer
+     * cannot be used. It says less than a written script would — but every line
+     * of it is a fact the inventory already holds.
+     *
+     * @param array<string, mixed> $metrics
+     * @return array<int, array{headline:string, sub:string, seconds:float}>
+     */
+    private static function fallbackScenes(array $metrics): array
+    {
+        $area = (string) ($metrics['area'] ?? '');
+        $price = $metrics['price_rm_12_month'] ?? $metrics['price_rm_monthly'] ?? null;
+        $tenure = $metrics['price_rm_12_month'] !== null ? '12 months' : 'flexible monthly';
+        $features = array_slice((array) ($metrics['features'] ?? []), 0, 3);
+
+        $scenes = [[
+            'headline' => mb_substr(ucfirst((string) $metrics['room_type']) . ' room' . ($area !== '' ? " in $area" : ''), 0, 40),
+            'sub'      => 'Fully furnished — just bring your bag',
+            'seconds'  => 3.5,
+        ]];
+
+        if ($price !== null) {
+            $scenes[] = [
+                'headline' => 'RM ' . number_format((float) $price) . '/mo',
+                'sub'      => "On a $tenure stay",
+                'seconds'  => 3.5,
+            ];
+        }
+        if ((float) ($metrics['deposit_rm'] ?? 0) === 0.0) {
+            $scenes[] = ['headline' => 'Zero deposit', 'sub' => 'Move in without the upfront hit', 'seconds' => 3.0];
+        }
+        if ($features !== []) {
+            $scenes[] = [
+                'headline' => 'What comes with it',
+                'sub'      => mb_substr(implode(' · ', $features), 0, 60),
+                'seconds'  => 4.0,
+            ];
+        }
+
+        return array_slice($scenes, 0, CONTENT_VIDEO_SCENE_MAX);
+    }
+
+    /** @param array<string, mixed> $metrics */
+    private static function fallbackCaption(array $metrics): string
+    {
+        $price = $metrics['price_rm_12_month'] ?? $metrics['price_rm_monthly'] ?? null;
+
+        return implode("\n", array_filter([
+            ucfirst((string) $metrics['room_type']) . ' room in ' . (string) $metrics['area'] . ' — ready when you are.',
+            $price !== null
+                ? 'RM ' . number_format((float) $price) . '/mo on a '
+                    . ($metrics['price_rm_12_month'] !== null ? '12-month' : 'flexible monthly') . ' stay.'
+                : '',
+            'Fully furnished. Weekly cleaning. Just bring your bag.',
+        ]));
     }
 
     /**

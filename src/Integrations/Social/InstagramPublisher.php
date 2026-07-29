@@ -13,10 +13,11 @@ use RuntimeException;
 /**
  * Instagram Business publisher (content publishing).
  *
- * Two-step container flow: POST /{ig_user_id}/media (image_url + caption)
- * then POST /{ig_user_id}/media_publish (creation_id). Instagram cannot post
- * without media, and Meta fetches image_url server-side — so real publishing
- * needs APP_URL to be publicly reachable.
+ * Two-step container flow: POST /{ig_user_id}/media (image_url + caption, or
+ * media_type=REELS + video_url for a promo video) then POST
+ * /{ig_user_id}/media_publish (creation_id). Instagram cannot post without
+ * media, and Meta fetches the media server-side — so real publishing needs
+ * APP_URL to be publicly reachable.
  *
  * The base URL and token come from InstagramApi, because Meta has two
  * Instagram APIs and an app set up for Instagram Login rejects the Page token
@@ -31,16 +32,29 @@ class InstagramPublisher implements SocialPublisherInterface
     /** Seconds to wait before each readiness re-check — 42s total, images are usually ready inside 5s. */
     private const POLL_DELAYS = [1, 2, 3, 5, 5, 8, 8, 10];
 
+    /** A reel is transcoded, not just fetched, so it gets a far longer budget — 132s. */
+    private const VIDEO_POLL_DELAYS = [3, 5, 5, 8, 8, 10, 10, 15, 15, 18, 20, 15];
+
     private Client $http;
 
     /** @var int[] overridable so tests don't actually sleep */
     private array $pollDelays;
 
-    /** @param int[] $pollDelays */
-    public function __construct(?Client $http = null, array $pollDelays = self::POLL_DELAYS)
+    /** @var int[] the reel budget; an explicit image override applies here too */
+    private array $videoPollDelays;
+
+    /**
+     * @param int[] $pollDelays
+     * @param int[]|null $videoPollDelays defaults to the reel budget, unless
+     *        $pollDelays was itself overridden — a test that asked for no
+     *        sleeping must not start sleeping the moment it posts a video.
+     */
+    public function __construct(?Client $http = null, array $pollDelays = self::POLL_DELAYS, ?array $videoPollDelays = null)
     {
         $this->http = $http ?? new Client(['timeout' => 30]);
         $this->pollDelays = $pollDelays;
+        $this->videoPollDelays = $videoPollDelays
+            ?? ($pollDelays === self::POLL_DELAYS ? self::VIDEO_POLL_DELAYS : $pollDelays);
     }
 
     public function isConfigured(): bool
@@ -48,15 +62,23 @@ class InstagramPublisher implements SocialPublisherInterface
         return InstagramApi::isConfigured();
     }
 
-    public function publish(string $caption, ?string $imageUrl): array
+    public function publish(string $caption, ?string $mediaUrl, string $mediaKind = 'image'): array
     {
+        $isVideo = $mediaKind === 'video';
+
         // Hard precondition — checked before any HTTP even in dry-run, so the
         // failure is recorded honestly instead of simulating an impossible post.
-        if ($imageUrl === null) {
-            throw new RuntimeException('Instagram requires an image — attach a room photo first.');
+        if ($mediaUrl === null) {
+            throw new RuntimeException($isVideo
+                ? 'Instagram requires the rendered video — this reel has none attached.'
+                : 'Instagram requires an image — attach a room photo first.');
         }
 
-        $containerPayload = ['image_url' => $imageUrl, 'caption' => $caption];
+        // A video goes up as a REELS container: Instagram has no plain video
+        // post type left, and media_type is what tells the two apart.
+        $containerPayload = $isVideo
+            ? ['media_type' => 'REELS', 'video_url' => $mediaUrl, 'caption' => $caption]
+            : ['image_url' => $mediaUrl, 'caption' => $caption];
 
         if (!$this->isConfigured()) {
             return $this->dryRun($containerPayload);
@@ -71,7 +93,7 @@ class InstagramPublisher implements SocialPublisherInterface
             throw new RuntimeException('Instagram media container returned no creation id.');
         }
 
-        $this->awaitContainerReady($api, $creationId);
+        $this->awaitContainerReady($api, $creationId, $isVideo);
 
         return [
             'external_id' => (string) ($this->publishContainer($api, $igUserId, $creationId)['id'] ?? ''),
@@ -86,11 +108,12 @@ class InstagramPublisher implements SocialPublisherInterface
      * pulled the image server-side; publishing too early is what returns
      * "Media ID is not available" (code 9007, subcode 2207027).
      */
-    private function awaitContainerReady(array $api, string $creationId): void
+    private function awaitContainerReady(array $api, string $creationId, bool $isVideo = false): void
     {
         $status = 'IN_PROGRESS';
+        $delays = $isVideo ? $this->videoPollDelays : $this->pollDelays;
 
-        foreach ($this->pollDelays as $delay) {
+        foreach ($delays as $delay) {
             $this->pause($delay);
             $container = $this->get($api, "/{$creationId}?fields=status_code,status");
             $status = (string) ($container['status_code'] ?? '');
@@ -100,18 +123,21 @@ class InstagramPublisher implements SocialPublisherInterface
             }
             if ($status === 'ERROR' || $status === 'EXPIRED') {
                 $detail = mb_substr((string) ($container['status'] ?? 'no detail given'), 0, 200);
-                throw new RuntimeException(
-                    "Instagram could not fetch the image ($status): $detail — check that the image URL is publicly reachable (APP_URL) and is a JPEG under 8MB."
-                );
+                throw new RuntimeException($isVideo
+                    ? "Instagram could not process the video ($status): $detail — check that the video URL is publicly reachable (APP_URL) and is H.264/AAC MP4 under 1GB."
+                    : "Instagram could not fetch the image ($status): $detail — check that the image URL is publicly reachable (APP_URL) and is a JPEG under 8MB.");
             }
         }
 
         // Still IN_PROGRESS after the whole budget — leave it failed so the
         // admin Retry button (and cron/publish_retry) can try a fresh container.
-        throw new RuntimeException(
-            'Instagram was still preparing the image after ' . array_sum($this->pollDelays)
-            . "s (status $status) — the image host may be slow. Hit Retry in a minute."
-        );
+        throw new RuntimeException(sprintf(
+            'Instagram was still preparing the %s after %ds (status %s) — %s. Hit Retry in a minute.',
+            $isVideo ? 'reel' : 'image',
+            array_sum($delays),
+            $status,
+            $isVideo ? 'transcoding a reel can take a while' : 'the image host may be slow'
+        ));
     }
 
     /**

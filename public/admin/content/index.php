@@ -13,6 +13,8 @@ defined('APP_BOOTED') || exit('No direct access.');
  */
 
 use App\AI\Skills\CreateSkill;
+use App\Content\PromoVideoDrafter;
+use App\Content\RoomVideoComposer;
 use App\Core\Auth;
 use App\Integrations\Social\SocialPublishManager;
 use App\Integrations\WhatsApp\WhatsAppLink;
@@ -30,16 +32,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'settings'
     $max = max(1, min(20, (int) ($_POST['content_auto_max'] ?? 3)));
     $platforms = array_values(array_intersect((array) ($_POST['content_auto_platforms'] ?? []), CONTENT_PLATFORMS));
     $brief = trim((string) ($_POST['content_brief'] ?? ''));
+    $mediaKind = in_array($_POST['content_auto_media'] ?? '', CONTENT_MEDIA_KINDS, true) ? $_POST['content_auto_media'] : 'image';
 
     if ($platforms === []) {
         set_flash('danger', 'Pick at least one platform for the daily drafts.');
+    } elseif ($mediaKind === 'video' && !RoomVideoComposer::isAvailable()) {
+        set_flash('danger', 'Daily reels need ffmpeg on this server — install it (or set FFMPEG_BIN in .env) before scheduling video drafts.');
     } else {
         $by = (string) ($_SESSION['admin_username'] ?? 'admin');
         Settings::set('content_auto_max', (string) $max, $by);
         Settings::set('content_auto_platforms', implode(',', $platforms), $by);
+        Settings::set('content_auto_media', $mediaKind, $by);
         Settings::set('content_brief', mb_substr($brief, 0, 1000), $by);
         Settings::set('content_wa_prefill', mb_substr(trim((string) ($_POST['content_wa_prefill'] ?? '')), 0, 200), $by);
-        set_flash('success', "Automation saved — up to $max draft(s) per run across " . implode(', ', $platforms) . '.');
+        set_flash('success', "Automation saved — up to $max " . ($mediaKind === 'video' ? 'reel' : 'caption')
+            . "(s) per run across " . implode(', ', $platforms) . '.');
     }
     header('Location: /admin/content');
     exit;
@@ -51,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate'
 
     $room = Room::find((int) ($_POST['room_id'] ?? 0));
     $platform = in_array($_POST['platform'] ?? '', CONTENT_PLATFORMS, true) ? $_POST['platform'] : 'facebook';
+    $mediaKind = in_array($_POST['media_kind'] ?? '', CONTENT_MEDIA_KINDS, true) ? $_POST['media_kind'] : 'image';
     // Per-post steer wins; otherwise fall back to the standing brief.
     $brief = trim((string) ($_POST['brief'] ?? '')) ?: Settings::get('content_brief', '');
 
@@ -58,12 +66,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate'
         set_flash('danger', 'Pick a room to feature.');
     } else {
         try {
-            $caption = CreateSkill::socialCaption($room, $platform, $brief);
-            Database::run(
-                'INSERT INTO content_posts (platform, room_id, caption, status, generated_by_model, generated_via, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [$platform, $room['id'], $caption['text'], 'draft', $caption['model'], 'manual', Room::photoUrls((int) $room['id'])[0] ?? null]
-            );
-            set_flash('success', 'Draft generated from live room metrics by ' . $caption['model'] . '.');
+            if ($mediaKind === 'video') {
+                $video = PromoVideoDrafter::draft($room, $platform, $brief);
+                set_flash('success', sprintf(
+                    'Promo video rendered from this room\'s own photos — %d scenes, %.1fs, scripted by %s.',
+                    $video['scenes'],
+                    $video['seconds'],
+                    $video['model']
+                ));
+            } else {
+                $caption = CreateSkill::socialCaption($room, $platform, $brief);
+                Database::run(
+                    'INSERT INTO content_posts (platform, room_id, caption, status, generated_by_model, generated_via, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [$platform, $room['id'], $caption['text'], 'draft', $caption['model'], 'manual', Room::photoUrls((int) $room['id'])[0] ?? null]
+                );
+                set_flash('success', 'Draft generated from live room metrics by ' . $caption['model'] . '.');
+            }
         } catch (\Throwable $e) {
             set_flash('danger', 'Generation failed: ' . $e->getMessage());
         }
@@ -93,6 +111,10 @@ $counts = SocialPublishManager::counts();
 
 $autoMax = Settings::getInt('content_auto_max', 3);
 $autoPlatforms = Settings::getList('content_auto_platforms', CONTENT_PLATFORMS);
+$autoMedia = Settings::get('content_auto_media', 'image');
+// Rendering is the one thing the studio cannot do on its own — say so up front
+// rather than after an admin has waited on a failing Generate.
+$videoReady = RoomVideoComposer::isAvailable();
 $standingBrief = Settings::get('content_brief', '');
 $waPrefill = Settings::get('content_wa_prefill', '');
 // Exactly what a reader taps, built from a real room so the preview is honest.
@@ -143,12 +165,28 @@ admin_header('Content', 'content');
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="belive-field" style="flex:1; min-width:170px; margin-bottom:0">
+            <label>Post type</label>
+            <select name="media_kind">
+                <option value="image">🖼 Photo post</option>
+                <option value="video"<?= $videoReady ? '' : ' disabled' ?>>🎬 Promo video (9:16 reel)</option>
+            </select>
+        </div>
         <div class="belive-field" style="flex:1 1 100%; margin-bottom:0">
             <label>What should this post be about? <span class="belive-muted" style="font-weight:400">(optional — blank uses the standing brief below)</span></label>
             <textarea name="brief" rows="2" maxlength="1000"
                       placeholder="e.g. push the zero-deposit angle for students moving in before September, mention the free weekly cleaning"></textarea>
         </div>
-        <button type="submit" class="belive-btn-primary">Generate caption</button>
+        <button type="submit" class="belive-btn-primary">Generate post</button>
+        <div class="belive-muted" style="flex:1 1 100%; font-size:12.5px">
+            <?php if ($videoReady): ?>
+                🎬 A promo video is cut from the room's <em>own</em> photos and tour clips — the AI writes the scenes and the
+                caption, never the footage. Rendering takes a few seconds per scene, so give Generate a moment.
+            <?php else: ?>
+                🎬 Promo video is unavailable — <code>ffmpeg</code> was not found on this server. Install it, or point
+                <code>FFMPEG_BIN</code> in <code>.env</code> at the executable, and the option turns on.
+            <?php endif; ?>
+        </div>
     </form>
 </div>
 
@@ -164,6 +202,13 @@ admin_header('Content', 'content');
         <div class="belive-field" style="flex:0 0 150px; margin-bottom:0">
             <label>Drafts per run</label>
             <input type="number" name="content_auto_max" min="1" max="20" value="<?= (int) $autoMax ?>">
+        </div>
+        <div class="belive-field" style="flex:0 0 180px; margin-bottom:0">
+            <label>Draft type</label>
+            <select name="content_auto_media">
+                <option value="image"<?= $autoMedia === 'image' ? ' selected' : '' ?>>🖼 Photo posts</option>
+                <option value="video"<?= $autoMedia === 'video' ? ' selected' : '' ?><?= $videoReady ? '' : ' disabled' ?>>🎬 Promo videos</option>
+            </select>
         </div>
         <div class="belive-field" style="flex:1; min-width:200px; margin-bottom:0">
             <label>Platforms</label>
@@ -203,11 +248,12 @@ admin_header('Content', 'content');
         <p class="belive-muted"><?= $filter === 'all' ? 'No drafts yet — generate one above, or let the daily cron draft for you.' : 'Nothing in this state right now.' ?></p>
     <?php else: ?>
         <table class="belive-table">
-            <thead><tr><th>Platform</th><th>Room</th><th>Caption</th><th>Model</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Platform</th><th>Type</th><th>Room</th><th>Caption</th><th>Model</th><th>Status</th><th></th></tr></thead>
             <tbody>
             <?php foreach ($posts as $post): ?>
                 <tr>
                     <td style="white-space:nowrap"><?= $platformIcons[$post['platform']] ?> <?= e(ucfirst($post['platform'])) ?></td>
+                    <td style="white-space:nowrap; font-size:13px"><?= $post['media_kind'] === 'video' ? '🎬 Video' : '🖼 Photo' ?></td>
                     <td style="font-size:13px"><?= e($post['room_name'] ? "{$post['room_name']} ({$post['area']})" : '—') ?></td>
                     <td style="font-size:13px; max-width:320px"><?= e(mb_substr($post['caption'], 0, 120)) ?><?= mb_strlen($post['caption']) > 120 ? '…' : '' ?></td>
                     <td style="font-size:12.5px"><code><?= e($post['generated_by_model']) ?></code></td>

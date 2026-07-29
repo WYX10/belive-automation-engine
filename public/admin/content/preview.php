@@ -64,6 +64,12 @@ if ($post === false) {
 }
 
 $imageUrl = SocialPublishManager::resolveImageUrl($post);
+$isVideo = ($post['media_kind'] ?? 'image') === 'video';
+// The player streams from our own site, so it wants the site-local path — the
+// absolute APP_URL form is for the platforms fetching it, not for this page.
+$videoPath = $isVideo ? (string) ($post['video_url'] ?? '') : '';
+$scenes = $isVideo ? (json_decode((string) ($post['video_script'] ?? ''), true) ?: []) : [];
+$videoSeconds = array_sum(array_map(static fn (array $scene): float => (float) ($scene['seconds'] ?? 0), $scenes));
 
 // A caption is the admin's to rewrite right up until it leaves for the
 // platform; after that the platform holds the copy.
@@ -95,14 +101,27 @@ admin_header('Post preview', 'content');
         <div class="belive-card">
             <div class="belive-card-title">
                 <?= ['facebook' => '📘', 'instagram' => '📷', 'tiktok' => '🎵'][$post['platform']] ?>
-                <?= e(ucfirst($post['platform'])) ?> draft
+                <?= e(ucfirst($post['platform'])) ?> <?= $isVideo ? 'video draft' : 'draft' ?>
                 <span class="belive-badge <?= $statusBadge ?>"><?= e($post['status']) ?></span>
                 <?php if ($publishBadge !== null): ?>
                     <span class="belive-badge <?= $publishBadge ?>"><?= e($post['publish_status']) ?></span>
                 <?php endif; ?>
             </div>
 
-            <?php if ($imageUrl !== null): ?>
+            <?php if ($isVideo && $videoPath !== ''): ?>
+                <video src="<?= e($videoPath) ?>" controls playsinline preload="metadata"
+                       <?= $imageUrl !== null ? 'poster="' . e($imageUrl) . '"' : '' ?>
+                       style="width:100%; max-width:300px; border-radius:12px; margin-bottom:10px; background:#000; display:block"></video>
+                <div class="belive-muted" style="font-size:12.5px; margin-bottom:10px">
+                    This is exactly the file that gets published — 9:16, <?= e(number_format($videoSeconds, 1)) ?>s,
+                    cut from this room's own photos and tour clips.
+                    <a href="<?= e($videoPath) ?>" download>Download</a>
+                </div>
+            <?php elseif ($isVideo): ?>
+                <div class="belive-badge danger" style="margin-bottom:10px; white-space:normal">
+                    This video draft has no rendered file — publishing it will fail. Generate it again from the content studio.
+                </div>
+            <?php elseif ($imageUrl !== null): ?>
                 <img src="<?= e($imageUrl) ?>" alt="Attached room photo" style="width:100%; border-radius:12px; margin-bottom:10px; max-height:260px; object-fit:cover">
             <?php else: ?>
                 <div class="belive-muted" style="font-size:12.5px; margin-bottom:10px">No room photo attached — Facebook posts text-only; Instagram and TikTok need an image.</div>
@@ -195,6 +214,33 @@ admin_header('Post preview', 'content');
     </div>
 
     <div class="belive-col">
+        <?php if ($isVideo && $scenes !== []): ?>
+            <div class="belive-card" style="margin-bottom:16px">
+                <div class="belive-card-title">🎬 Shot list</div>
+                <p class="belive-muted" style="font-size:13px; margin-top:-4px">
+                    What the AI wrote onto each shot. The closing WhatsApp card is added by the studio, not the model —
+                    every reel ends with a way to reach Eve.
+                </p>
+                <table class="belive-table">
+                    <thead><tr><th>#</th><th>On screen</th><th style="white-space:nowrap">Length</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($scenes as $index => $scene): ?>
+                        <tr>
+                            <td><?= $index + 1 ?><?= !empty($scene['cta']) ? ' 💬' : '' ?></td>
+                            <td style="font-size:13px">
+                                <strong><?= e((string) ($scene['headline'] ?? '')) ?></strong>
+                                <?php if (($scene['sub'] ?? '') !== ''): ?>
+                                    <div class="belive-muted"><?= e((string) $scene['sub']) ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td style="white-space:nowrap; font-size:13px"><?= e(number_format((float) ($scene['seconds'] ?? 0), 1)) ?>s</td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+
         <div class="belive-card">
             <div class="belive-card-title">ℹ Publishing model</div>
             <p style="font-size:13.5px" class="belive-muted">
@@ -204,9 +250,13 @@ admin_header('Post preview', 'content');
                 the TikTok Content Posting API. When a platform credential isn't active yet the
                 publish runs in <strong>dry-run mode</strong>: the exact API payload is written to
                 the activity log and the post is badged <em>simulated</em>, never passed off as a
-                real delivery. Instagram and TikTok fetch the image by URL, so real publishing
+                real delivery. Instagram and TikTok fetch the media by URL, so real publishing
                 needs a public <code>APP_URL</code> and (for Meta) a Page token with
                 <code>pages_manage_posts</code> + <code>instagram_content_publish</code>.
+                A promo video takes the video route on each platform — Instagram as a
+                <code>REELS</code> container, Facebook on the Page's video edge, TikTok through
+                the video init endpoint — and Instagram transcodes it, so that publish can sit
+                for a minute or two before it returns.
             </p>
         </div>
     </div>

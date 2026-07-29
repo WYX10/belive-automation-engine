@@ -16,7 +16,7 @@ namespace App\AI;
  * via real keys entered in Admin → API Credentials. See docs/setup_guide.md.
  *
  * Skills pass opts['mock_hint'] naming the response shape they expect
- * ('understand' | 'decide' | 'create' | 'learn' | 'caption' | 'time_parse');
+ * ('understand' | 'decide' | 'create' | 'learn' | 'caption' | 'video' | 'time_parse');
  * real clients ignore that field entirely.
  */
 final class MockClient implements LlmClient
@@ -41,6 +41,7 @@ final class MockClient implements LlmClient
             'create'     => $this->mockCreate($lastUser),
             'learn'      => $this->mockLearn($system . ' ' . $lastUser),
             'caption'    => "[MOCK] Fully furnished room, ready when you are. Just bring your bag — we handle the rest.",
+            'video'      => $this->mockVideo($lastUser),
             'time_parse' => $this->mockTimeParse($lastUser),
             'scam'       => $this->mockScam($lastUser),
             'agreement'  => $this->mockAgreement($lastUser),
@@ -179,6 +180,35 @@ final class MockClient implements LlmClient
         return $recall . ($photosFirst
             ? "[MOCK] Here are photos of the room first 📷 — fully furnished, WiFi, weekly cleaning. Want the pricing details?"
             : "[MOCK] Fully furnished room, zero deposit, weekly cleaning. Rental is $priceLine. Want photos or a viewing?");
+    }
+
+    /**
+     * Promo video script. Reads the same ROOM METRICS json the real prompt
+     * gets, so the offline reel still says true things about the actual room —
+     * and returns them in the JSON contract the parser expects.
+     */
+    private function mockVideo(string $userPrompt): string
+    {
+        $get = static fn (string $key): ?string => preg_match('/"' . $key . '":(?:"([^"]*)"|([\d.]+))/', $userPrompt, $m)
+            ? ($m[1] !== '' ? $m[1] : ($m[2] ?? null))
+            : null;
+
+        $area = $get('area') ?? 'KL';
+        $type = $get('room_type') ?? 'room';
+        $price = $get('price_rm_12_month') ?? $get('price_rm_monthly');
+        $link = preg_match('#(https://wa\.(?:me|link)/\S+)#', $userPrompt, $m) ? $m[1] : '';
+
+        $scenes = [
+            ['headline' => "[MOCK] $type room, $area", 'sub' => 'Fully furnished — bring your bag', 'seconds' => 3.5],
+            ['headline' => $price !== null ? 'RM ' . number_format((float) $price) . '/mo' : 'Move-in ready', 'sub' => 'Zero deposit', 'seconds' => 3.5],
+            ['headline' => 'Weekly cleaning included', 'sub' => '', 'seconds' => 3.0],
+        ];
+
+        return json_encode([
+            'scenes'  => $scenes,
+            'caption' => "[MOCK] A $type room in $area, ready when you are. Zero deposit, weekly cleaning.\n"
+                . ($link !== '' ? "$link\n" : '') . '#BeLive #RoomForRent',
+        ], JSON_UNESCAPED_UNICODE);
     }
 
     private function mockLearn(string $context): string
