@@ -62,6 +62,9 @@ define('CONTENT_POST_STATUSES', ['draft', 'approved', 'rejected', 'posted']);
 define('CONTENT_PLATFORMS', ['facebook', 'instagram', 'tiktok']);
 // content_posts.media_kind — a photo post or a rendered vertical promo reel.
 define('CONTENT_MEDIA_KINDS', ['image', 'video']);
+// The campaign tag every BeLive post carries, no exceptions — it is how the
+// challenge organisers find our work, so it is enforced rather than prompted.
+define('CONTENT_REQUIRED_HASHTAG', '#BeLiveSolopreneur');
 // Promo video shape: 9:16 at 1080p, the format all three platforms treat as
 // native short-form. A scene is one shot with its burned-in line.
 define('CONTENT_VIDEO_WIDTH', 1080);

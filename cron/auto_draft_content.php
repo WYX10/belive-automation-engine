@@ -31,13 +31,11 @@ Dotenv\Dotenv::createImmutable(APP_ROOT)->safeLoad();
 require APP_ROOT . '/config/constants.php';
 date_default_timezone_set('Asia/Kuala_Lumpur');
 
-use App\AI\Memory\EpisodicLogger;
-use App\AI\Skills\CreateSkill;
+use App\Content\PhotoPostDrafter;
 use App\Content\PromoVideoDrafter;
 use App\Content\RoomVideoComposer;
 use App\Core\Database;
 use App\Core\Settings;
-use App\Models\Room;
 
 // Defaults come from the content studio's automation card; CLI flags override.
 $platforms = array_values(array_intersect(Settings::getList('content_auto_platforms', CONTENT_PLATFORMS), CONTENT_PLATFORMS));
@@ -110,13 +108,9 @@ foreach ($platforms as $platform) {
                 $video['model']
             );
         } else {
-            $caption = CreateSkill::socialCaption($room, $platform, $brief);
-            Database::run(
-                'INSERT INTO content_posts (platform, room_id, caption, status, generated_by_model, generated_via, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [$platform, $room['id'], $caption['text'], 'draft', $caption['model'], 'cron', Room::photoUrls((int) $room['id'])[0] ?? null]
-            );
-            EpisodicLogger::activity('content_auto_drafted', 'content_creation', $caption['model'], null, "$platform draft for room #{$room['id']} ({$room['name']})");
-            echo "$platform: drafted for room #{$room['id']} ({$room['name']}) by {$caption['model']}\n";
+            $photo = PhotoPostDrafter::draft($room, $platform, $brief, 'cron');
+            echo "$platform: drafted for room #{$room['id']} ({$room['name']}) by {$photo['model']}"
+                . ($photo['branded'] ? ' (mascot branded)' : '') . "\n";
         }
         $drafted++;
     } catch (Throwable $e) {

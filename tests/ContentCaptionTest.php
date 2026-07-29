@@ -61,6 +61,13 @@ $caption = CreateSkill::socialCaption($captionRoom, 'facebook');
 check('an AI caption always ships with the WhatsApp link', str_contains($caption['text'], $link), $caption['text']);
 check('...appended once, not duplicated', substr_count($caption['text'], $link) === 1, $caption['text']);
 
+// The campaign tag is a submission requirement, so it gets the same treatment
+// as the link: enforced on the way out, never left to the model to remember.
+check('an AI caption always carries the campaign hashtag',
+    str_contains($caption['text'], CONTENT_REQUIRED_HASHTAG), $caption['text']);
+check('...exactly once, whoever wrote it',
+    substr_count($caption['text'], CONTENT_REQUIRED_HASHTAG) === 1, $caption['text']);
+
 Database::run(
     "INSERT INTO content_posts (platform, room_id, caption, status, generated_by_model, generated_via)
      VALUES ('facebook', ?, ?, 'draft', ?, 'manual')",
