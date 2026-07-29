@@ -13,7 +13,10 @@ interface LlmClient
     /**
      * @param string $system   System prompt.
      * @param array  $messages [['role' => 'user'|'assistant', 'content' => string], ...]
-     * @param array  $opts     max_tokens?, temperature?, mock_hint? (ignored by real clients)
+     * @param array  $opts     max_tokens?, temperature?, mock_hint? (ignored by real clients),
+     *                         image? => ['mime' => string, 'data' => base64 string] — attached
+     *                         to the last user message in whatever shape the provider expects,
+     *                         so a caller can show a model a photo without knowing the wire format.
      *
      * @return array{text: string, raw: array, model: string}
      */

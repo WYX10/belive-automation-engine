@@ -29,6 +29,10 @@ final class ClaudeClient implements LlmClient
 
     public function generate(string $system, array $messages, array $opts = []): array
     {
+        if (isset($opts['image'])) {
+            $messages = self::withImage($messages, $opts['image']);
+        }
+
         try {
             $response = $this->http->post(self::ENDPOINT, [
                 'headers' => [
@@ -63,5 +67,33 @@ final class ClaudeClient implements LlmClient
     public function modelName(): string
     {
         return $this->model;
+    }
+
+    /**
+     * Attach the image to the last user turn as an Anthropic content block.
+     * The image goes before the text — Anthropic's own guidance for
+     * "look at this, then answer".
+     *
+     * @param array $messages
+     * @param array{mime:string, data:string} $image
+     */
+    private static function withImage(array $messages, array $image): array
+    {
+        for ($i = count($messages) - 1; $i >= 0; $i--) {
+            if (($messages[$i]['role'] ?? '') !== 'user' || !is_string($messages[$i]['content'])) {
+                continue;
+            }
+            $messages[$i]['content'] = [
+                ['type' => 'image', 'source' => [
+                    'type'       => 'base64',
+                    'media_type' => $image['mime'],
+                    'data'       => $image['data'],
+                ]],
+                ['type' => 'text', 'text' => $messages[$i]['content']],
+            ];
+            break;
+        }
+
+        return $messages;
     }
 }

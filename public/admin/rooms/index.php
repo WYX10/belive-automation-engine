@@ -10,6 +10,7 @@ use App\Models\Property;
 use App\Models\PropertyUnit;
 use App\Models\Room;
 use App\Properties\PropertyManager;
+use App\Properties\RoomPhotoEnhancer;
 use App\Properties\RoomPhotoManager;
 
 require dirname(__DIR__) . '/_layout.php';
@@ -70,6 +71,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_FILES['room_photo'] ?? []
             );
             set_flash('success', 'Room photo added to the gallery as image #' . $photo['id'] . '.');
+        } elseif ($action === 'enhance_photo') {
+            // A dark, yellow, crooked phone shot of a good room. The correction
+            // is applied to the photograph only — see RoomPhotoEnhancer.
+            set_time_limit(120);
+            $result = RoomPhotoEnhancer::enhance(
+                (int) ($_POST['image_id'] ?? 0),
+                trim((string) ($_POST['enhance_brief'] ?? ''))
+            );
+            set_flash(
+                $result['grounded'] ? 'success' : 'warning',
+                sprintf('Photo #%d touched up by %s — %s Revert it if the room no longer looks like itself.',
+                    $result['id'],
+                    $result['model'],
+                    rtrim($result['verdict'], '.') . '.'
+                )
+            );
+        } elseif ($action === 'revert_photo') {
+            $result = RoomPhotoEnhancer::revert((int) ($_POST['image_id'] ?? 0));
+            set_flash('success', 'Photo #' . $result['id'] . ' is back to the owner\'s original upload.');
         } else {
             throw new RuntimeException('Choose a valid room-management action.');
         }
@@ -454,7 +474,7 @@ else:
             <?php foreach ($rooms as $room): ?>
                 <?php
                 $prices = Room::prices((int) $room['id']);
-                $photos = Room::photoUrls((int) $room['id']);
+                $photos = Room::photoRows((int) $room['id']);
                 $tenants = Room::tenants((int) $room['id']);
                 ?>
                 <article class="belive-card admin-room-card" aria-labelledby="admin-room-<?= (int) $room['id'] ?>">
@@ -490,7 +510,52 @@ else:
                     <?php if ($photos !== []): ?>
                         <div class="admin-room-gallery" aria-label="<?= e($room['name']) ?> photos">
                             <?php foreach ($photos as $index => $photo): ?>
-                                <img src="<?= e($photo) ?>" alt="<?= e($room['name']) ?> room photo <?= $index + 1 ?>" loading="lazy" width="180" height="120">
+                                <?php $touchedUp = ($photo['original_path'] ?? null) !== null; ?>
+                                <figure class="admin-room-shot">
+                                    <img src="<?= e($photo['image_path']) ?>" alt="<?= e($room['name']) ?> room photo <?= $index + 1 ?>" loading="lazy" width="180" height="120">
+                                    <figcaption>
+                                        <?php if ($touchedUp): ?>
+                                            <span class="belive-badge">AI touch-up</span>
+                                            <p class="admin-shot-note"><?= e((string) $photo['enhance_note']) ?></p>
+                                            <p class="admin-shot-meta">Lighting and colour only, by <?= e((string) $photo['enhanced_by_model']) ?>. The room itself is unchanged.</p>
+                                        <?php else: ?>
+                                            <span class="belive-badge muted">Owner's original</span>
+                                        <?php endif; ?>
+                                    </figcaption>
+
+                                    <div class="admin-shot-actions">
+                                        <details>
+                                            <summary><?= $touchedUp ? 'Redo the touch-up' : 'Improve with AI' ?></summary>
+                                            <form method="post" action="/admin/rooms">
+                                                <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                                                <input type="hidden" name="do" value="enhance_photo">
+                                                <input type="hidden" name="image_id" value="<?= (int) $photo['id'] ?>">
+                                                <input type="hidden" name="return_owner" value="<?= e($ownerFilter) ?>">
+                                                <input type="hidden" name="return_location" value="<?= e($locationFilter) ?>">
+                                                <input type="hidden" name="return_property" value="<?= (int) $property['id'] ?>">
+                                                <input type="hidden" name="return_unit" value="<?= (int) $house['id'] ?>">
+                                                <div class="belive-field">
+                                                    <label for="enhance-brief-<?= (int) $photo['id'] ?>">What's wrong with it? <span class="belive-muted">(optional)</span></label>
+                                                    <input id="enhance-brief-<?= (int) $photo['id'] ?>" name="enhance_brief" type="text" maxlength="200" placeholder="too dark, yellow light, tilted…" aria-describedby="enhance-hint-<?= (int) $photo['id'] ?>">
+                                                    <div id="enhance-hint-<?= (int) $photo['id'] ?>" class="hint">The AI fixes the photo — exposure, colour, tilt, sharpness. It never adds furniture or renovation the room doesn't have.</div>
+                                                </div>
+                                                <button class="belive-btn-secondary" type="submit">Run AI touch-up</button>
+                                            </form>
+                                        </details>
+                                        <?php if ($touchedUp): ?>
+                                            <form method="post" action="/admin/rooms">
+                                                <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                                                <input type="hidden" name="do" value="revert_photo">
+                                                <input type="hidden" name="image_id" value="<?= (int) $photo['id'] ?>">
+                                                <input type="hidden" name="return_owner" value="<?= e($ownerFilter) ?>">
+                                                <input type="hidden" name="return_location" value="<?= e($locationFilter) ?>">
+                                                <input type="hidden" name="return_property" value="<?= (int) $property['id'] ?>">
+                                                <input type="hidden" name="return_unit" value="<?= (int) $house['id'] ?>">
+                                                <button class="belive-btn-ghost" type="submit">Revert to the original</button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </div>
+                                </figure>
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
