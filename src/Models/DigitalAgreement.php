@@ -120,6 +120,48 @@ final class DigitalAgreement extends BaseModel
         )->fetchAll();
     }
 
+    /**
+     * The tenancy a tenant's own portal centres on — their signed agreement
+     * with the room and its place in the portfolio attached.
+     *
+     * Only a completed agreement carrying both dates counts as a tenancy, the
+     * same rule tenanciesForOwner() applies, so the two sides of one tenancy
+     * are never reading different things. A tenant may hold several over time,
+     * so the one closest to today wins: the live one, then the one about to
+     * start, then the one that ended most recently.
+     */
+    public static function currentForTenant(int $leadId): ?array
+    {
+        $row = Database::run(
+            "SELECT a.*,
+                    r.name AS room_name, r.room_code, r.location, r.room_type, r.address,
+                    r.status AS room_status, r.property_id, r.unit_id,
+                    COALESCE(p.name, r.property_name) AS property_name,
+                    u.name AS house_name
+             FROM digital_agreements a
+             LEFT JOIN rooms r ON r.id = a.room_id
+             LEFT JOIN properties p ON p.id = r.property_id
+             LEFT JOIN property_units u ON u.id = r.unit_id
+             WHERE a.lead_id = ?
+               AND a.status = 'completed'
+               AND a.starts_on IS NOT NULL
+               AND a.ends_on IS NOT NULL
+             ORDER BY CASE
+                          WHEN CURDATE() BETWEEN a.starts_on AND a.ends_on THEN 0
+                          WHEN a.starts_on > CURDATE() THEN 1
+                          ELSE 2
+                      END,
+                      -- Soonest to start, for the upcoming bucket only: this key
+                      -- is NULL, and so inert, for the other two.
+                      CASE WHEN a.starts_on > CURDATE() THEN a.starts_on END ASC,
+                      a.ends_on DESC, a.id DESC
+             LIMIT 1",
+            [$leadId]
+        )->fetch();
+
+        return $row ?: null;
+    }
+
     /** One agreement with the tenant/room context every screen needs. */
     public static function withContext(int $id): ?array
     {
@@ -199,6 +241,7 @@ final class DigitalAgreement extends BaseModel
      *   days_remaining: int,
      *   days_until_start: int,
      *   days_since_end: int,
+     *   total_days: int,
      *   progress_percent: int
      * }|null
      */
@@ -235,8 +278,36 @@ final class DigitalAgreement extends BaseModel
             'days_remaining' => in_array($state, ['active', 'ending_soon'], true) ? $daysRemaining : 0,
             'days_until_start' => $state === 'upcoming' ? $daysUntilStart : 0,
             'days_since_end' => $state === 'expired' ? $daysSinceEnd : 0,
+            'total_days' => $totalDays,
             'progress_percent' => (int) round(($elapsedDays / $totalDays) * 100),
         ];
+    }
+
+    /**
+     * How long the whole term runs, in the words a tenant would use: whole
+     * months when the dates make whole months, days when they don't. Takes a
+     * timeline or the agreement row itself.
+     */
+    public static function termLabel(array $dated): ?string
+    {
+        $start = self::parseDate($dated['starts_on'] ?? null);
+        $end = self::parseDate($dated['ends_on'] ?? null);
+        if ($start === null || $end === null || $end < $start) {
+            return null;
+        }
+
+        // A term runs to the end of its last day, so a 12-month term ends the
+        // day before the anniversary — measure to the day after ends_on.
+        $span = $start->diff($end->modify('+1 day'));
+        $months = $span->y * 12 + $span->m;
+
+        if ($months > 0 && $span->d === 0) {
+            return $months === 1 ? '1 month' : $months . ' months';
+        }
+
+        $days = (int) $start->diff($end)->days + 1;
+
+        return $days === 1 ? '1 day' : $days . ' days';
     }
 
     private static function parseDate(mixed $value): ?DateTimeImmutable
