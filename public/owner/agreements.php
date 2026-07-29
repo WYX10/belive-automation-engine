@@ -169,33 +169,35 @@ portal_header('owner', 'Agreements', 'agreements');
     <?php if ($others === []): ?>
         <p class="belive-muted">Nothing else yet.</p>
     <?php else: ?>
-        <table class="belive-table">
-            <thead><tr><th>#</th><th>Tenant</th><th>Room</th><th>Term</th><th>Stage</th><th>Your signature</th></tr></thead>
-            <tbody>
-            <?php foreach ($others as $agreement): ?>
-                <?php $stage = DigitalAgreement::stage($agreement['status']); ?>
-                <tr>
-                    <td>BL-AGR-<?= sprintf('%05d', (int) $agreement['id']) ?></td>
-                    <td><?= e($agreement['tenant_name'] ?: $agreement['wa_phone']) ?></td>
-                    <td style="font-size:13px"><?= e($agreement['room_name'] ?? '—') ?></td>
-                    <td style="font-size:13px; white-space:nowrap">
-                        <?php if ($agreement['starts_on'] !== null && $agreement['ends_on'] !== null): ?>
-                            <?= e(date('j M Y', strtotime($agreement['starts_on']))) ?><br>
-                            <span class="belive-muted">to <?= e(date('j M Y', strtotime($agreement['ends_on']))) ?></span>
-                        <?php else: ?>
-                            <span class="belive-muted">—</span>
-                        <?php endif; ?>
-                    </td>
-                    <td><span class="belive-badge <?= $agreement['status'] === 'completed' ? '' : ($agreement['status'] === 'cancelled' ? 'danger' : 'muted') ?>"><?= e($stage['label']) ?></span></td>
-                    <td style="font-size:13px">
-                        <?= $agreement['owner_signed_at'] !== null
-                            ? e($agreement['owner_signed_name'] . ' · ' . $agreement['owner_signed_at'])
-                            : '<span class="belive-muted">—</span>' ?>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
+        <div class="belive-table-wrap">
+            <table class="belive-table">
+                <thead><tr><th>#</th><th>Tenant</th><th>Room</th><th>Term</th><th>Stage</th><th>Your signature</th></tr></thead>
+                <tbody>
+                <?php foreach ($others as $agreement): ?>
+                    <?php $stage = DigitalAgreement::stage($agreement['status']); ?>
+                    <tr>
+                        <td>BL-AGR-<?= sprintf('%05d', (int) $agreement['id']) ?></td>
+                        <td><?= e($agreement['tenant_name'] ?: $agreement['wa_phone']) ?></td>
+                        <td style="font-size:13px"><?= e($agreement['room_name'] ?? '—') ?></td>
+                        <td style="font-size:13px; white-space:nowrap">
+                            <?php if ($agreement['starts_on'] !== null && $agreement['ends_on'] !== null): ?>
+                                <?= e(date('j M Y', strtotime($agreement['starts_on']))) ?><br>
+                                <span class="belive-muted">to <?= e(date('j M Y', strtotime($agreement['ends_on']))) ?></span>
+                            <?php else: ?>
+                                <span class="belive-muted">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <td><span class="belive-badge <?= $agreement['status'] === 'completed' ? '' : ($agreement['status'] === 'cancelled' ? 'danger' : 'muted') ?>"><?= e($stage['label']) ?></span></td>
+                        <td style="font-size:13px">
+                            <?= $agreement['owner_signed_at'] !== null
+                                ? e($agreement['owner_signed_name'] . ' · ' . $agreement['owner_signed_at'])
+                                : '<span class="belive-muted">—</span>' ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
         <p class="belive-muted" style="font-size:12px; margin-top:10px">
             Signing here means typing your own full name against a dated record — it is not a cryptographic
             e-signature, and the agreement still needs stamping under the Stamp Act 1949.

@@ -43,8 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="theme-color" content="#F5833C">
 <title>Tenant portal · beLive</title>
 <link rel="icon" type="image/png" href="/assets/img/belive-favicon.png">
-<link rel="stylesheet" href="/assets/css/belive-theme.css">
-<link rel="stylesheet" href="/assets/css/portal.css">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/belive-theme.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/portal.css')) ?>">
 </head>
 <body class="portal-tenant portal-login">
 <div class="belive-card portal-login-card">

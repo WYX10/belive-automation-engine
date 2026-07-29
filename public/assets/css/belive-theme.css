@@ -31,27 +31,63 @@
 
   --font-head: 'Poppins', 'Segoe UI', sans-serif;
   --font-body: 'Inter', 'Segoe UI', sans-serif;
+
+  /* --- Fluid scale ---------------------------------------------------------
+     Type, spacing and container widths interpolate with the viewport instead
+     of stepping at breakpoints, so a 360px phone and a 1920px monitor both get
+     proportionate text and gutters. Each clamp() bottoms out at the old phone
+     size and tops out before lines get uncomfortably long. */
+  --text-xs:   clamp(11px,   0.66rem + 0.10vw, 12.5px);
+  --text-sm:   clamp(12.5px, 0.72rem + 0.14vw, 14px);
+  --text-base: clamp(14.5px, 0.85rem + 0.17vw, 16.5px);
+  --text-lg:   clamp(15.5px, 0.88rem + 0.28vw, 18.5px);
+  --text-h3:   clamp(15px,   0.85rem + 0.26vw, 18px);
+  --text-h2:   clamp(18px,   0.95rem + 0.55vw, 24px);
+  --text-h1:   clamp(23px,   1.15rem + 1.05vw, 34px);
+
+  --space-2xs: clamp(4px,  0.22rem + 0.10vw, 6px);
+  --space-xs:  clamp(8px,  0.45rem + 0.20vw, 12px);
+  --space-sm:  clamp(12px, 0.60rem + 0.40vw, 18px);
+  --space-md:  clamp(16px, 0.80rem + 0.70vw, 26px);
+  --space-lg:  clamp(24px, 1.10rem + 1.30vw, 44px);
+  --space-xl:  clamp(34px, 1.50rem + 2.40vw, 72px);
+
+  /* Page gutter, and the two content widths every surface centres on. Both
+     keep growing past the old fixed 980/1080px cap on large displays. */
+  --gutter:         clamp(14px, 0.9rem + 1.2vw, 34px);
+  --content-w:      clamp(1000px, 84vw, 1480px);
+  --content-narrow: clamp(880px,  76vw, 1240px);
 }
 
 /* --- Base ----------------------------------------------------------------- */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html { -webkit-text-size-adjust: 100%; }
+
 body {
   font-family: var(--font-body);
-  font-size: 15px;
+  font-size: var(--text-base);
   line-height: 1.55;
   color: var(--belive-ink);
   background: var(--belive-cream);
   -webkit-font-smoothing: antialiased;
 }
 
+/* Nothing wider than its container may force the page to scroll sideways. */
+img, svg, video, canvas { max-width: 100%; }
+img, video { height: auto; }
+pre, code { overflow-wrap: anywhere; }
+
 h1, h2, h3, h4 { font-family: var(--font-head); font-weight: 600; line-height: 1.25; }
-h1 { font-size: 26px; font-weight: 700; }
-h2 { font-size: 20px; }
-h3 { font-size: 16px; }
+h1 { font-size: var(--text-h1); font-weight: 700; }
+h2 { font-size: var(--text-h2); }
+h3 { font-size: var(--text-h3); }
 a { color: var(--belive-teal-dark); text-decoration: none; }
 a:hover { text-decoration: underline; }
 small, .belive-muted { color: var(--belive-muted); }
+
+/* Wide tables scroll inside their own box rather than widening the page. */
+.belive-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 /* --- Wordmark: "be" teal + "Live" orange, matching the real logo ---------- */
 .belive-wordmark { font-family: var(--font-head); font-weight: 700; letter-spacing: -0.5px; }
@@ -63,12 +99,12 @@ small, .belive-muted { color: var(--belive-muted); }
   background: var(--belive-white);
   border-radius: var(--belive-radius);
   box-shadow: var(--belive-shadow);
-  padding: 22px;
+  padding: var(--space-md);
 }
-.belive-card + .belive-card { margin-top: 16px; }
+.belive-card + .belive-card { margin-top: var(--space-sm); }
 .belive-card-title {
   font-family: var(--font-head);
-  font-size: 15px;
+  font-size: var(--text-base);
   font-weight: 600;
   margin-bottom: 14px;
   display: flex;
@@ -77,20 +113,24 @@ small, .belive-muted { color: var(--belive-muted); }
 }
 
 /* --- Stat strip: icon + big number + small label (site homepage pattern) --- */
+/* min() on the track floor: below ~190px of available width the card shrinks
+   with the column instead of overflowing it. Every fluid grid here does this. */
 .belive-stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
+  gap: var(--space-sm);
 }
 .belive-stat {
   background: var(--belive-white);
   border-radius: var(--belive-radius);
   box-shadow: var(--belive-shadow);
-  padding: 18px 20px;
+  padding: var(--space-sm) var(--space-md);
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--space-xs);
+  min-width: 0;
 }
+.belive-stat > div { min-width: 0; }
 .belive-stat-icon {
   width: 44px; height: 44px;
   border-radius: 12px;
@@ -102,19 +142,20 @@ small, .belive-muted { color: var(--belive-muted); }
 .belive-stat-icon.teal { background: var(--belive-teal-soft); }
 .belive-stat-number {
   font-family: var(--font-head);
-  font-size: 24px;
+  font-size: clamp(21px, 1.1rem + 0.55vw, 27px);
   font-weight: 700;
   color: var(--belive-orange);
   line-height: 1.1;
 }
 .belive-stat-number.teal { color: var(--belive-teal-dark); }
-.belive-stat-label { font-size: 12.5px; color: var(--belive-muted); }
+.belive-stat-label { font-size: var(--text-sm); color: var(--belive-muted); }
 
 /* --- Buttons ---------------------------------------------------------------- */
 .belive-btn-primary, .belive-btn-secondary, .belive-btn-ghost, .belive-btn-danger {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-family: var(--font-body); font-size: 14px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600;
   padding: 9px 18px; border-radius: 10px; border: none; cursor: pointer;
+  max-width: 100%; min-height: 40px; text-align: center;
   text-decoration: none !important; transition: filter .15s, box-shadow .15s;
 }
 .belive-btn-primary   { background: var(--belive-orange); color: #fff; }
@@ -155,9 +196,9 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 }
 
 /* --- Tables ------------------------------------------------------------------ */
-.belive-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.belive-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
 .belive-table th {
-  text-align: left; font-family: var(--font-head); font-size: 12.5px; font-weight: 600;
+  text-align: left; font-family: var(--font-head); font-size: var(--text-xs); font-weight: 600;
   color: var(--belive-muted); text-transform: uppercase; letter-spacing: .4px;
   padding: 10px 12px; border-bottom: 2px solid var(--belive-line);
 }
@@ -169,10 +210,16 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .belive-field label {
   display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;
 }
+/* 16px on phones — anything smaller makes iOS Safari zoom the whole page on
+   focus, which is exactly the "size doesn't fit the screen" symptom. */
 .belive-field input, .belive-field select, .belive-field textarea {
-  width: 100%; padding: 10px 12px; font: inherit; font-size: 14px;
+  width: 100%; max-width: 100%; padding: 10px 12px; font: inherit;
+  font-size: clamp(15px, 0.9rem + 0.12vw, 16px);
   border: 1.5px solid var(--belive-line); border-radius: 10px;
   background: var(--belive-white); color: var(--belive-ink);
+}
+@media (min-width: 700px) {
+  .belive-field input, .belive-field select, .belive-field textarea { font-size: var(--text-sm); }
 }
 .belive-field input:focus, .belive-field select:focus, .belive-field textarea:focus {
   outline: none; border-color: var(--belive-teal);
@@ -194,9 +241,10 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .belive-bar.orange > span { background: var(--belive-orange); }
 
 /* --- Layout helpers ------------------------------------------------------------------ */
-.belive-row { display: flex; gap: 16px; flex-wrap: wrap; }
-.belive-col { flex: 1; min-width: 280px; }
+.belive-row { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+.belive-col { flex: 1; min-width: min(280px, 100%); }
 .belive-page-head {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+  gap: var(--space-xs); margin-bottom: var(--space-md); flex-wrap: wrap;
 }
+.belive-page-head > * { min-width: 0; }

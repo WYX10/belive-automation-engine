@@ -61,30 +61,32 @@ admin_header('AI models', 'models');
 
 <div class="belive-card" style="margin-top:16px">
     <div class="belive-card-title">📚 Model registry</div>
-    <table class="belive-table">
-        <thead><tr><th>Model</th><th>Provider</th><th>Purpose</th><th>Cost tier</th><th>Source</th><th></th></tr></thead>
-        <tbody>
-        <?php foreach ($registry as $key => $meta): ?>
-            <tr>
-                <td><code><?= e($key) ?></code></td>
-                <td><?= e($meta['provider']) ?></td>
-                <td><?= e($meta['purpose']) ?></td>
-                <td><span class="belive-badge <?= $meta['cost_tier'] === 'premium' ? 'orange' : '' ?>"><?= e($meta['cost_tier']) ?></span></td>
-                <td><span class="belive-badge <?= isset($meta['custom_id']) ? '' : 'muted' ?>"><?= isset($meta['custom_id']) ? 'custom' : 'built-in' ?></span></td>
-                <td style="text-align:right">
-                    <?php if (isset($meta['custom_id'])): ?>
-                        <form method="post" action="/admin/models/remove" style="display:inline"
-                              onsubmit="return confirm('Remove model \'<?= e($key) ?>\' from the registry?')">
-                            <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-                            <input type="hidden" name="id" value="<?= (int) $meta['custom_id'] ?>">
-                            <button type="submit" class="belive-btn-ghost" style="padding:6px 12px; font-size:13px; color:#c0392b">Remove</button>
-                        </form>
-                    <?php endif; ?>
-                </td>
-            </tr>
-        <?php endforeach; ?>
-        </tbody>
-    </table>
+    <div class="belive-table-wrap">
+        <table class="belive-table">
+            <thead><tr><th>Model</th><th>Provider</th><th>Purpose</th><th>Cost tier</th><th>Source</th><th></th></tr></thead>
+            <tbody>
+            <?php foreach ($registry as $key => $meta): ?>
+                <tr>
+                    <td><code><?= e($key) ?></code></td>
+                    <td><?= e($meta['provider']) ?></td>
+                    <td><?= e($meta['purpose']) ?></td>
+                    <td><span class="belive-badge <?= $meta['cost_tier'] === 'premium' ? 'orange' : '' ?>"><?= e($meta['cost_tier']) ?></span></td>
+                    <td><span class="belive-badge <?= isset($meta['custom_id']) ? '' : 'muted' ?>"><?= isset($meta['custom_id']) ? 'custom' : 'built-in' ?></span></td>
+                    <td style="text-align:right">
+                        <?php if (isset($meta['custom_id'])): ?>
+                            <form method="post" action="/admin/models/remove" style="display:inline"
+                                  onsubmit="return confirm('Remove model \'<?= e($key) ?>\' from the registry?')">
+                                <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                                <input type="hidden" name="id" value="<?= (int) $meta['custom_id'] ?>">
+                                <button type="submit" class="belive-btn-ghost" style="padding:6px 12px; font-size:13px; color:#c0392b">Remove</button>
+                            </form>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <div class="belive-card" style="margin-top:16px">

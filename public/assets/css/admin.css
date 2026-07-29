@@ -6,8 +6,10 @@ body.admin {
   min-height: 100vh;
 }
 
+/* The rail narrows on smaller laptops so the content column keeps its room,
+   and widens a little on large monitors. */
 .admin-sidebar {
-  width: 232px;
+  width: clamp(196px, 16vw, 252px);
   flex-shrink: 0;
   background: var(--belive-white);
   border-right: 1px solid var(--belive-line);
@@ -51,8 +53,8 @@ body.admin {
 
 .admin-main {
   flex: 1;
-  padding: 26px 30px 60px;
-  max-width: 1200px;
+  padding: var(--space-md) var(--space-lg) var(--space-xl);
+  max-width: 1600px;
   min-width: 0;
 }
 
@@ -62,8 +64,9 @@ body.admin-login {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  padding: var(--gutter);
 }
-.login-card { width: 380px; max-width: 92vw; }
+.login-card { width: 100%; max-width: 380px; }
 
 /* Chat bubbles in chat history / lead view */
 .chat-thread { display: flex; flex-direction: column; gap: 10px; }
@@ -88,7 +91,7 @@ body.admin-login {
 /* Dashboard live-lead list: ten leads, each hiding its own transcript.
    Cards in a row share a height and pin their buttons to the bottom, so the
    row reads as one line however much Eve had to say about each lead. */
-.dash-lead-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-top: 14px; align-items: stretch; }
+.dash-lead-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 14px; margin-top: 14px; align-items: stretch; }
 .dash-lead { display: flex; flex-direction: column; padding: 16px; border: 1px solid var(--belive-line); border-radius: 12px; background: var(--belive-white); }
 .dash-lead-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .dash-lead-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 14px; }
@@ -269,7 +272,7 @@ body.admin-login {
 .admin-room-card-head h2 { margin-top: 4px; font-size: 19px; }
 .admin-room-card-head p { margin-top: 3px; color: var(--belive-muted); font-size: 13px; }
 .admin-room-badges { display: flex; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
-.admin-room-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-top: 16px; }
+.admin-room-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr)); gap: 12px; margin-top: 16px; }
 .admin-room-gallery img { width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 10px; border: 1px solid var(--belive-line); background: var(--belive-cream); }
 
 /* One gallery shot with its AI touch-up controls. The badge always says whose
@@ -301,7 +304,7 @@ body.admin-login {
 .admin-crumbs span[aria-hidden] { color: var(--belive-muted); }
 .admin-crumbs [aria-current] { color: var(--belive-muted); font-weight: 700; }
 
-.admin-hier-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.admin-hier-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 16px; }
 .admin-hier-card { display: block; border-top: 4px solid var(--belive-orange); color: inherit; text-decoration: none; }
 /* The whole card is the link, so hovering it must not underline its contents. */
 a.admin-hier-card:hover,
@@ -316,7 +319,7 @@ a.admin-hier-card:focus-visible { outline: 3px solid var(--belive-teal); outline
 .admin-hier-card-head p { margin-top: 3px; color: var(--belive-muted); font-size: 13px; }
 .admin-hier-card-head .belive-btn-secondary { flex: none; white-space: nowrap; }
 .admin-hier-go { color: var(--belive-orange-dark); font-size: 24px; line-height: 1; }
-.admin-hier-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--belive-line); }
+.admin-hier-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(72px, 100%), 1fr)); gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--belive-line); }
 .admin-hier-stats dt { color: var(--belive-muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .admin-hier-stats dd { margin-top: 2px; font-size: 20px; font-weight: 800; }
 .admin-hier-context { min-width: 0; }

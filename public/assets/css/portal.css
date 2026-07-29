@@ -5,20 +5,20 @@
 .portal-nav {
   background: var(--belive-white);
   border-bottom: 1px solid var(--belive-line);
-  padding: 14px 22px;
+  padding: var(--space-xs) var(--gutter);
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
   position: sticky;
   top: 0;
   z-index: 10;
 }
-.portal-nav .links { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+.portal-nav .links { display: flex; gap: 4px; flex-wrap: wrap; flex: 1 1 auto; min-width: 0; }
 .portal-nav a.nav-link {
   padding: 7px 13px;
   border-radius: 9px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--belive-ink);
   text-decoration: none !important;
@@ -28,18 +28,23 @@
 body.portal-tenant .portal-nav a.nav-link.active { background: var(--belive-teal-soft); color: var(--belive-teal-dark); font-weight: 600; }
 body.portal-owner  .portal-nav a.nav-link.active { background: var(--belive-orange-soft); color: var(--belive-orange-dark); font-weight: 600; }
 
-.portal-main { max-width: 980px; margin: 0 auto; padding: 28px 20px 70px; }
+.portal-main {
+  width: 100%;
+  max-width: var(--content-narrow);
+  margin: 0 auto;
+  padding: var(--space-md) var(--gutter) var(--space-xl);
+}
 
-.portal-hero { margin-bottom: 22px; }
-.portal-hero h1 { font-size: 24px; }
-.portal-hero p { color: var(--belive-muted); margin-top: 4px; font-size: 14.5px; }
+.portal-hero { margin-bottom: var(--space-md); }
+.portal-hero h1 { font-size: var(--text-h1); }
+.portal-hero p { color: var(--belive-muted); margin-top: 4px; font-size: var(--text-base); }
 
 body.portal-tenant .portal-hero .tagline { color: var(--belive-teal-dark); font-weight: 600; }
 body.portal-owner  .portal-hero .tagline { color: var(--belive-orange-dark); font-weight: 600; }
 
 /* Centered login card shared by both portals */
-body.portal-login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-.portal-login-card { width: 400px; max-width: 92vw; }
+body.portal-login { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: var(--gutter); }
+.portal-login-card { width: 100%; max-width: 400px; }
 
 /* Verified listing badge */
 .verified-badge-big {
@@ -51,7 +56,7 @@ body.portal-login { display: flex; align-items: center; justify-content: center;
 .verified-badge-big.unverified { background: rgba(107,114,128,.12); color: var(--belive-muted); }
 
 /* Move-in photo timeline */
-.movein-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.movein-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 14px; }
 .movein-item img { width: 100%; border-radius: 10px; display: block; }
 .movein-item .stamp { font-size: 12px; color: var(--belive-muted); margin-top: 6px; }
 
@@ -169,7 +174,7 @@ body.portal-login { display: flex; align-items: center; justify-content: center;
 .electric-num { white-space: nowrap; }
 .electric-sub { display: block; margin-top: 3px; color: var(--belive-muted); font-size: 11.5px; font-variant-numeric: normal; }
 
-.electric-meter-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.electric-meter-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 10px; }
 .electric-meter-facts > div { padding: 10px 12px; border-radius: 10px; background: var(--belive-cream); }
 .electric-meter-facts span { display: block; color: var(--belive-muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .electric-meter-facts strong { display: block; margin-top: 3px; font-size: 14px; }
@@ -213,7 +218,7 @@ body.portal-login { display: flex; align-items: center; justify-content: center;
 .owner-room-main h3 { margin-top: 3px; }
 .owner-room-main p { margin-top: 3px; color: var(--belive-muted); font-size: 13px; }
 .owner-room-link { min-height: 44px; }
-.owner-room-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 7px; margin-top: 14px; }
+.owner-room-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(110px, 100%), 1fr)); gap: 7px; margin-top: 14px; }
 .owner-room-gallery img { width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border: 1px solid var(--belive-line); border-radius: 9px; background: var(--belive-white); }
 .owner-room-photo-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; margin-top: 14px; padding: 12px; border-radius: 10px; background: var(--belive-white); }
 .owner-room-photo-form .belive-field { margin: 0; }
@@ -353,10 +358,10 @@ a.belive-stat:hover { box-shadow: var(--belive-shadow-lift); transform: translat
 .tenant-room-rent { text-align: right; white-space: nowrap; }
 .tenant-room-rent strong { display: block; font-family: var(--font-head); font-size: 22px; color: var(--belive-teal-dark); font-variant-numeric: tabular-nums; }
 .tenant-room-rent span { color: var(--belive-muted); font-size: 12px; }
-.tenant-room-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 16px; }
+.tenant-room-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr)); gap: 8px; margin-top: 16px; }
 .tenant-room-gallery img { width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border: 1px solid var(--belive-line); border-radius: 10px; background: var(--belive-cream); }
 
-.tenant-similar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; margin-top: 14px; }
+.tenant-similar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr)); gap: 14px; margin-top: 14px; }
 .tenant-similar-card {
   display: flex; flex-direction: column;
   overflow: hidden; border: 1px solid var(--belive-line); border-radius: 12px;

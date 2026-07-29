@@ -108,18 +108,20 @@ admin_header('Rule detail', 'learning_log');
     <?php if ($usages === []): ?>
         <p class="belive-muted">Not used yet — it will apply to the next matching conversation.</p>
     <?php else: ?>
-        <table class="belive-table">
-            <thead><tr><th>When</th><th>Lead</th><th>Reply</th></tr></thead>
-            <tbody>
-            <?php foreach ($usages as $use): ?>
-                <tr>
-                    <td style="white-space:nowrap; font-size:13px"><?= e($use['created_at']) ?></td>
-                    <td><a href="/admin/leads/view?id=<?= (int) $use['lead_id'] ?>">#<?= (int) $use['lead_id'] ?></a></td>
-                    <td style="font-size:13px"><?= e(mb_substr((string) $use['message_out'], 0, 160)) ?></td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
+        <div class="belive-table-wrap">
+            <table class="belive-table">
+                <thead><tr><th>When</th><th>Lead</th><th>Reply</th></tr></thead>
+                <tbody>
+                <?php foreach ($usages as $use): ?>
+                    <tr>
+                        <td style="white-space:nowrap; font-size:13px"><?= e($use['created_at']) ?></td>
+                        <td><a href="/admin/leads/view?id=<?= (int) $use['lead_id'] ?>">#<?= (int) $use['lead_id'] ?></a></td>
+                        <td style="font-size:13px"><?= e(mb_substr((string) $use['message_out'], 0, 160)) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     <?php endif; ?>
 </div>
 <?php admin_footer();

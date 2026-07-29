@@ -16,6 +16,21 @@ if (!function_exists('e')) {
     }
 }
 
+if (!function_exists('asset_url')) {
+    /**
+     * Cache-busting asset URL: appends ?v=<mtime> so a deployed CSS change is
+     * fetched immediately instead of being served from the browser (or Azure)
+     * cache. Falls back to the bare path if the file can't be stat'd.
+     */
+    function asset_url(string $path): string
+    {
+        $file = (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__, 2)) . '/public' . $path;
+        $mtime = is_file($file) ? filemtime($file) : false;
+
+        return $mtime !== false ? $path . '?v=' . $mtime : $path;
+    }
+}
+
 if (!function_exists('eve_whatsapp_link')) {
     function eve_whatsapp_link(): string
     {
@@ -77,8 +92,8 @@ function site_header(string $title, string $active = ''): void
 <meta name="description" content="Fully furnished rooms. Zero deposit. Weekly cleaning. Just bring your bag — we handle the rest.">
 <title><?= e($title) ?> · beLive</title>
 <link rel="icon" type="image/png" href="/assets/img/belive-favicon.png">
-<link rel="stylesheet" href="/assets/css/belive-theme.css">
-<link rel="stylesheet" href="/assets/css/site.css">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/belive-theme.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/site.css')) ?>">
 </head>
 <body>
 <nav class="site-nav">

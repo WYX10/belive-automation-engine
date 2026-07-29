@@ -30,8 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="theme-color" content="#F5833C">
 <title>Log in · BeLive Automation Engine</title>
 <link rel="icon" type="image/png" href="/assets/img/belive-favicon.png">
-<link rel="stylesheet" href="/assets/css/belive-theme.css">
-<link rel="stylesheet" href="/assets/css/admin.css">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/belive-theme.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset_url('/assets/css/admin.css')) ?>">
 </head>
 <body class="admin-login">
 <div class="belive-card login-card">

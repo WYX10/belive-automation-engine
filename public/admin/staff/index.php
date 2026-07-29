@@ -427,31 +427,33 @@ admin_header('Staff schedule', 'staff');
                 <p class="belive-muted" style="font-size:13.5px">No upcoming leave. Anything added here is
                 carved out of the roster immediately.</p>
             <?php else: ?>
-                <table class="belive-table" style="font-size:13px">
-                    <tbody>
-                    <?php foreach ($timeOff as $off): ?>
-                        <tr>
-                            <td>
-                                <strong><?= e($off['staff_name']) ?></strong>
-                                <div class="belive-muted" style="font-size:12.5px">
-                                    <?= e(date('j M, g:ia', strtotime($off['starts_at']))) ?>
-                                    → <?= e(date('j M, g:ia', strtotime($off['ends_at']))) ?>
-                                    <?= $off['reason'] !== null ? ' · ' . e($off['reason']) : '' ?>
-                                </div>
-                            </td>
-                            <td style="text-align:right">
-                                <form method="post" data-confirm="Remove this time off?">
-                                    <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-                                    <input type="hidden" name="do" value="remove_time_off">
-                                    <input type="hidden" name="time_off_id" value="<?= (int) $off['id'] ?>">
-                                    <button class="belive-btn-ghost"
-                                            style="padding:2px 8px; font-size:12px; color:var(--belive-danger)">✕</button>
-                                </form>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+                <div class="belive-table-wrap">
+                    <table class="belive-table" style="font-size:13px">
+                        <tbody>
+                        <?php foreach ($timeOff as $off): ?>
+                            <tr>
+                                <td>
+                                    <strong><?= e($off['staff_name']) ?></strong>
+                                    <div class="belive-muted" style="font-size:12.5px">
+                                        <?= e(date('j M, g:ia', strtotime($off['starts_at']))) ?>
+                                        → <?= e(date('j M, g:ia', strtotime($off['ends_at']))) ?>
+                                        <?= $off['reason'] !== null ? ' · ' . e($off['reason']) : '' ?>
+                                    </div>
+                                </td>
+                                <td style="text-align:right">
+                                    <form method="post" data-confirm="Remove this time off?">
+                                        <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                                        <input type="hidden" name="do" value="remove_time_off">
+                                        <input type="hidden" name="time_off_id" value="<?= (int) $off['id'] ?>">
+                                        <button class="belive-btn-ghost"
+                                                style="padding:2px 8px; font-size:12px; color:var(--belive-danger)">✕</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             <?php endif; ?>
 
             <form method="post" style="margin-top:14px; border-top:1px solid var(--belive-line); padding-top:14px">
@@ -491,25 +493,27 @@ admin_header('Staff schedule', 'staff');
                 <p class="belive-muted" style="font-size:13.5px">Nothing scheduled yet. As Eve books viewings
                 she picks the least-loaded agent who is on shift and can handle the chosen mode.</p>
             <?php else: ?>
-                <table class="belive-table" style="font-size:13px">
-                    <thead><tr><th>When</th><th>Agent</th><th>Customer</th><th>Mode</th></tr></thead>
-                    <tbody>
-                    <?php foreach ($assignments as $row): ?>
-                        <tr>
-                            <td style="white-space:nowrap">
-                                <?= e(date('D j M', strtotime($row['viewing_datetime']))) ?>
-                                <div class="belive-muted" style="font-size:12px"><?= e(date('g:ia', strtotime($row['viewing_datetime']))) ?></div>
-                            </td>
-                            <td><?= e($row['staff_name']) ?></td>
-                            <td>
-                                <?= e($row['lead_name'] ?: $row['wa_phone']) ?>
-                                <div class="belive-muted" style="font-size:12px"><?= e($row['room_name'] ?: 'General viewing') ?></div>
-                            </td>
-                            <td style="white-space:nowrap"><?= e($modeLabel($row['viewing_mode'])) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+                <div class="belive-table-wrap">
+                    <table class="belive-table" style="font-size:13px">
+                        <thead><tr><th>When</th><th>Agent</th><th>Customer</th><th>Mode</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($assignments as $row): ?>
+                            <tr>
+                                <td style="white-space:nowrap">
+                                    <?= e(date('D j M', strtotime($row['viewing_datetime']))) ?>
+                                    <div class="belive-muted" style="font-size:12px"><?= e(date('g:ia', strtotime($row['viewing_datetime']))) ?></div>
+                                </td>
+                                <td><?= e($row['staff_name']) ?></td>
+                                <td>
+                                    <?= e($row['lead_name'] ?: $row['wa_phone']) ?>
+                                    <div class="belive-muted" style="font-size:12px"><?= e($row['room_name'] ?: 'General viewing') ?></div>
+                                </td>
+                                <td style="white-space:nowrap"><?= e($modeLabel($row['viewing_mode'])) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             <?php endif; ?>
         </div>
     </div>
@@ -522,42 +526,44 @@ admin_header('Staff schedule', 'staff');
         Booked when nobody was rostered (or before the roster existed). Agents already busy or off duty
         at that hour are left out of the list.
     </p>
-    <table class="belive-table" style="font-size:13px">
-        <thead><tr><th>When</th><th>Customer</th><th>Mode</th><th>Assign to</th></tr></thead>
-        <tbody>
-        <?php foreach ($unassigned as $row): ?>
-            <?php $candidates = StaffScheduler::availableAt($row['viewing_datetime'], $row['viewing_mode'] ?: 'any'); ?>
-            <tr>
-                <td style="white-space:nowrap">
-                    <?= e(date('D j M', strtotime($row['viewing_datetime']))) ?>
-                    <div class="belive-muted" style="font-size:12px"><?= e(date('g:ia', strtotime($row['viewing_datetime']))) ?></div>
-                </td>
-                <td>
-                    <a href="/admin/bookings"><?= e($row['lead_name'] ?: $row['wa_phone']) ?></a>
-                    <div class="belive-muted" style="font-size:12px"><?= e($row['room_name'] ?: 'General viewing') ?></div>
-                </td>
-                <td style="white-space:nowrap"><?= e($modeLabel($row['viewing_mode'])) ?></td>
-                <td>
-                    <?php if ($candidates === []): ?>
-                        <span class="belive-muted" style="font-size:12.5px">Nobody free — extend a shift or move the viewing.</span>
-                    <?php else: ?>
-                        <form method="post" class="staff-assign">
-                            <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-                            <input type="hidden" name="do" value="assign_booking">
-                            <input type="hidden" name="booking_id" value="<?= (int) $row['id'] ?>">
-                            <select name="staff_id">
-                                <?php foreach ($candidates as $candidate): ?>
-                                    <option value="<?= (int) $candidate['id'] ?>"><?= e($candidate['name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <button class="belive-btn-ghost" style="padding:8px 14px; font-size:13px">Assign</button>
-                        </form>
-                    <?php endif; ?>
-                </td>
-            </tr>
-        <?php endforeach; ?>
-        </tbody>
-    </table>
+    <div class="belive-table-wrap">
+        <table class="belive-table" style="font-size:13px">
+            <thead><tr><th>When</th><th>Customer</th><th>Mode</th><th>Assign to</th></tr></thead>
+            <tbody>
+            <?php foreach ($unassigned as $row): ?>
+                <?php $candidates = StaffScheduler::availableAt($row['viewing_datetime'], $row['viewing_mode'] ?: 'any'); ?>
+                <tr>
+                    <td style="white-space:nowrap">
+                        <?= e(date('D j M', strtotime($row['viewing_datetime']))) ?>
+                        <div class="belive-muted" style="font-size:12px"><?= e(date('g:ia', strtotime($row['viewing_datetime']))) ?></div>
+                    </td>
+                    <td>
+                        <a href="/admin/bookings"><?= e($row['lead_name'] ?: $row['wa_phone']) ?></a>
+                        <div class="belive-muted" style="font-size:12px"><?= e($row['room_name'] ?: 'General viewing') ?></div>
+                    </td>
+                    <td style="white-space:nowrap"><?= e($modeLabel($row['viewing_mode'])) ?></td>
+                    <td>
+                        <?php if ($candidates === []): ?>
+                            <span class="belive-muted" style="font-size:12.5px">Nobody free — extend a shift or move the viewing.</span>
+                        <?php else: ?>
+                            <form method="post" class="staff-assign">
+                                <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                                <input type="hidden" name="do" value="assign_booking">
+                                <input type="hidden" name="booking_id" value="<?= (int) $row['id'] ?>">
+                                <select name="staff_id">
+                                    <?php foreach ($candidates as $candidate): ?>
+                                        <option value="<?= (int) $candidate['id'] ?>"><?= e($candidate['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button class="belive-btn-ghost" style="padding:8px 14px; font-size:13px">Assign</button>
+                            </form>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 <?php endif; ?>
 
