@@ -23,6 +23,15 @@ $roomId = (int) $room['id'];
 $saving = PricingCalculator::savingVsFlexible($roomId, '12_month');
 $enquired = ($_GET['enquired'] ?? '') === '1';
 
+// Handed over by /enquire when the visitor still has to open the conversation
+// themselves (WhatsApp's 24-hour window). One-shot: a refresh must not send
+// them back to WhatsApp with an enquiry they already sent.
+$enquiryWaLink = '';
+if ($enquired && !empty($_SESSION['enquiry_wa_link'])) {
+    $enquiryWaLink = (string) $_SESSION['enquiry_wa_link'];
+    unset($_SESSION['enquiry_wa_link']);
+}
+
 site_header($room['property_name'] ?: $room['name'], 'rooms');
 ?>
 <div style="padding-top:30px">
@@ -37,7 +46,20 @@ site_header($room['property_name'] ?: $room['name'], 'rooms');
     <p class="belive-muted" style="margin:4px 0 18px">📍 <?= e($room['location']) ?> · <?= e(ucfirst($room['room_type'])) ?> room<?= $room['available_from'] ? ' · available from ' . e(date('j M Y', strtotime($room['available_from']))) : '' ?></p>
 </div>
 
-<?php if ($enquired): ?>
+<?php if ($enquired && $enquiryWaLink !== ''): ?>
+    <div class="belive-alert success">
+        ✓ Got it — opening WhatsApp with your enquiry ready to send.
+        <span class="belive-muted">Tap send and Eve replies in seconds, this room's details already in hand.</span>
+        <p style="margin-top:10px">
+            <a class="belive-btn-primary" href="<?= e($enquiryWaLink) ?>" id="open-wa" target="_blank" rel="noopener">Open WhatsApp</a>
+        </p>
+    </div>
+    <script>
+        // Same tab, after a beat, so the line above is readable first — and the
+        // button above stays the fallback if the browser blocks the hop.
+        setTimeout(function () { window.location.href = document.getElementById('open-wa').href; }, 1200);
+    </script>
+<?php elseif ($enquired): ?>
     <div class="belive-alert success">✓ Enquiry sent! Check your WhatsApp — Eve already has this room's details and is ready to help.</div>
 <?php elseif (($_GET['error'] ?? '') !== ''): ?>
     <div class="belive-alert danger"><?= e($_GET['error']) ?></div>

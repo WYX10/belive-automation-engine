@@ -62,6 +62,40 @@ final class WebhookParser
         return $messages;
     }
 
+    /**
+     * Deliveries Meta gave up on. A send can return HTTP 200 with a message id
+     * and still never arrive — a closed 24-hour window, a number that is not on
+     * WhatsApp — and the only notice of that is this status callback. Dropping
+     * it (as we used to) leaves a message looking sent forever.
+     *
+     * @return array<int, array{message_id:string, recipient:string, code:int, title:string, details:string}>
+     */
+    public static function parseFailedStatuses(array $payload): array
+    {
+        $failures = [];
+
+        foreach ($payload['entry'] ?? [] as $entry) {
+            foreach ($entry['changes'] ?? [] as $change) {
+                foreach (($change['value'] ?? [])['statuses'] ?? [] as $status) {
+                    if (($status['status'] ?? '') !== 'failed') {
+                        continue;
+                    }
+
+                    $error = ($status['errors'] ?? [])[0] ?? [];
+                    $failures[] = [
+                        'message_id' => (string) ($status['id'] ?? ''),
+                        'recipient'  => (string) ($status['recipient_id'] ?? ''),
+                        'code'       => (int) ($error['code'] ?? 0),
+                        'title'      => (string) ($error['title'] ?? 'Unknown delivery failure'),
+                        'details'    => (string) ($error['error_data']['details'] ?? $error['message'] ?? ''),
+                    ];
+                }
+            }
+        }
+
+        return $failures;
+    }
+
     /** True when the payload is a WhatsApp status update (sent/delivered/read). */
     public static function isStatusOnly(array $payload): bool
     {

@@ -114,7 +114,7 @@ final class ConversationManager
                 'direction'    => 'outbound',
                 'message_out'  => $reply,
                 'message_kind' => 'escalation_notice',
-                'reasoning'    => $decision['reasoning'] . ($sent['dry_run'] ? ' (dry-run)' : ''),
+                'reasoning'    => $decision['reasoning'] . WhatsAppClient::deliveryNote($sent),
                 'response_ms'  => (int) ((hrtime(true) - $started) / 1_000_000),
             ]);
             return;
@@ -201,7 +201,7 @@ final class ConversationManager
                     ? 'Requested slot clashed with an existing booking'
                     : 'No staff rostered/free for the requested slot')
                     . '; suggested nearest free slot.'
-                    . ($sent['dry_run'] ? ' (dry-run)' : ''),
+                    . WhatsAppClient::deliveryNote($sent),
             ]);
             return true;
         }
@@ -263,7 +263,7 @@ final class ConversationManager
             'message_out'  => $reply,
             'message_kind' => 'question',
             'reasoning'    => 'Proposed exact viewing slot; awaiting viewing-mode choice (video call vs in person).'
-                . ($sent['dry_run'] ? ' (dry-run)' : ''),
+                . WhatsAppClient::deliveryNote($sent),
         ]);
 
         return true;
@@ -336,7 +336,7 @@ final class ConversationManager
             'direction'    => 'outbound',
             'message_out'  => $reply,
             'message_kind' => 'reply',
-            'reasoning'    => 'Canned ack for ' . $pre . ($sent['dry_run'] ? ' (dry-run)' : ''),
+            'reasoning'    => 'Canned ack for ' . $pre . WhatsAppClient::deliveryNote($sent),
         ]);
     }
 }

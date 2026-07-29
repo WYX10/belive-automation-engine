@@ -78,6 +78,27 @@ Meta-side setup and a public URL:
 **Free-tier note (budget)**: replies inside the 24-hour customer-service window to user-initiated
 messages are free on the Cloud API — the demo flow costs nothing per message.
 
+### Why the website enquiry form opens WhatsApp instead of pushing a message
+
+That same 24-hour window is the reason "Enquire on WhatsApp" hands the visitor a prefilled wa.me
+link rather than messaging them out of the blue. A first-time visitor has never messaged our
+number, so there is no open window to reply into: Meta refuses the send (error **131047**), or
+accepts it and drops it, and either way the customer's phone stays silent. They tap send, the
+window opens from their side, and Eve answers on the inbound webhook with the room context already
+attached to their lead. A visitor who *has* messaged us in the last 24 hours still gets the instant
+AI reply, unchanged.
+
+The other lawful way to open a conversation is an approved **message template** for first contact —
+a WABA-side approval (Meta Business Suite → WhatsApp Manager → Message templates), not a code
+change. Add template sending to `WhatsAppClient` once a template is approved if you want the push.
+
+**When a message does not arrive, look here first** — both are visible in **Admin → Activity**:
+- `wa_send_failed` — Meta refused the send; the row carries its error code and message.
+  Common ones: **131047** closed window, **131030** number not in the test-recipient list
+  (see step 5 above), **131026** number is not on WhatsApp.
+- `wa_delivery_failed` — Meta accepted the send with a message id and then failed to deliver it.
+  This only ever arrives on the status webhook, so it is invisible anywhere else.
+
 ## 5b. Going live on Facebook / Instagram auto-reply
 
 Someone comments on a beLive post → they get a public reply and a private DM holding a WhatsApp

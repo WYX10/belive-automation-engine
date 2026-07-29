@@ -47,7 +47,19 @@ $e = fn ($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
     </div>
 
     <div class="belive-card">
-        <?php if ($result !== null && $result['ok']): ?>
+        <?php if ($result !== null && $result['ok'] && ($result['wa_link'] ?? '') !== ''): ?>
+            <?php // First contact: WhatsApp's 24h window only opens once THEY message us. ?>
+            <div class="belive-alert success">
+                ✓ Got it! One tap left — open WhatsApp and send the message we've written for you.
+            </div>
+            <p style="margin:12px 0">
+                <a class="belive-btn-primary" href="<?= $e($result['wa_link']) ?>" id="open-wa" target="_blank" rel="noopener"
+                   style="width:100%; justify-content:center">Open WhatsApp</a>
+            </p>
+            <script>
+                setTimeout(function () { window.location.href = document.getElementById('open-wa').href; }, 1200);
+            </script>
+        <?php elseif ($result !== null && $result['ok']): ?>
             <div class="belive-alert success">
                 ✓ Got it! Check your WhatsApp — Eve is already looking for your room.
             </div>
