@@ -112,15 +112,17 @@ final class RoomVideoComposer
                     $seconds = min($seconds, max(1.5, $shot['duration'] - 0.2));
                 }
 
+                $isCta = (bool) ($scene['cta'] ?? false);
                 $overlay = $workDir . '/overlay_' . $i . '.png';
                 self::drawOverlay(
                     $overlay,
                     $fonts,
                     (string) $scene['headline'],
                     (string) ($scene['sub'] ?? ''),
-                    (bool) ($scene['cta'] ?? false),
+                    $isCta,
                     $i + 1,
-                    count($scenes)
+                    count($scenes),
+                    MascotLibrary::forScene($i, trim($scene['headline'] . ' ' . ($scene['sub'] ?? '')), $isCta)
                 );
                 $overlays[] = $overlay;
                 $plan[] = ['shot' => $shot, 'seconds' => round($seconds, 2), 'overlay' => $overlay];
@@ -337,7 +339,8 @@ final class RoomVideoComposer
         string $sub,
         bool $isCta,
         int $position,
-        int $total
+        int $total,
+        ?string $mascotPose = null
     ): void {
         $width = CONTENT_VIDEO_WIDTH;
         $height = CONTENT_VIDEO_HEIGHT;
@@ -377,6 +380,9 @@ final class RoomVideoComposer
             if ($isCta) {
                 $lines = self::wrap($fonts['bold'], 74, $maxWidth, $headline);
                 $blockTop = (int) ($height / 2) - count($lines) * 50;
+                // The end card is the mascot's frame: it stands over the ask,
+                // centred, at the size a sticker would be.
+                MascotLibrary::stamp($canvas, $mascotPose, 560, (int) ($width / 2), $blockTop - 60, 'centre');
                 $y = self::writeLines($canvas, $lines, $fonts['bold'], 74, 96, $margin, $blockTop, $white);
                 if ($sub !== '') {
                     $y = self::writeLines($canvas, self::wrap($fonts['regular'], 44, $maxWidth, $sub), $fonts['regular'], 44, 62, $margin, $y + 34, $softWhite);
@@ -384,6 +390,10 @@ final class RoomVideoComposer
                 // The teal rule under an end card reads as a button edge.
                 imagefilledrectangle($canvas, $margin, $y + 46, $margin + 260, $y + 56, $teal);
             } else {
+                // On a room shot the mascot stands to the right, its feet on the
+                // line where the scrim begins, clear of the words underneath.
+                MascotLibrary::stamp($canvas, $mascotPose, 520, $width - 40, (int) ($height * 0.52) + 90, 'right');
+
                 $headlineLines = self::wrap($fonts['bold'], 66, $maxWidth, $headline);
                 $subLines = $sub !== '' ? self::wrap($fonts['regular'], 40, $maxWidth, $sub) : [];
                 $blockHeight = count($headlineLines) * 86 + count($subLines) * 58;

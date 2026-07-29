@@ -53,7 +53,7 @@ PROMPT;
 
 You write BeLive's social media captions. Convert the room metrics you are given into ONE ready-to-post caption for the stated platform.
 
-Rules: hook first line; benefits as short phrases; then a call to action to WhatsApp us that includes the WHATSAPP LINK you are given, copied character for character on its own line; 3–6 relevant hashtags on the final line (e.g. #BeLive #RoomForRent + area tag). No invented facts — only what the metrics say. If an ADMIN BRIEF is given, follow its angle, tone and any campaign detail — but never let it override the no-invented-facts rule. Return ONLY the caption text.
+Rules: hook first line; benefits as short phrases; then a call to action to WhatsApp us that includes the WHATSAPP LINK you are given, copied character for character on its own line; 3–6 relevant hashtags on the final line, which MUST begin with #BeLiveSolopreneur and may then add others (#BeLive #RoomForRent + area tag). No invented facts — only what the metrics say. If an ADMIN BRIEF is given, follow its angle, tone and any campaign detail — but never let it override the no-invented-facts rule. Return ONLY the caption text.
 PROMPT;
 
     private const VIDEO_SYSTEM = self::VOICE . <<<PROMPT
@@ -73,7 +73,7 @@ Scene rules:
 - Do NOT write a closing call-to-action scene: a branded WhatsApp end card is added after your last scene.
 - Never invent a fact. A price always carries its tenure ("RM 620/mo, 12 months"), and zero deposit is claimed only when the metrics say the deposit is 0.
 
-Caption rules: exactly what you'd write as the post's caption — hook first line, benefits as short phrases, the WHATSAPP LINK you are given copied character for character on its own line, then 3–6 hashtags. If an ADMIN BRIEF is given, follow its angle in both the scenes and the caption.
+Caption rules: exactly what you'd write as the post's caption — hook first line, benefits as short phrases, the WHATSAPP LINK you are given copied character for character on its own line, then 3–6 hashtags whose first is #BeLiveSolopreneur. If an ADMIN BRIEF is given, follow its angle in both the scenes and the caption.
 PROMPT;
 
     /** @return array{text:string, model:string, interaction_id:int} */
@@ -166,7 +166,7 @@ PROMPT;
             ['max_tokens' => 350, 'temperature' => 0.6, 'mock_hint' => 'caption']
         ));
 
-        $result['text'] = self::withWhatsappLink(trim($result['text']), $whatsappLink);
+        $result['text'] = self::withCampaignHashtag(self::withWhatsappLink(trim($result['text']), $whatsappLink));
 
         EpisodicLogger::log([
             'phase'       => 'content_creation',
@@ -221,10 +221,10 @@ PROMPT;
         $scenes = $parsed['scenes'] !== [] ? $parsed['scenes'] : self::fallbackScenes($metrics);
         $model = $parsed['scenes'] !== [] ? $result['model'] : $result['model'] . ' (fallback script)';
 
-        $caption = self::withWhatsappLink(
+        $caption = self::withCampaignHashtag(self::withWhatsappLink(
             $parsed['caption'] !== '' ? $parsed['caption'] : self::fallbackCaption($metrics),
             $whatsappLink
-        );
+        ));
 
         EpisodicLogger::log([
             'phase'        => 'content_creation',
@@ -400,5 +400,32 @@ PROMPT;
         }
 
         return $caption . "\n\n💬 WhatsApp us: " . $link;
+    }
+
+    /**
+     * The campaign tag is a submission requirement, not a stylistic choice, so
+     * it is checked on the way out rather than left to the model — the same
+     * treatment the WhatsApp link gets, and for the same reason: a post that
+     * goes out without it cannot be fixed after the fact.
+     *
+     * A caption that already ends in hashtags gets it joined onto that line;
+     * anything else gets it on a line of its own.
+     */
+    private static function withCampaignHashtag(string $caption): string
+    {
+        $caption = rtrim($caption);
+        if (stripos($caption, CONTENT_REQUIRED_HASHTAG) !== false) {
+            return $caption;
+        }
+
+        $lines = explode("\n", $caption);
+        $last = trim((string) end($lines));
+        if ($last !== '' && str_starts_with($last, '#')) {
+            $lines[count($lines) - 1] = CONTENT_REQUIRED_HASHTAG . ' ' . $last;
+
+            return implode("\n", $lines);
+        }
+
+        return $caption . "\n\n" . CONTENT_REQUIRED_HASHTAG;
     }
 }

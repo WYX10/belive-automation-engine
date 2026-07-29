@@ -65,6 +65,7 @@ if ($post === false) {
 
 $imageUrl = SocialPublishManager::resolveImageUrl($post);
 $isVideo = ($post['media_kind'] ?? 'image') === 'video';
+$isBranded = str_starts_with((string) ($post['image_url'] ?? ''), '/assets/img/uploads/branded/');
 // The player streams from our own site, so it wants the site-local path — the
 // absolute APP_URL form is for the platforms fetching it, not for this page.
 $videoPath = $isVideo ? (string) ($post['video_url'] ?? '') : '';
@@ -123,6 +124,11 @@ admin_header('Post preview', 'content');
                 </div>
             <?php elseif ($imageUrl !== null): ?>
                 <img src="<?= e($imageUrl) ?>" alt="Attached room photo" style="width:100%; border-radius:12px; margin-bottom:10px; max-height:260px; object-fit:cover">
+                <?php if ($isBranded): ?>
+                    <div class="belive-muted" style="font-size:12.5px; margin-bottom:10px">
+                        🔒 Mascot-branded copy — this is what publishes. The room's gallery photo is untouched.
+                    </div>
+                <?php endif; ?>
             <?php else: ?>
                 <div class="belive-muted" style="font-size:12.5px; margin-bottom:10px">No room photo attached — Facebook posts text-only; Instagram and TikTok need an image.</div>
             <?php endif; ?>

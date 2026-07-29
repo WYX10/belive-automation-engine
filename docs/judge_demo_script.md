@@ -133,10 +133,15 @@ generic "hi again".
 - **Manual intake** (Admin → Leads → Manual intake): log a TikTok/PropertyGuru enquiry — identical
   downstream AI pipeline (see honest-limitations below).
 - **Content studio** (Admin → Content): pick a room, generate — an on-brand caption from live room
-  metrics, by the model shown on the draft. Approve → mark posted → dashboard count updates.
+  metrics, by the model shown on the draft, with BeLive's mascot stamped on the photo that publishes
+  (the owner's gallery original is never written to). Every caption carries `#BeLiveSolopreneur`,
+  enforced on the way out rather than left to the model. Approve → mark posted → dashboard count
+  updates.
 - **Promo video** (same screen, post type → 🎬): generate again and a 9:16 reel is cut on the spot
   from that room's *own* photos and tour clips — the AI writes the scenes burned onto each shot and
-  the caption, never the footage, and the studio adds the closing WhatsApp card itself. Preview
+  the caption, never the footage, and the studio adds the closing WhatsApp card itself. The mascot
+  appears on every scene in a pose picked from what that scene says (price → trophy, zero deposit →
+  fist pump, the end card → megaphone), so point that out while it plays. Preview
   plays the exact file that publishes, next to the shot list showing what each second says.
   Needs `ffmpeg` on the box (`FFMPEG_BIN` in `.env` if it's off PATH); without it the option is
   visibly off rather than silently degrading to a photo post.

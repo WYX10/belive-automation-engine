@@ -11,14 +11,19 @@ declare(strict_types=1);
  *      produces a real 9:16 file (skipped where ffmpeg isn't installed),
  *   3. each platform publishes a video down its video route, and a video draft
  *      with nothing rendered fails as a video rather than quietly posting the
- *      poster photo.
+ *      poster photo,
+ *   4. BeLive's mascot reacts to what the copy says and lands on both kinds of
+ *      post, without the owner's original photography ever being written to.
  */
 
 use App\AI\Skills\CreateSkill;
+use App\Content\MascotLibrary;
+use App\Content\PhotoPostDrafter;
 use App\Content\PromoVideoDrafter;
 use App\Content\RoomVideoComposer;
 use App\Core\Database;
 use App\Core\Settings;
+use App\Models\Room;
 use App\Integrations\Social\FacebookPublisher;
 use App\Integrations\Social\InstagramPublisher;
 use App\Integrations\Social\SocialPublishManager;
@@ -70,6 +75,8 @@ $promo = CreateSkill::videoPromo($videoRoom, 'instagram', null, 2);
 check('a promo video script comes back with scenes', $promo['scenes'] !== [], json_encode($promo['scenes']));
 check('the video caption carries the tap-to-chat WhatsApp link',
     str_contains($promo['caption'], 'https://wa.me/60123456789'), $promo['caption']);
+check('the video caption carries the campaign hashtag',
+    str_contains($promo['caption'], CONTENT_REQUIRED_HASHTAG), $promo['caption']);
 
 $sceneShapeOk = true;
 foreach ($promo['scenes'] as $scene) {
@@ -88,6 +95,58 @@ check('a script never runs longer than a short-form reel should',
 // Cross-fades overlap, so the reel is shorter than the sum of its scenes.
 check('duration accounts for the cross-fade overlap',
     RoomVideoComposer::duration([['seconds' => 4.0], ['seconds' => 4.0], ['seconds' => 4.0]]) === 11.0);
+
+// ---- the mascot -------------------------------------------------------------
+check('the mascot artwork ships with the app', MascotLibrary::isAvailable());
+check('every named pose is actually on disk',
+    array_filter(MascotLibrary::POSES, static fn (string $p): bool => MascotLibrary::file($p) === null) === [],
+    implode(', ', array_filter(MascotLibrary::POSES, static fn (string $p): bool => MascotLibrary::file($p) === null)));
+check('an unknown pose is refused rather than guessed at', MascotLibrary::file('not-a-pose') === null);
+
+// The pose is read off what the scene says, so the character reacts to the copy.
+check('the opening scene waves before it sells', MascotLibrary::forScene(0, 'Master room in Cheras') === 'waving');
+check('the closing card gets the megaphone', MascotLibrary::forScene(3, 'anything at all', true) === 'megaphone');
+check('a price line gets the trophy', MascotLibrary::forScene(1, 'RM 820/mo on a 12-month stay') === 'trophy');
+check('a zero-deposit line gets the fist pump', MascotLibrary::forScene(2, 'Zero deposit, move in now') === 'cheering');
+check('a wifi line gets the laptop', MascotLibrary::forScene(2, 'Fast WiFi for late-night study') === 'laptop');
+// Cues are ordered, so a line that could take two poses takes the first — the
+// benefit BeLive leads with, not whichever pattern happened to be written last.
+check('a line with competing cues resolves to one pose, predictably',
+    MascotLibrary::forScene(2, 'WiFi and weekly cleaning') === 'zen');
+check('a scene with no cue still gets a pose', in_array(MascotLibrary::forScene(2, 'A quiet corner unit'), MascotLibrary::POSES, true));
+check('the same scene always picks the same pose',
+    MascotLibrary::forScene(2, 'A quiet corner unit') === MascotLibrary::forScene(2, 'A quiet corner unit'));
+
+// ---- branding a photo post --------------------------------------------------
+$photoDraft = PhotoPostDrafter::draft($videoRoom, 'facebook', 'Zero deposit push.');
+$brandedPost = Database::run('SELECT * FROM content_posts WHERE id = ?', [$photoDraft['post_id']])->fetch();
+
+check('a photo post is branded with the mascot', $photoDraft['branded'] === true, (string) $photoDraft['image_url']);
+check('the photo post publishes the branded copy, not the raw room photo',
+    str_starts_with((string) $brandedPost['image_url'], '/assets/img/uploads/branded/'), (string) $brandedPost['image_url']);
+check('the branded copy is a real image of the same shape as the original', (static function () use ($brandedPost): bool {
+    $branded = @getimagesize(APP_ROOT . '/public' . $brandedPost['image_url']);
+    $original = @getimagesize(APP_ROOT . '/public/assets/img/rooms/riamas-master-ensuite-1.jpg');
+
+    return $branded !== false && $original !== false && $branded[0] === $original[0] && $branded[1] === $original[1];
+})());
+check('the owner\'s original photography is left exactly as uploaded',
+    Room::photoUrls($videoRoomId)[0] === '/assets/img/rooms/riamas-master-ensuite-1.jpg'
+    && is_file(APP_ROOT . '/public/assets/img/rooms/riamas-master-ensuite-1.jpg'));
+check('the photo caption carries the campaign hashtag too',
+    str_contains((string) $brandedPost['caption'], CONTENT_REQUIRED_HASHTAG), (string) $brandedPost['caption']);
+@unlink(APP_ROOT . '/public' . $brandedPost['image_url']);
+
+// A room with no photography has nothing to brand, and that is not a failure.
+check('a photoless room still drafts a caption post', (static function () use ($videoProperty): bool {
+    $room = App\Properties\PropertyManager::addRoomForAdmin((int) $videoProperty['id'], [
+        'room_code' => 'PRR-03', 'name' => 'Unbranded Room', 'room_type' => 'single', 'status' => 'available',
+        'price_monthly' => '600', 'price_6_month' => '580', 'price_12_month' => '560', 'referral_reward_points' => '40',
+    ]);
+    $draft = PhotoPostDrafter::draft($room, 'facebook');
+
+    return $draft['post_id'] > 0 && $draft['branded'] === false && $draft['image_url'] === null;
+})());
 
 // ---- the render -------------------------------------------------------------
 if (RoomVideoComposer::isAvailable()) {

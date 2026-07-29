@@ -13,6 +13,8 @@ defined('APP_BOOTED') || exit('No direct access.');
  */
 
 use App\AI\Skills\CreateSkill;
+use App\Content\MascotLibrary;
+use App\Content\PhotoPostDrafter;
 use App\Content\PromoVideoDrafter;
 use App\Content\RoomVideoComposer;
 use App\Core\Auth;
@@ -75,12 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate'
                     $video['model']
                 ));
             } else {
-                $caption = CreateSkill::socialCaption($room, $platform, $brief);
-                Database::run(
-                    'INSERT INTO content_posts (platform, room_id, caption, status, generated_by_model, generated_via, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [$platform, $room['id'], $caption['text'], 'draft', $caption['model'], 'manual', Room::photoUrls((int) $room['id'])[0] ?? null]
-                );
-                set_flash('success', 'Draft generated from live room metrics by ' . $caption['model'] . '.');
+                $photo = PhotoPostDrafter::draft($room, $platform, $brief);
+                set_flash('success', 'Draft generated from live room metrics by ' . $photo['model'] . '.'
+                    . ($photo['branded'] ? ' The mascot is on the photo that publishes — your original stays untouched.' : ''));
             }
         } catch (\Throwable $e) {
             set_flash('danger', 'Generation failed: ' . $e->getMessage());
@@ -115,6 +114,7 @@ $autoMedia = Settings::get('content_auto_media', 'image');
 // Rendering is the one thing the studio cannot do on its own — say so up front
 // rather than after an admin has waited on a failing Generate.
 $videoReady = RoomVideoComposer::isAvailable();
+$mascotReady = MascotLibrary::isAvailable();
 $standingBrief = Settings::get('content_brief', '');
 $waPrefill = Settings::get('content_wa_prefill', '');
 // Exactly what a reader taps, built from a real room so the preview is honest.
@@ -181,11 +181,17 @@ admin_header('Content', 'content');
         <div class="belive-muted" style="flex:1 1 100%; font-size:12.5px">
             <?php if ($videoReady): ?>
                 🎬 A promo video is cut from the room's <em>own</em> photos and tour clips — the AI writes the scenes and the
-                caption, never the footage. Rendering takes a few seconds per scene, so give Generate a moment.
+                caption, never the footage. Rendering takes a few seconds per scene, so give Generate a moment.<br>
             <?php else: ?>
                 🎬 Promo video is unavailable — <code>ffmpeg</code> was not found on this server. Install it, or point
-                <code>FFMPEG_BIN</code> in <code>.env</code> at the executable, and the option turns on.
+                <code>FFMPEG_BIN</code> in <code>.env</code> at the executable, and the option turns on.<br>
             <?php endif; ?>
+            <?php if ($mascotReady): ?>
+                🔒 Both post types carry the BeLive mascot — a pose picked to match what the copy says. On a photo post it is
+                stamped onto a <em>copy</em>; the gallery keeps the owner's original untouched.
+            <?php endif; ?>
+            Every caption goes out with <code><?= e(CONTENT_REQUIRED_HASHTAG) ?></code> — added on the way out, so a draft
+            can never lose the campaign tag.
         </div>
     </form>
 </div>
