@@ -16,7 +16,7 @@ namespace App\AI;
  * via real keys entered in Admin → API Credentials. See docs/setup_guide.md.
  *
  * Skills pass opts['mock_hint'] naming the response shape they expect
- * ('understand' | 'decide' | 'create' | 'learn' | 'caption' | 'video' | 'time_parse');
+ * ('understand' | 'decide' | 'create' | 'learn' | 'caption' | 'video' | 'photo' | 'time_parse');
  * real clients ignore that field entirely.
  */
 final class MockClient implements LlmClient
@@ -42,6 +42,7 @@ final class MockClient implements LlmClient
             'learn'      => $this->mockLearn($system . ' ' . $lastUser),
             'caption'    => "[MOCK] Fully furnished room, ready when you are. Just bring your bag — we handle the rest.",
             'video'      => $this->mockVideo($lastUser),
+            'photo'      => $this->mockPhoto($lastUser),
             'time_parse' => $this->mockTimeParse($lastUser),
             'scam'       => $this->mockScam($lastUser),
             'agreement'  => $this->mockAgreement($lastUser),
@@ -208,6 +209,55 @@ final class MockClient implements LlmClient
             'scenes'  => $scenes,
             'caption' => "[MOCK] A $type room in $area, ready when you are. Zero deposit, weekly cleaning.\n"
                 . ($link !== '' ? "$link\n" : '') . '#BeLive #RoomForRent',
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * A room-photo touch-up recipe. The stub cannot see the image, so it works
+     * purely off the measurement block the enhancer puts in the prompt — which
+     * is exactly the deterministic path RoomPhotoEnhancer falls back to when a
+     * real model is unreachable, so tests exercise a realistic recipe shape.
+     */
+    private function mockPhoto(string $userPrompt): string
+    {
+        $get = static fn (string $key): ?float => preg_match('/"' . $key . '":\s*(-?[\d.]+)/', $userPrompt, $m)
+            ? (float) $m[1]
+            : null;
+        $cast = preg_match('/"colour_cast":\s*"([a-z]+)"/', $userPrompt, $m) ? $m[1] : 'neutral';
+
+        $luminance = $get('mean_luminance_pct') ?? 50.0;
+        $spread = $get('contrast_spread_pct') ?? 60.0;
+        $saturation = $get('saturation_pct') ?? 30.0;
+        $castStrength = $get('cast_strength_pct') ?? 0.0;
+
+        $issues = [];
+        if ($luminance < 42.0) {
+            $issues[] = 'underexposed';
+        } elseif ($luminance > 62.0) {
+            $issues[] = 'overexposed';
+        }
+        if ($spread < 50.0) {
+            $issues[] = 'flat contrast';
+        }
+        if ($castStrength > 8.0 && $cast !== 'neutral') {
+            $issues[] = $cast . ' colour cast';
+        }
+
+        return json_encode([
+            'verdict'    => '[MOCK] ' . ($issues === []
+                ? 'Well exposed already — only a light polish applied.'
+                : 'Phone shot with ' . implode(' and ', $issues) . '; corrected without changing the room.'),
+            'issues'     => $issues,
+            'brightness' => (int) max(-40, min(40, round((50.0 - $luminance) * 0.9))),
+            'contrast'   => (int) max(-25, min(25, round((60.0 - $spread) * 0.5))),
+            'saturation' => (int) max(-20, min(25, round((32.0 - $saturation) * 0.6))),
+            'warmth'     => (int) max(-30, min(30, round(match ($cast) {
+                'warm'    => -$castStrength * 0.7,
+                'cool'    => $castStrength * 0.7,
+                default   => 0,
+            }))),
+            'straighten' => 0.0,
+            'sharpen'    => 25,
         ], JSON_UNESCAPED_UNICODE);
     }
 

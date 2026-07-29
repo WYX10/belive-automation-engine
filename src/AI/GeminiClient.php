@@ -33,6 +33,10 @@ final class GeminiClient implements LlmClient
             'parts' => [['text' => $m['content']]],
         ], $messages);
 
+        if (isset($opts['image'])) {
+            $contents = self::withImage($contents, $opts['image']);
+        }
+
         try {
             $response = $this->http->post(self::BASE . "/{$this->model}:generateContent", [
                 'headers' => [
@@ -74,5 +78,26 @@ final class GeminiClient implements LlmClient
     public function modelName(): string
     {
         return $this->model;
+    }
+
+    /**
+     * Prepend the image as an inline_data part on the last user turn.
+     *
+     * @param array $contents Gemini-shaped contents
+     * @param array{mime:string, data:string} $image
+     */
+    private static function withImage(array $contents, array $image): array
+    {
+        for ($i = count($contents) - 1; $i >= 0; $i--) {
+            if ($contents[$i]['role'] !== 'user') {
+                continue;
+            }
+            array_unshift($contents[$i]['parts'], [
+                'inline_data' => ['mime_type' => $image['mime'], 'data' => $image['data']],
+            ]);
+            break;
+        }
+
+        return $contents;
     }
 }

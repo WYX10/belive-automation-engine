@@ -31,6 +31,9 @@ final class OpenAiCompatibleClient implements LlmClient
     public function generate(string $system, array $messages, array $opts = []): array
     {
         $maxTokens = $opts['max_tokens'] ?? 1024;
+        if (isset($opts['image'])) {
+            $messages = self::withImage($messages, $opts['image']);
+        }
 
         try {
             $response = $this->http->post(rtrim($this->baseUrl, '/') . '/chat/completions', [
@@ -63,5 +66,30 @@ final class OpenAiCompatibleClient implements LlmClient
     public function modelName(): string
     {
         return $this->model;
+    }
+
+    /**
+     * Attach the image to the last user turn as a data: URL — the shape both
+     * OpenAI and OpenRouter accept for vision models.
+     *
+     * @param array $messages
+     * @param array{mime:string, data:string} $image
+     */
+    private static function withImage(array $messages, array $image): array
+    {
+        for ($i = count($messages) - 1; $i >= 0; $i--) {
+            if (($messages[$i]['role'] ?? '') !== 'user' || !is_string($messages[$i]['content'])) {
+                continue;
+            }
+            $messages[$i]['content'] = [
+                ['type' => 'text', 'text' => $messages[$i]['content']],
+                ['type' => 'image_url', 'image_url' => [
+                    'url' => 'data:' . $image['mime'] . ';base64,' . $image['data'],
+                ]],
+            ];
+            break;
+        }
+
+        return $messages;
     }
 }

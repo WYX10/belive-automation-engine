@@ -128,6 +128,23 @@ final class Room extends BaseModel
         )->fetchAll(\PDO::FETCH_COLUMN);
     }
 
+    /**
+     * The same gallery photos as photoUrls(), but as full rows — the admin
+     * gallery needs each image's id and touch-up state to offer the per-photo
+     * Improve/Revert controls (see App\Properties\RoomPhotoEnhancer).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function photoRows(int $roomId): array
+    {
+        return Database::run(
+            "SELECT * FROM room_images
+             WHERE room_id = ? AND image_path NOT LIKE '%.mp4'
+             ORDER BY sort_order, id",
+            [$roomId]
+        )->fetchAll();
+    }
+
     /** @return string[] video tour URLs (mp4), sorted */
     public static function videoUrls(int $roomId): array
     {
