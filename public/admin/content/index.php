@@ -253,31 +253,33 @@ admin_header('Content', 'content');
     <?php if ($posts === []): ?>
         <p class="belive-muted"><?= $filter === 'all' ? 'No drafts yet — generate one above, or let the daily cron draft for you.' : 'Nothing in this state right now.' ?></p>
     <?php else: ?>
-        <table class="belive-table">
-            <thead><tr><th>Platform</th><th>Type</th><th>Room</th><th>Caption</th><th>Model</th><th>Status</th><th></th></tr></thead>
-            <tbody>
-            <?php foreach ($posts as $post): ?>
-                <tr>
-                    <td style="white-space:nowrap"><?= $platformIcons[$post['platform']] ?> <?= e(ucfirst($post['platform'])) ?></td>
-                    <td style="white-space:nowrap; font-size:13px"><?= $post['media_kind'] === 'video' ? '🎬 Video' : '🖼 Photo' ?></td>
-                    <td style="font-size:13px"><?= e($post['room_name'] ? "{$post['room_name']} ({$post['area']})" : '—') ?></td>
-                    <td style="font-size:13px; max-width:320px"><?= e(mb_substr($post['caption'], 0, 120)) ?><?= mb_strlen($post['caption']) > 120 ? '…' : '' ?></td>
-                    <td style="font-size:12.5px"><code><?= e($post['generated_by_model']) ?></code></td>
-                    <td>
-                        <span class="belive-badge <?= match ($post['status']) { 'posted' => '', 'rejected' => 'danger', default => 'orange' } ?>"><?= e($post['status']) ?></span>
-                        <?php if ($post['publish_status']): ?>
-                            <span class="belive-badge <?= match ($post['publish_status']) { 'published' => '', 'simulated' => 'orange', default => 'danger' } ?>" style="font-size:11px"><?= e($post['publish_status']) ?></span>
-                        <?php endif; ?>
-                        <?php if ($post['publish_status'] === 'failed' && $post['publish_error']): ?>
-                            <div class="belive-muted" style="font-size:11px" title="<?= e($post['publish_error']) ?>"><?= e(mb_substr($post['publish_error'], 0, 60)) ?><?= mb_strlen($post['publish_error']) > 60 ? '…' : '' ?></div>
-                        <?php endif; ?>
-                        <?php if ($post['posted_at']): ?><div class="belive-muted" style="font-size:11px"><?= e($post['posted_at']) ?></div><?php endif; ?>
-                    </td>
-                    <td><a class="belive-btn-ghost" style="padding:5px 12px; font-size:13px" href="/admin/content/preview?id=<?= (int) $post['id'] ?>">Preview</a></td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
+        <div class="belive-table-wrap">
+            <table class="belive-table">
+                <thead><tr><th>Platform</th><th>Type</th><th>Room</th><th>Caption</th><th>Model</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                <?php foreach ($posts as $post): ?>
+                    <tr>
+                        <td style="white-space:nowrap"><?= $platformIcons[$post['platform']] ?> <?= e(ucfirst($post['platform'])) ?></td>
+                        <td style="white-space:nowrap; font-size:13px"><?= $post['media_kind'] === 'video' ? '🎬 Video' : '🖼 Photo' ?></td>
+                        <td style="font-size:13px"><?= e($post['room_name'] ? "{$post['room_name']} ({$post['area']})" : '—') ?></td>
+                        <td style="font-size:13px; max-width:320px"><?= e(mb_substr($post['caption'], 0, 120)) ?><?= mb_strlen($post['caption']) > 120 ? '…' : '' ?></td>
+                        <td style="font-size:12.5px"><code><?= e($post['generated_by_model']) ?></code></td>
+                        <td>
+                            <span class="belive-badge <?= match ($post['status']) { 'posted' => '', 'rejected' => 'danger', default => 'orange' } ?>"><?= e($post['status']) ?></span>
+                            <?php if ($post['publish_status']): ?>
+                                <span class="belive-badge <?= match ($post['publish_status']) { 'published' => '', 'simulated' => 'orange', default => 'danger' } ?>" style="font-size:11px"><?= e($post['publish_status']) ?></span>
+                            <?php endif; ?>
+                            <?php if ($post['publish_status'] === 'failed' && $post['publish_error']): ?>
+                                <div class="belive-muted" style="font-size:11px" title="<?= e($post['publish_error']) ?>"><?= e(mb_substr($post['publish_error'], 0, 60)) ?><?= mb_strlen($post['publish_error']) > 60 ? '…' : '' ?></div>
+                            <?php endif; ?>
+                            <?php if ($post['posted_at']): ?><div class="belive-muted" style="font-size:11px"><?= e($post['posted_at']) ?></div><?php endif; ?>
+                        </td>
+                        <td><a class="belive-btn-ghost" style="padding:5px 12px; font-size:13px" href="/admin/content/preview?id=<?= (int) $post['id'] ?>">Preview</a></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     <?php endif; ?>
 </div>
 <?php admin_footer();

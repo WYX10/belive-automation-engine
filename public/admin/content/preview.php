@@ -227,23 +227,25 @@ admin_header('Post preview', 'content');
                     What the AI wrote onto each shot. The closing WhatsApp card is added by the studio, not the model —
                     every reel ends with a way to reach Eve.
                 </p>
-                <table class="belive-table">
-                    <thead><tr><th>#</th><th>On screen</th><th style="white-space:nowrap">Length</th></tr></thead>
-                    <tbody>
-                    <?php foreach ($scenes as $index => $scene): ?>
-                        <tr>
-                            <td><?= $index + 1 ?><?= !empty($scene['cta']) ? ' 💬' : '' ?></td>
-                            <td style="font-size:13px">
-                                <strong><?= e((string) ($scene['headline'] ?? '')) ?></strong>
-                                <?php if (($scene['sub'] ?? '') !== ''): ?>
-                                    <div class="belive-muted"><?= e((string) $scene['sub']) ?></div>
-                                <?php endif; ?>
-                            </td>
-                            <td style="white-space:nowrap; font-size:13px"><?= e(number_format((float) ($scene['seconds'] ?? 0), 1)) ?>s</td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+                <div class="belive-table-wrap">
+                    <table class="belive-table">
+                        <thead><tr><th>#</th><th>On screen</th><th style="white-space:nowrap">Length</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($scenes as $index => $scene): ?>
+                            <tr>
+                                <td><?= $index + 1 ?><?= !empty($scene['cta']) ? ' 💬' : '' ?></td>
+                                <td style="font-size:13px">
+                                    <strong><?= e((string) ($scene['headline'] ?? '')) ?></strong>
+                                    <?php if (($scene['sub'] ?? '') !== ''): ?>
+                                        <div class="belive-muted"><?= e((string) $scene['sub']) ?></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="white-space:nowrap; font-size:13px"><?= e(number_format((float) ($scene['seconds'] ?? 0), 1)) ?>s</td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         <?php endif; ?>
 

@@ -33,61 +33,63 @@ admin_header('API credentials', 'credentials');
         <p class="belive-muted">No API keys yet. Add your Meta WhatsApp, Claude and Gemini keys to bring
         Eve online — keys are encrypted at rest (AES-256-GCM) and never shown in full again.</p>
     <?php else: ?>
-        <table class="belive-table">
-            <thead>
-            <tr>
-                <th>Service</th><th>Label</th><th>Key</th><th>Status</th><th>Last test</th><th></th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($credentials as $cred): ?>
+        <div class="belive-table-wrap">
+            <table class="belive-table">
+                <thead>
                 <tr>
-                    <td><?= e($serviceLabels[$cred['service']] ?? $cred['service']) ?></td>
-                    <td><?= e($cred['label']) ?></td>
-                    <td><code><?= e($cred['masked_key']) ?></code></td>
-                    <td>
-                        <?php if ((int) $cred['is_active'] === 1): ?>
-                            <span class="belive-badge">active</span>
-                        <?php else: ?>
-                            <span class="belive-badge muted">inactive</span>
-                        <?php endif; ?>
-                    </td>
-                    <td style="font-size:13px">
-                        <?php if ($cred['last_tested_at'] === null): ?>
-                            <span class="belive-muted">never</span>
-                        <?php elseif ($cred['test_status'] === 'ok'): ?>
-                            <span class="belive-badge">✓ ok</span>
-                            <span class="belive-muted"><?= e($cred['last_tested_at']) ?></span>
-                        <?php else: ?>
-                            <span class="belive-badge danger">✗ failed</span>
-                            <span class="belive-muted" title="<?= e($cred['test_detail'] ?? '') ?>"><?= e($cred['last_tested_at']) ?></span>
-                        <?php endif; ?>
-                    </td>
-                    <td style="text-align:right; white-space:nowrap">
-                        <form method="post" action="/admin/credentials/test" style="display:inline">
-                            <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-                            <input type="hidden" name="id" value="<?= (int) $cred['id'] ?>">
-                            <button type="submit" class="belive-btn-ghost" style="padding:6px 12px; font-size:13px">Test connection</button>
-                        </form>
-                        <?php if ((int) $cred['is_active'] !== 1): ?>
+                    <th>Service</th><th>Label</th><th>Key</th><th>Status</th><th>Last test</th><th></th>
+                </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($credentials as $cred): ?>
+                    <tr>
+                        <td><?= e($serviceLabels[$cred['service']] ?? $cred['service']) ?></td>
+                        <td><?= e($cred['label']) ?></td>
+                        <td><code><?= e($cred['masked_key']) ?></code></td>
+                        <td>
+                            <?php if ((int) $cred['is_active'] === 1): ?>
+                                <span class="belive-badge">active</span>
+                            <?php else: ?>
+                                <span class="belive-badge muted">inactive</span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="font-size:13px">
+                            <?php if ($cred['last_tested_at'] === null): ?>
+                                <span class="belive-muted">never</span>
+                            <?php elseif ($cred['test_status'] === 'ok'): ?>
+                                <span class="belive-badge">✓ ok</span>
+                                <span class="belive-muted"><?= e($cred['last_tested_at']) ?></span>
+                            <?php else: ?>
+                                <span class="belive-badge danger">✗ failed</span>
+                                <span class="belive-muted" title="<?= e($cred['test_detail'] ?? '') ?>"><?= e($cred['last_tested_at']) ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="text-align:right; white-space:nowrap">
                             <form method="post" action="/admin/credentials/test" style="display:inline">
                                 <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                                 <input type="hidden" name="id" value="<?= (int) $cred['id'] ?>">
-                                <input type="hidden" name="activate_on_success" value="1">
-                                <button type="submit" class="belive-btn-secondary" style="padding:6px 12px; font-size:13px">Test &amp; activate</button>
+                                <button type="submit" class="belive-btn-ghost" style="padding:6px 12px; font-size:13px">Test connection</button>
                             </form>
-                            <form method="post" action="/admin/credentials/delete" style="display:inline"
-                                  onsubmit="return confirm('Delete credential \'<?= e($cred['label']) ?>\'? The key cannot be recovered.')">
-                                <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-                                <input type="hidden" name="id" value="<?= (int) $cred['id'] ?>">
-                                <button type="submit" class="belive-btn-ghost" style="padding:6px 12px; font-size:13px; color:#c0392b">Delete</button>
-                            </form>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
+                            <?php if ((int) $cred['is_active'] !== 1): ?>
+                                <form method="post" action="/admin/credentials/test" style="display:inline">
+                                    <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                                    <input type="hidden" name="id" value="<?= (int) $cred['id'] ?>">
+                                    <input type="hidden" name="activate_on_success" value="1">
+                                    <button type="submit" class="belive-btn-secondary" style="padding:6px 12px; font-size:13px">Test &amp; activate</button>
+                                </form>
+                                <form method="post" action="/admin/credentials/delete" style="display:inline"
+                                      onsubmit="return confirm('Delete credential \'<?= e($cred['label']) ?>\'? The key cannot be recovered.')">
+                                    <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                                    <input type="hidden" name="id" value="<?= (int) $cred['id'] ?>">
+                                    <button type="submit" class="belive-btn-ghost" style="padding:6px 12px; font-size:13px; color:#c0392b">Delete</button>
+                                </form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     <?php endif; ?>
 </div>
 

@@ -77,36 +77,38 @@ admin_header('Listing reviews', 'listing_reviews');
             <p class="belive-muted">New owner submissions will appear here automatically.</p>
         </div>
     <?php else: ?>
-        <table class="belive-table review-table">
-            <thead>
-            <tr><th>Listing</th><th>Owner</th><th>Ownership</th><th>Location</th><th>AI screen</th><th>Badge</th><th></th></tr>
-            </thead>
-            <tbody>
-            <?php foreach ($reviews as $review): ?>
-                <?php $flags = json_decode($review['scam_flags'] ?? '[]', true) ?: []; ?>
-                <tr>
-                    <td>
-                        <strong><?= e($review['property_name'] ?: $review['room_name']) ?></strong>
-                        <div class="belive-muted" style="font-size:12px"><?= e($review['room_code'] ?: 'Room #' . $review['room_id']) ?> · <?= e($review['location']) ?></div>
-                    </td>
-                    <td><?= e($review['owner_name'] ?: 'Unassigned') ?></td>
-                    <td><span class="belive-badge <?= $tone($review['ownership_review_status']) ?>"><?= e(str_replace('_', ' ', $review['ownership_review_status'])) ?></span></td>
-                    <td><span class="belive-badge <?= $tone($review['gps_review_status']) ?>"><?= e(str_replace('_', ' ', $review['gps_review_status'])) ?></span></td>
-                    <td>
-                        <?php if ($review['scam_checked_at'] === null): ?>
-                            <span class="belive-badge muted">not screened</span>
-                        <?php elseif ($flags === []): ?>
-                            <span class="belive-badge">clean</span>
-                        <?php else: ?>
-                            <span class="belive-badge <?= count(array_filter($flags, fn ($flag) => ($flag['severity'] ?? '') === 'high')) > 0 ? 'danger' : 'orange' ?>"><?= count($flags) ?> flag(s)</span>
-                        <?php endif; ?>
-                    </td>
-                    <td><span class="belive-badge <?= (int) $review['verified_badge'] === 1 ? '' : 'muted' ?>"><?= (int) $review['verified_badge'] === 1 ? 'verified' : 'not verified' ?></span></td>
-                    <td><a class="belive-btn-ghost review-open-button" href="/admin/listing_reviews/view?id=<?= (int) $review['id'] ?>">Open review</a></td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
+        <div class="belive-table-wrap">
+            <table class="belive-table review-table">
+                <thead>
+                <tr><th>Listing</th><th>Owner</th><th>Ownership</th><th>Location</th><th>AI screen</th><th>Badge</th><th></th></tr>
+                </thead>
+                <tbody>
+                <?php foreach ($reviews as $review): ?>
+                    <?php $flags = json_decode($review['scam_flags'] ?? '[]', true) ?: []; ?>
+                    <tr>
+                        <td>
+                            <strong><?= e($review['property_name'] ?: $review['room_name']) ?></strong>
+                            <div class="belive-muted" style="font-size:12px"><?= e($review['room_code'] ?: 'Room #' . $review['room_id']) ?> · <?= e($review['location']) ?></div>
+                        </td>
+                        <td><?= e($review['owner_name'] ?: 'Unassigned') ?></td>
+                        <td><span class="belive-badge <?= $tone($review['ownership_review_status']) ?>"><?= e(str_replace('_', ' ', $review['ownership_review_status'])) ?></span></td>
+                        <td><span class="belive-badge <?= $tone($review['gps_review_status']) ?>"><?= e(str_replace('_', ' ', $review['gps_review_status'])) ?></span></td>
+                        <td>
+                            <?php if ($review['scam_checked_at'] === null): ?>
+                                <span class="belive-badge muted">not screened</span>
+                            <?php elseif ($flags === []): ?>
+                                <span class="belive-badge">clean</span>
+                            <?php else: ?>
+                                <span class="belive-badge <?= count(array_filter($flags, fn ($flag) => ($flag['severity'] ?? '') === 'high')) > 0 ? 'danger' : 'orange' ?>"><?= count($flags) ?> flag(s)</span>
+                            <?php endif; ?>
+                        </td>
+                        <td><span class="belive-badge <?= (int) $review['verified_badge'] === 1 ? '' : 'muted' ?>"><?= (int) $review['verified_badge'] === 1 ? 'verified' : 'not verified' ?></span></td>
+                        <td><a class="belive-btn-ghost review-open-button" href="/admin/listing_reviews/view?id=<?= (int) $review['id'] ?>">Open review</a></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     <?php endif; ?>
 </div>
 <?php admin_footer();

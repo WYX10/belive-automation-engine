@@ -23,6 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $e = fn ($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
+
+/** Cache-busting asset URL, matching the other layouts. */
+$asset = static function (string $path): string {
+    $file = (defined('APP_ROOT') ? APP_ROOT : __DIR__ . '/..') . '/public' . $path;
+    $mtime = is_file($file) ? filemtime($file) : false;
+
+    return $mtime !== false ? $path . '?v=' . $mtime : $path;
+};
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -32,10 +40,10 @@ $e = fn ($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
 <meta name="theme-color" content="#F5833C">
 <title>Find your room · beLive</title>
 <link rel="icon" type="image/png" href="/assets/img/belive-favicon.png">
-<link rel="stylesheet" href="/assets/css/belive-theme.css">
+<link rel="stylesheet" href="<?= $e($asset('/assets/css/belive-theme.css')) ?>">
 <style>
     /* page-scoped layout only — all colours come from the theme tokens */
-    .enquiry-wrap { max-width: 520px; margin: 8vh auto; padding: 0 16px; }
+    .enquiry-wrap { width: 100%; max-width: 520px; margin: clamp(24px, 8vh, 96px) auto; padding: 0 var(--gutter); }
 </style>
 </head>
 <body>

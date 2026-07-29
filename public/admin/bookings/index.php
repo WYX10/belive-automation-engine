@@ -48,50 +48,52 @@ admin_header('Bookings', 'bookings');
         <p class="belive-muted">No bookings yet. When a customer proposes a viewing time on WhatsApp,
         Eve parses it, cross-checks the schedule, books it and sends the confirmation — it shows up here.</p>
     <?php else: ?>
-        <table class="belive-table">
-            <thead><tr><th>Viewing</th><th>Customer</th><th>Room</th><th>Mode</th><th>Agent</th><th>Status</th><th>Confirmation</th><th></th></tr></thead>
-            <tbody>
-            <?php foreach ($bookings as $booking): ?>
-                <tr>
-                    <td style="white-space:nowrap">
-                        <strong><?= e(date('D, j M Y', strtotime($booking['viewing_datetime']))) ?></strong>
-                        <div class="belive-muted" style="font-size:12.5px"><?= e(date('g:ia', strtotime($booking['viewing_datetime']))) ?></div>
-                    </td>
-                    <td>
-                        <a href="/admin/leads/view?id=<?= (int) $booking['lead_id'] ?>"><?= e($booking['lead_name'] ?: $booking['wa_phone']) ?></a>
-                        <div class="belive-muted" style="font-size:12px"><?= e($booking['wa_phone']) ?></div>
-                    </td>
-                    <td style="font-size:13.5px"><?= e($booking['room_name'] ? "{$booking['room_name']} — {$booking['area']}" : 'General viewing') ?></td>
-                    <td style="font-size:13px; white-space:nowrap"><?= match ($booking['viewing_mode'] ?? null) {
-                        'video_call' => '💻 Video call',
-                        'in_person'  => '🤝 In person',
-                        default      => '<span class="belive-muted">not picked yet</span>',
-                    } ?></td>
-                    <td style="font-size:13px; white-space:nowrap"><?= $booking['staff_name'] !== null
-                        ? e($booking['staff_name'])
-                        : '<a class="belive-muted" href="/admin/staff">unassigned</a>' ?></td>
-                    <td><span class="belive-badge <?= $statusTone[$booking['status']] ?? '' ?>"><?= e($booking['status']) ?></span></td>
-                    <td style="font-size:13px"><?= (int) $booking['confirmation_sent'] === 1 ? '✅ sent' : '<span class="belive-muted">—</span>' ?></td>
-                    <td style="white-space:nowrap">
-                        <?php if (in_array($booking['status'], ['pending', 'confirmed'], true)): ?>
-                            <form method="post" style="display:inline">
-                                <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-                                <input type="hidden" name="id" value="<?= (int) $booking['id'] ?>">
-                                <input type="hidden" name="to" value="completed">
-                                <button class="belive-btn-ghost" style="padding:4px 10px; font-size:12.5px">Complete</button>
-                            </form>
-                            <form method="post" style="display:inline" data-confirm="Cancel this viewing?">
-                                <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-                                <input type="hidden" name="id" value="<?= (int) $booking['id'] ?>">
-                                <input type="hidden" name="to" value="cancelled">
-                                <button class="belive-btn-ghost" style="padding:4px 10px; font-size:12.5px; color:var(--belive-danger)">Cancel</button>
-                            </form>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
+        <div class="belive-table-wrap">
+            <table class="belive-table">
+                <thead><tr><th>Viewing</th><th>Customer</th><th>Room</th><th>Mode</th><th>Agent</th><th>Status</th><th>Confirmation</th><th></th></tr></thead>
+                <tbody>
+                <?php foreach ($bookings as $booking): ?>
+                    <tr>
+                        <td style="white-space:nowrap">
+                            <strong><?= e(date('D, j M Y', strtotime($booking['viewing_datetime']))) ?></strong>
+                            <div class="belive-muted" style="font-size:12.5px"><?= e(date('g:ia', strtotime($booking['viewing_datetime']))) ?></div>
+                        </td>
+                        <td>
+                            <a href="/admin/leads/view?id=<?= (int) $booking['lead_id'] ?>"><?= e($booking['lead_name'] ?: $booking['wa_phone']) ?></a>
+                            <div class="belive-muted" style="font-size:12px"><?= e($booking['wa_phone']) ?></div>
+                        </td>
+                        <td style="font-size:13.5px"><?= e($booking['room_name'] ? "{$booking['room_name']} — {$booking['area']}" : 'General viewing') ?></td>
+                        <td style="font-size:13px; white-space:nowrap"><?= match ($booking['viewing_mode'] ?? null) {
+                            'video_call' => '💻 Video call',
+                            'in_person'  => '🤝 In person',
+                            default      => '<span class="belive-muted">not picked yet</span>',
+                        } ?></td>
+                        <td style="font-size:13px; white-space:nowrap"><?= $booking['staff_name'] !== null
+                            ? e($booking['staff_name'])
+                            : '<a class="belive-muted" href="/admin/staff">unassigned</a>' ?></td>
+                        <td><span class="belive-badge <?= $statusTone[$booking['status']] ?? '' ?>"><?= e($booking['status']) ?></span></td>
+                        <td style="font-size:13px"><?= (int) $booking['confirmation_sent'] === 1 ? '✅ sent' : '<span class="belive-muted">—</span>' ?></td>
+                        <td style="white-space:nowrap">
+                            <?php if (in_array($booking['status'], ['pending', 'confirmed'], true)): ?>
+                                <form method="post" style="display:inline">
+                                    <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                                    <input type="hidden" name="id" value="<?= (int) $booking['id'] ?>">
+                                    <input type="hidden" name="to" value="completed">
+                                    <button class="belive-btn-ghost" style="padding:4px 10px; font-size:12.5px">Complete</button>
+                                </form>
+                                <form method="post" style="display:inline" data-confirm="Cancel this viewing?">
+                                    <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                                    <input type="hidden" name="id" value="<?= (int) $booking['id'] ?>">
+                                    <input type="hidden" name="to" value="cancelled">
+                                    <button class="belive-btn-ghost" style="padding:4px 10px; font-size:12.5px; color:var(--belive-danger)">Cancel</button>
+                                </form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     <?php endif; ?>
 </div>
 <?php admin_footer();

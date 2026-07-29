@@ -4,57 +4,63 @@
 .site-nav {
   background: var(--belive-white);
   border-bottom: 1px solid var(--belive-line);
-  padding: 14px 24px;
+  padding: var(--space-xs) var(--gutter);
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
   position: sticky;
   top: 0;
   z-index: 20;
 }
-.site-nav .links { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+.site-nav .links { display: flex; gap: 4px; flex: 1 1 auto; flex-wrap: wrap; min-width: 0; }
 .site-nav a.nav-link {
   padding: 8px 14px; border-radius: 9px;
-  font-size: 14px; font-weight: 500;
+  font-size: var(--text-sm); font-weight: 500;
   color: var(--belive-ink); text-decoration: none !important;
 }
 .site-nav a.nav-link:hover { background: var(--belive-cream); }
 .site-nav a.nav-link.active { background: var(--belive-orange-soft); color: var(--belive-orange-dark); font-weight: 600; }
 
-.site-main { max-width: 1080px; margin: 0 auto; padding: 0 20px 80px; }
+/* width:100% keeps the fluid max-width from ever exceeding a narrow viewport. */
+.site-main {
+  width: 100%;
+  max-width: var(--content-w);
+  margin: 0 auto;
+  padding: 0 var(--gutter) var(--space-xl);
+}
 
 /* Hero */
 .site-hero {
   text-align: center;
-  padding: 64px 16px 46px;
+  padding: var(--space-xl) 0 var(--space-lg);
 }
 .site-hero h1 {
-  font-size: clamp(28px, 5vw, 44px);
+  font-size: clamp(27px, 1.2rem + 2.6vw, 48px);
   font-weight: 700;
   line-height: 1.15;
-  max-width: 720px;
+  max-width: 20ch;
   margin: 0 auto;
 }
 .site-hero h1 .accent { color: var(--belive-orange); }
 .site-hero p {
   color: var(--belive-muted);
-  font-size: 17px;
-  max-width: 560px;
-  margin: 16px auto 26px;
+  font-size: var(--text-lg);
+  max-width: 58ch;
+  margin: var(--space-sm) auto var(--space-md);
 }
-.site-hero .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.site-hero .cta-row { display: flex; gap: var(--space-xs); justify-content: center; flex-wrap: wrap; }
 
 /* Section headings */
-.site-section { margin-top: 56px; }
-.site-section > h2 { font-size: 24px; margin-bottom: 6px; }
-.site-section > .sub { color: var(--belive-muted); font-size: 14.5px; margin-bottom: 22px; }
+.site-section { margin-top: var(--space-xl); }
+.site-section > h2 { font-size: var(--text-h2); margin-bottom: 6px; }
+.site-section > .sub { color: var(--belive-muted); font-size: var(--text-sm); margin-bottom: var(--space-md); }
 
 /* Room cards */
 .room-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr));
+  gap: var(--space-sm);
 }
 .room-card {
   background: var(--belive-white);
@@ -80,9 +86,9 @@
   font-size: 11.5px; font-weight: 700;
   padding: 3px 9px; border-radius: 7px;
 }
-.room-card .body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
-.room-card .title { font-family: var(--font-head); font-weight: 600; font-size: 15.5px; line-height: 1.3; }
-.room-card .meta { font-size: 13px; color: var(--belive-muted); }
+.room-card .body { padding: var(--space-sm); display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
+.room-card .title { font-family: var(--font-head); font-weight: 600; font-size: var(--text-base); line-height: 1.3; }
+.room-card .meta { font-size: var(--text-sm); color: var(--belive-muted); overflow-wrap: anywhere; }
 
 /* Tenure price rows — all three visible, always labelled */
 .tenure-rows { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
@@ -101,14 +107,15 @@
   background: var(--belive-white);
   border-radius: var(--belive-radius);
   box-shadow: var(--belive-shadow);
-  padding: 16px 18px;
-  display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;
-  margin: 22px 0;
+  padding: var(--space-sm) var(--space-md);
+  display: flex; gap: var(--space-xs); flex-wrap: wrap; align-items: flex-end;
+  margin: var(--space-md) 0;
 }
-.filter-bar .belive-field { margin: 0; flex: 1; min-width: 150px; }
+.filter-bar .belive-field { margin: 0; flex: 1 1 150px; min-width: min(150px, 100%); }
+.filter-bar button, .filter-bar .belive-btn-ghost { flex: 0 1 auto; }
 
 /* Location cards */
-.loc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.loc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: var(--space-xs); }
 .loc-card {
   background: var(--belive-white);
   border-radius: 12px;
@@ -129,13 +136,32 @@
 @media (max-width: 640px) { .detail-gallery { grid-template-columns: 1fr; } .detail-gallery .main { grid-row: auto; } }
 
 .tenure-table { width: 100%; border-collapse: collapse; }
-.tenure-table td { padding: 12px 14px; border-bottom: 1px solid var(--belive-line); font-size: 14.5px; }
+.tenure-table td { padding: 12px 14px; border-bottom: 1px solid var(--belive-line); font-size: var(--text-base); }
 .tenure-table tr.best td { background: var(--belive-teal-soft); }
-.tenure-table .price { font-family: var(--font-head); font-weight: 700; font-size: 17px; text-align: right; white-space: nowrap; }
+.tenure-table .price { font-family: var(--font-head); font-weight: 700; font-size: var(--text-lg); text-align: right; white-space: nowrap; }
 
 /* Footer */
 .site-footer {
   border-top: 1px solid var(--belive-line);
-  margin-top: 70px; padding: 26px 24px;
-  text-align: center; font-size: 13px; color: var(--belive-muted);
+  margin-top: var(--space-xl); padding: var(--space-md) var(--gutter);
+  text-align: center; font-size: var(--text-sm); color: var(--belive-muted);
+}
+
+/* Phones: logo and the WhatsApp CTA share the top row, and the links drop to a
+   single strip below it that scrolls sideways rather than wrapping onto two
+   lines — a sticky header must not eat a sixth of a phone screen. */
+@media (max-width: 640px) {
+  .site-nav { gap: var(--space-2xs) var(--space-xs); padding-bottom: 6px; }
+  .site-nav .links {
+    flex: 1 0 100%;
+    order: 3;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .site-nav .links::-webkit-scrollbar { display: none; }
+  .site-nav .links a.nav-link { flex: 0 0 auto; padding: 6px 11px; white-space: nowrap; }
+  .site-nav > .belive-btn-primary { margin-left: auto; }
+  .site-hero .cta-row > * { flex: 1 1 220px; }
 }

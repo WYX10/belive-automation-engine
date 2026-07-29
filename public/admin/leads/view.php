@@ -56,17 +56,19 @@ admin_header('Lead #' . $lead['id'], 'leads');
 
         <div class="belive-card" style="margin-top:16px">
             <div class="belive-card-title">📇 Details</div>
-            <table class="belive-table" style="font-size:13.5px">
-                <tr><td class="belive-muted">Contact</td><td><?= e($lead['wa_phone']) ?></td></tr>
-                <tr><td class="belive-muted">Channel</td><td><?= e(str_replace('_', ' ', $lead['source_channel'])) ?></td></tr>
-                <tr><td class="belive-muted">Status</td><td><span class="belive-badge <?= $lead['status'] === 'new' ? 'orange' : '' ?>"><?= e($lead['status']) ?></span></td></tr>
-                <tr><td class="belive-muted">Location</td><td><?= e($lead['location'] ?? '—') ?></td></tr>
-                <tr><td class="belive-muted">Budget</td><td><?= $lead['budget'] ? 'RM' . e($lead['budget']) : '—' ?></td></tr>
-                <tr><td class="belive-muted">Room type</td><td><?= e($lead['room_type'] ?? '—') ?></td></tr>
-                <tr><td class="belive-muted">Move-in</td><td><?= e($lead['move_in_date'] ?? '—') ?></td></tr>
-                <tr><td class="belive-muted">Profile</td><td><?= e($lead['tenant_profile'] ?? '—') ?></td></tr>
-                <tr><td class="belive-muted">First contact</td><td><?= e($lead['created_at']) ?></td></tr>
-            </table>
+            <div class="belive-table-wrap">
+                <table class="belive-table" style="font-size:13.5px">
+                    <tr><td class="belive-muted">Contact</td><td><?= e($lead['wa_phone']) ?></td></tr>
+                    <tr><td class="belive-muted">Channel</td><td><?= e(str_replace('_', ' ', $lead['source_channel'])) ?></td></tr>
+                    <tr><td class="belive-muted">Status</td><td><span class="belive-badge <?= $lead['status'] === 'new' ? 'orange' : '' ?>"><?= e($lead['status']) ?></span></td></tr>
+                    <tr><td class="belive-muted">Location</td><td><?= e($lead['location'] ?? '—') ?></td></tr>
+                    <tr><td class="belive-muted">Budget</td><td><?= $lead['budget'] ? 'RM' . e($lead['budget']) : '—' ?></td></tr>
+                    <tr><td class="belive-muted">Room type</td><td><?= e($lead['room_type'] ?? '—') ?></td></tr>
+                    <tr><td class="belive-muted">Move-in</td><td><?= e($lead['move_in_date'] ?? '—') ?></td></tr>
+                    <tr><td class="belive-muted">Profile</td><td><?= e($lead['tenant_profile'] ?? '—') ?></td></tr>
+                    <tr><td class="belive-muted">First contact</td><td><?= e($lead['created_at']) ?></td></tr>
+                </table>
+            </div>
             <?php if (!empty($lead['notes'])): ?>
                 <div class="reasoning-box" style="margin-top:10px"><?= nl2br(e($lead['notes'])) ?></div>
             <?php endif; ?>

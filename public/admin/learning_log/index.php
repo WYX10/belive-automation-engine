@@ -41,59 +41,61 @@ admin_header('Learning log', 'learning_log');
         <a href="/admin/chat_history">chat history</a>, or let the drop-off pattern detector find a
         sequencing lesson — every lesson lands here.</p>
     <?php else: ?>
-        <table class="belive-table">
-            <thead>
-            <tr>
-                <th>Mistake</th>
-                <th>Correction applied</th>
-                <th>Rule learned</th>
-                <th style="text-align:center">Times reinforced</th>
-                <th>Status</th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($rules as $rule): ?>
+        <div class="belive-table-wrap">
+            <table class="belive-table">
+                <thead>
                 <tr>
-                    <td style="max-width:220px">
-                        <?php if ($rule['error_type'] !== null): ?>
-                            <span class="belive-badge <?= in_array($rule['error_type'], ['poor_sequencing', 'low_engagement'], true) ? '' : 'orange' ?>">
-                                <?= e(str_replace('_', ' ', $rule['error_type'])) ?>
-                            </span>
-                            <div class="belive-muted" style="font-size:12px; margin-top:4px">
-                                <?= e(mb_substr((string) $rule['feedback_comment'], 0, 140)) ?><?= mb_strlen((string) $rule['feedback_comment']) > 140 ? '…' : '' ?>
-                            </div>
-                        <?php else: ?>
-                            <span class="belive-muted">—</span>
-                        <?php endif; ?>
-                    </td>
-                    <td style="font-size:13px">
-                        <?= e(str_replace('_', ' ', (string) ($rule['feedback_source'] ?? 'manual'))) ?>
-                        <div class="belive-muted" style="font-size:12px"><?= e($rule['created_at']) ?></div>
-                    </td>
-                    <td style="max-width:300px">
-                        <span class="belive-badge <?= $rule['rule_type'] === 'sequencing' ? '' : 'orange' ?>" style="font-size:11px"><?= e($rule['rule_type']) ?></span>
-                        <span class="belive-badge muted" style="font-size:11px"><?= e($rule['context_tag']) ?></span>
-                        <div style="margin-top:4px; font-size:13.5px">
-                            <a href="/admin/learning_log/rule?id=<?= (int) $rule['id'] ?>"><?= e($rule['learned_rule']) ?></a>
-                        </div>
-                    </td>
-                    <td style="text-align:center">
-                        <strong><?= (int) $rule['times_reinforced'] ?></strong>
-                        <?php if ((int) $rule['times_contradicted'] > 0): ?>
-                            <div class="belive-muted" style="font-size:11px"><?= (int) $rule['times_contradicted'] ?>× contradicted</div>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php if ((int) $rule['active'] === 1): ?>
-                            <span class="belive-badge">active · <?= number_format((float) $rule['confidence_score'], 2) ?></span>
-                        <?php else: ?>
-                            <span class="belive-badge danger">retired · <?= number_format((float) $rule['confidence_score'], 2) ?></span>
-                        <?php endif; ?>
-                    </td>
+                    <th>Mistake</th>
+                    <th>Correction applied</th>
+                    <th>Rule learned</th>
+                    <th style="text-align:center">Times reinforced</th>
+                    <th>Status</th>
                 </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                <?php foreach ($rules as $rule): ?>
+                    <tr>
+                        <td style="max-width:220px">
+                            <?php if ($rule['error_type'] !== null): ?>
+                                <span class="belive-badge <?= in_array($rule['error_type'], ['poor_sequencing', 'low_engagement'], true) ? '' : 'orange' ?>">
+                                    <?= e(str_replace('_', ' ', $rule['error_type'])) ?>
+                                </span>
+                                <div class="belive-muted" style="font-size:12px; margin-top:4px">
+                                    <?= e(mb_substr((string) $rule['feedback_comment'], 0, 140)) ?><?= mb_strlen((string) $rule['feedback_comment']) > 140 ? '…' : '' ?>
+                                </div>
+                            <?php else: ?>
+                                <span class="belive-muted">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="font-size:13px">
+                            <?= e(str_replace('_', ' ', (string) ($rule['feedback_source'] ?? 'manual'))) ?>
+                            <div class="belive-muted" style="font-size:12px"><?= e($rule['created_at']) ?></div>
+                        </td>
+                        <td style="max-width:300px">
+                            <span class="belive-badge <?= $rule['rule_type'] === 'sequencing' ? '' : 'orange' ?>" style="font-size:11px"><?= e($rule['rule_type']) ?></span>
+                            <span class="belive-badge muted" style="font-size:11px"><?= e($rule['context_tag']) ?></span>
+                            <div style="margin-top:4px; font-size:13.5px">
+                                <a href="/admin/learning_log/rule?id=<?= (int) $rule['id'] ?>"><?= e($rule['learned_rule']) ?></a>
+                            </div>
+                        </td>
+                        <td style="text-align:center">
+                            <strong><?= (int) $rule['times_reinforced'] ?></strong>
+                            <?php if ((int) $rule['times_contradicted'] > 0): ?>
+                                <div class="belive-muted" style="font-size:11px"><?= (int) $rule['times_contradicted'] ?>× contradicted</div>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ((int) $rule['active'] === 1): ?>
+                                <span class="belive-badge">active · <?= number_format((float) $rule['confidence_score'], 2) ?></span>
+                            <?php else: ?>
+                                <span class="belive-badge danger">retired · <?= number_format((float) $rule['confidence_score'], 2) ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     <?php endif; ?>
 </div>
 

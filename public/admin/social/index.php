@@ -172,37 +172,39 @@ admin_header('Social auto-reply', 'social');
     <?php if ($events === []): ?>
         <p class="belive-muted">Nothing yet. Comment on a connected post — or run <code>php tests/run.php</code> to see the flow end to end.</p>
     <?php else: ?>
-        <table class="belive-table">
-            <thead><tr><th>When</th><th>Where</th><th>Who</th><th>Public</th><th>DM</th><th>Token</th><th>Landed on WhatsApp</th></tr></thead>
-            <tbody>
-            <?php foreach ($events as $event): ?>
-                <tr>
-                    <td style="font-size:12.5px; white-space:nowrap"><?= e($event['created_at']) ?></td>
-                    <td style="font-size:13px; white-space:nowrap">
-                        <?= $event['platform'] === 'instagram' ? '📷' : '📘' ?>
-                        <?= e($event['event_type'] === 'comment' ? 'Comment' : 'DM') ?>
-                    </td>
-                    <td style="font-size:13px"><?= e($event['sender_name'] ?? $event['sender_id']) ?></td>
-                    <td><span class="belive-badge <?= $statusBadge($event['public_reply']) ?>" style="font-size:11px"><?= e($event['public_reply']) ?></span></td>
-                    <td>
-                        <span class="belive-badge <?= $statusBadge($event['private_reply']) ?>" style="font-size:11px"><?= e($event['private_reply']) ?></span>
-                        <?php if ($event['error']): ?>
-                            <div class="belive-muted" style="font-size:11px" title="<?= e($event['error']) ?>"><?= e(mb_substr($event['error'], 0, 60)) ?><?= mb_strlen($event['error']) > 60 ? '…' : '' ?></div>
-                        <?php endif; ?>
-                    </td>
-                    <td style="font-size:12px"><code><?= e($event['ref_token'] ?? '—') ?></code></td>
-                    <td style="font-size:12.5px">
-                        <?php if ($event['claimed_at']): ?>
-                            <span class="belive-badge">✓ <?= e($event['claimed_name'] ?: $event['claimed_phone']) ?></span>
-                            <div class="belive-muted" style="font-size:11px"><?= e($event['claimed_at']) ?></div>
-                        <?php else: ?>
-                            <span class="belive-muted">not yet</span>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
+        <div class="belive-table-wrap">
+            <table class="belive-table">
+                <thead><tr><th>When</th><th>Where</th><th>Who</th><th>Public</th><th>DM</th><th>Token</th><th>Landed on WhatsApp</th></tr></thead>
+                <tbody>
+                <?php foreach ($events as $event): ?>
+                    <tr>
+                        <td style="font-size:12.5px; white-space:nowrap"><?= e($event['created_at']) ?></td>
+                        <td style="font-size:13px; white-space:nowrap">
+                            <?= $event['platform'] === 'instagram' ? '📷' : '📘' ?>
+                            <?= e($event['event_type'] === 'comment' ? 'Comment' : 'DM') ?>
+                        </td>
+                        <td style="font-size:13px"><?= e($event['sender_name'] ?? $event['sender_id']) ?></td>
+                        <td><span class="belive-badge <?= $statusBadge($event['public_reply']) ?>" style="font-size:11px"><?= e($event['public_reply']) ?></span></td>
+                        <td>
+                            <span class="belive-badge <?= $statusBadge($event['private_reply']) ?>" style="font-size:11px"><?= e($event['private_reply']) ?></span>
+                            <?php if ($event['error']): ?>
+                                <div class="belive-muted" style="font-size:11px" title="<?= e($event['error']) ?>"><?= e(mb_substr($event['error'], 0, 60)) ?><?= mb_strlen($event['error']) > 60 ? '…' : '' ?></div>
+                            <?php endif; ?>
+                        </td>
+                        <td style="font-size:12px"><code><?= e($event['ref_token'] ?? '—') ?></code></td>
+                        <td style="font-size:12.5px">
+                            <?php if ($event['claimed_at']): ?>
+                                <span class="belive-badge">✓ <?= e($event['claimed_name'] ?: $event['claimed_phone']) ?></span>
+                                <div class="belive-muted" style="font-size:11px"><?= e($event['claimed_at']) ?></div>
+                            <?php else: ?>
+                                <span class="belive-muted">not yet</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     <?php endif; ?>
 </div>
 <?php admin_footer();
