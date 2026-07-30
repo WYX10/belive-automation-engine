@@ -275,6 +275,7 @@ final class RoomPhotoEnhancer
                 [
                     'max_tokens'  => 500,
                     'temperature' => 0.2,
+                    'json'        => true,
                     'mock_hint'   => 'photo',
                     'image'       => self::inspectionCopy($image),
                 ]

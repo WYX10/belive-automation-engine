@@ -59,6 +59,17 @@ check('repeated contradiction collapses confidence', (float) $row['confidence_sc
 check('collapsed rule auto-deactivates (soft, kept for audit)', (int) $row['active'] === 0);
 check('collapsed rule no longer retrieved', !in_array($setapakActive, $afterCollapse, true));
 
+// Area not known yet. An unfiltered query used to hand back EVERY area's rules,
+// so a Cheras price fact steered a conversation that had nothing to do with
+// Cheras — and a Setapak sequencing rule made Eve send photos to everyone.
+$noContext = array_map(fn ($r) => (int) $r['id'], MemoryRetriever::forContext(null));
+check('unknown area retrieves the global rules', in_array($generalActive, $noContext, true));
+check('unknown area does NOT inherit another area’s rules', !in_array($cherasActive, $noContext, true));
+check(
+    'unknown area retrieves nothing but general rules',
+    array_filter(MemoryRetriever::forContext(null), fn ($r) => $r['context_tag'] !== 'general') === []
+);
+
 // Case-insensitive tag normalization.
 $normalized = array_map(fn ($r) => (int) $r['id'], MemoryRetriever::forContext('setapak'));
 check('context tag matching is case-insensitive via normalization', $normalized === $afterCollapse);

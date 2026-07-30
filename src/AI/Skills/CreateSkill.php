@@ -38,6 +38,7 @@ Hard rules:
 - Ground every fact in the provided room inventory. NEVER invent rooms, prices, or availability. If inventory says nothing matches, say so honestly and offer the closest alternative.
 - NEVER state a price without naming its tenure ("RM 620/mo on a 12-month stay", not a bare "RM 620"). When recommending a tenure, mention the saving vs the flexible monthly rate. Zero deposit is BeLive's signature — mention it when introducing a room.
 - Follow the decision given to you: if send_photos_first=true, do NOT state any price figure — tease the rooms, say photos are coming through, and ask if they'd like pricing after.
+- Photos: the photo messages are sent by the system, not written by you. Only say photos are on their way when send_photos_first=true or send_photos=true — those photos really are going out alongside this message, so a short "here you go 📸" is right. When BOTH are false, do not mention sending, attaching or sharing photos in any form; offer them as a question instead ("want to see it?"), because nothing would actually arrive.
 - Answer the question the customer actually asked, first. If they asked for the price, the reply opens with the price — never with another question.
 - Read the CONVERSATION STATE. Never repeat an offer the customer already accepted ("would you like the pricing?" after they said yes), never re-announce photos that were already sent, and never re-ask a detail they already gave.
 - If a recall line about a returning customer is provided, open with it naturally (reference their earlier enquiry specifically — never a generic "hi again"). Only ever do this once, at the start of a conversation — mid-conversation, just continue where you left off.
@@ -109,6 +110,7 @@ PROMPT;
             'DECISION TO EXECUTE: ' . json_encode([
                 'next_action'        => $decision['next_action'],
                 'send_photos_first'  => $decision['send_photos_first'],
+                'send_photos'        => $decision['send_photos'] ?? false,
                 'recommended_tenure' => $decision['recommended_tenure'] ?? null,
                 'recommendation'     => $decision['recommendation'],
             ], JSON_UNESCAPED_UNICODE),
@@ -129,7 +131,8 @@ PROMPT;
             'model_used'  => $result['model'],
             'direction'   => 'internal',
             'reasoning'   => 'Drafted reply per decision (' . $decision['next_action']
-                . ($decision['send_photos_first'] ? ', photos before price' : '') . ').',
+                . ($decision['send_photos_first'] ? ', photos before price' : '')
+                . (($decision['send_photos'] ?? false) ? ', photos attached' : '') . ').',
             'memory_used' => $memory['ids'] ?? [],
             'response_ms' => $ms,
         ]);
@@ -214,7 +217,7 @@ PROMPT;
         [$result, $ms] = SkillSupport::timed(fn () => $client->generate(
             self::VIDEO_SYSTEM,
             [['role' => 'user', 'content' => $prompt]],
-            ['max_tokens' => 700, 'temperature' => 0.6, 'mock_hint' => 'video']
+            ['max_tokens' => 700, 'temperature' => 0.6, 'json' => true, 'mock_hint' => 'video']
         ));
 
         $parsed = self::parseVideoScript($result['text']);

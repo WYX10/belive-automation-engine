@@ -28,6 +28,12 @@ final class LearnedMemory extends BaseModel
             // Context-specific rules plus global ones (context_tag = 'general').
             $sql .= " AND (context_tag = ? OR context_tag = 'general')";
             $params[] = $contextTag;
+        } else {
+            // Area still unknown. Only the global rules can apply — an
+            // unfiltered query handed every area's rules to the prompt, so a
+            // Cheras price fact or a Setapak sequencing rule steered a
+            // conversation that had nothing to do with either.
+            $sql .= " AND context_tag = 'general'";
         }
 
         $sql .= ' ORDER BY confidence_score DESC, times_reinforced DESC LIMIT ' . (int) $limit;

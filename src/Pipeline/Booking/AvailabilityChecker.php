@@ -41,7 +41,7 @@ PROMPT;
         $result = $client->generate(
             self::SYSTEM,
             [['role' => 'user', 'content' => 'NOW: ' . date('Y-m-d H:i:s (l)') . "\nCUSTOMER: $customerText"]],
-            ['max_tokens' => 250, 'temperature' => 0, 'mock_hint' => 'time_parse']
+            ['max_tokens' => 250, 'temperature' => 0, 'json' => true, 'mock_hint' => 'time_parse']
         );
 
         $parsed = SkillSupport::extractJson($result['text']) ?? [];

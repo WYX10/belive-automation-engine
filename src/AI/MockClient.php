@@ -49,7 +49,7 @@ final class MockClient implements LlmClient
             default      => "[MOCK REPLY — offline stub, not an AI model] Received: " . mb_substr($lastUser, 0, 120),
         };
 
-        return ['text' => $text, 'raw' => ['mock' => true], 'model' => $this->model];
+        return ['text' => $text, 'raw' => ['mock' => true], 'model' => $this->model, 'truncated' => false];
     }
 
     public function modelName(): string
@@ -85,7 +85,7 @@ final class MockClient implements LlmClient
         } elseif ($location !== null || $budget !== null || str_contains($lower, 'room')) {
             $intent = 'room_enquiry';
         }
-        if (preg_match('/\b(photo|picture|pic|image)\b/i', $msg)) {
+        if (preg_match('/\b(photos?|pictures?|pics?|images?)\b/i', $msg)) {
             $intent = 'photo_request';
         }
         if (preg_match('/\b(price|how much|rent|rental)\b/i', $msg) && $intent === 'general_enquiry') {
@@ -130,6 +130,12 @@ final class MockClient implements LlmClient
         $photosFirst = self::hasPhotosFirstRule($userPrompt);
         $isBooking = str_contains($userPrompt, '"intent":"booking_request"');
 
+        // A plain request to see the room is answered with photos, whether or
+        // not any sequencing rule exists — the offline stub has to exercise
+        // that path too, since it is the one customers hit most.
+        $sendPhotos = str_contains($userPrompt, '"intent":"photo_request"')
+            || str_contains($userPrompt, 'customer is waiting on room photos: YES');
+
         // Tenure logic mirrors the real prompt's guidance: customer statement
         // wins; else students → 12_month, professionals → 6_month.
         $tenure = match (true) {
@@ -154,9 +160,12 @@ final class MockClient implements LlmClient
             'recommended_room_ids'=> $roomIds,
             'recommended_tenure'  => $tenure,
             'send_photos_first'   => $photosFirst,
-            'recommendation'      => $photosFirst
-                ? 'Send room photos before quoting the price (learned rule in effect).'
-                : 'Answer with matching rooms and price.',
+            'send_photos'         => $sendPhotos,
+            'recommendation'      => match (true) {
+                $photosFirst => 'Send room photos before quoting the price (learned rule in effect).',
+                $sendPhotos  => 'Send the room photos the customer asked for.',
+                default      => 'Answer with matching rooms and price.',
+            },
             'reasoning'           => '[MOCK] Heuristic decision — offline stub, not a real model.',
         ], JSON_UNESCAPED_UNICODE);
     }
@@ -165,6 +174,7 @@ final class MockClient implements LlmClient
     {
         $photosFirst = self::hasPhotosFirstRule($userPrompt)
             || str_contains($userPrompt, '"send_photos_first":true');
+        $sendPhotos = str_contains($userPrompt, '"send_photos":true');
 
         // Returning customer: acknowledge the recall context like the real
         // model is instructed to (reference the prior enquiry specifically).
@@ -178,9 +188,11 @@ final class MockClient implements LlmClient
         $priceLine = preg_match('/Pricing: (RM [\d,]+\/mo [^·.\n]+)/', $userPrompt, $p)
             ? trim($p[1]) : 'RM 650/mo 6 months';
 
-        return $recall . ($photosFirst
-            ? "[MOCK] Here are photos of the room first 📷 — fully furnished, WiFi, weekly cleaning. Want the pricing details?"
-            : "[MOCK] Fully furnished room, zero deposit, weekly cleaning. Rental is $priceLine. Want photos or a viewing?");
+        return $recall . match (true) {
+            $photosFirst => '[MOCK] Here are photos of the room first 📷 — fully furnished, WiFi, weekly cleaning. Want the pricing details?',
+            $sendPhotos  => "[MOCK] Here you go 📷 — fully furnished, WiFi, weekly cleaning. Rental is $priceLine.",
+            default      => "[MOCK] Fully furnished room, zero deposit, weekly cleaning. Rental is $priceLine. Want photos or a viewing?",
+        };
     }
 
     /**

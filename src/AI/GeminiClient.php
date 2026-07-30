@@ -49,6 +49,10 @@ final class GeminiClient implements LlmClient
                     'generationConfig'   => array_filter([
                         'maxOutputTokens' => $opts['max_tokens'] ?? 1024,
                         'temperature'     => $opts['temperature'] ?? null,
+                        // Structured calls ask for JSON on the wire, so a
+                        // skill parses the same shape whichever provider the
+                        // admin has assigned to the phase.
+                        'responseMimeType' => ($opts['json'] ?? false) ? 'application/json' : null,
                         // Thinking models spend maxOutputTokens on hidden
                         // reasoning first — unbudgeted, it starves the visible
                         // reply into mid-sentence truncation. These calls are
@@ -72,7 +76,12 @@ final class GeminiClient implements LlmClient
             $text .= $part['text'] ?? '';
         }
 
-        return ['text' => trim($text), 'raw' => $raw, 'model' => $this->model];
+        return [
+            'text'      => trim($text),
+            'raw'       => $raw,
+            'model'     => $this->model,
+            'truncated' => ($raw['candidates'][0]['finishReason'] ?? '') === 'MAX_TOKENS',
+        ];
     }
 
     public function modelName(): string

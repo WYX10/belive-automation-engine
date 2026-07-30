@@ -32,28 +32,73 @@ final class AutomateSkill
         $kinds = [];
         $dryRun = false;
 
-        // 1. Photos before price when decided (the Setapak sequencing lesson).
-        if ($decision['send_photos_first']) {
-            foreach (array_slice($decision['rooms'], 0, 1) as $room) {
+        // 1. Photos go out when the decision says so — either as the pre-price
+        //    opener (the Setapak sequencing lesson) or because the customer
+        //    asked to see the room. The reply text promising photos counts too:
+        //    a message that says "sending photos now" with nothing attached is
+        //    the worst of both worlds, so the promise is honoured here rather
+        //    than left to whether one boolean survived the model round-trip.
+        $promised = (bool) preg_match(SkillSupport::PHOTO_PROMISE, $replyText);
+        $wantsPhotos = ($decision['send_photos_first'] ?? false)
+            || ($decision['send_photos'] ?? false)
+            || $promised;
+
+        if ($wantsPhotos) {
+            $reason = match (true) {
+                ($decision['send_photos_first'] ?? false) => 'Photos sent before pricing, per decision/learned sequencing rule.',
+                ($decision['send_photos'] ?? false)       => 'Photos sent because the customer asked to see the room.',
+                default                                   => 'Reply promised photos, so the photos were sent with it.',
+            };
+
+            $photoRooms = self::photoRooms($decision);
+            if ($photoRooms === []) {
+                EpisodicLogger::activity(
+                    'photos_unavailable',
+                    $phase,
+                    $decision['model'],
+                    $leadId,
+                    'Photos were due but the decision carried no room to show — nothing was sent.'
+                );
+            }
+
+            foreach (array_slice($photoRooms, 0, 1) as $room) {
                 $photos = \App\Models\Room::photoUrls((int) $room['id']);
+
+                if ($photos === []) {
+                    // Never let the reply claim something the inventory cannot
+                    // back. Surfaced as an activity so the admin sees which room
+                    // is missing photos rather than a silent no-op.
+                    EpisodicLogger::activity(
+                        'photos_unavailable',
+                        $phase,
+                        $decision['model'],
+                        $leadId,
+                        "Photos were due for room #{$room['id']} ({$room['name']}) but it has none uploaded."
+                    );
+                    if ($promised) {
+                        $replyText = rtrim($replyText)
+                            . "\n\nI don't have photos of that one on hand — I'll get them to you shortly.";
+                    }
+                    continue;
+                }
+
                 foreach (array_slice($photos, 0, 3) as $photoUrl) {
                     $sent = $wa->sendImage($lead['wa_phone'], $photoUrl, $room['name'] . ' — ' . $room['location']);
                     $dryRun = $dryRun || $sent['dry_run'];
                 }
-                if ($photos !== []) {
-                    $kinds[] = 'photos';
-                    EpisodicLogger::log([
-                        'lead_id'      => $leadId,
-                        'phase'        => $phase,
-                        'skill'        => 'automate',
-                        'model_used'   => $decision['model'],
-                        'direction'    => 'outbound',
-                        'message_out'  => '[' . count($photos) . " room photos: {$room['name']}]",
-                        'message_kind' => 'photos',
-                        'reasoning'    => 'Photos sent before pricing, per decision/learned sequencing rule.',
-                        'memory_used'  => $decision['memory_ids'],
-                    ]);
-                }
+
+                $kinds[] = 'photos';
+                EpisodicLogger::log([
+                    'lead_id'      => $leadId,
+                    'phase'        => $phase,
+                    'skill'        => 'automate',
+                    'model_used'   => $decision['model'],
+                    'direction'    => 'outbound',
+                    'message_out'  => '[' . min(3, count($photos)) . " room photos: {$room['name']}]",
+                    'message_kind' => 'photos',
+                    'reasoning'    => $reason,
+                    'memory_used'  => $decision['memory_ids'],
+                ]);
             }
         }
 
@@ -93,6 +138,33 @@ final class AutomateSkill
             'delivered'     => empty($sent['failed']),
             'message_kinds' => $kinds,
         ];
+    }
+
+    /**
+     * The rooms whose photos should go out, recommended pick first. Sending the
+     * inventory's first candidate when the decision named a different room is
+     * how a customer asking about RM-111 ends up looking at another unit.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private static function photoRooms(array $decision): array
+    {
+        $rooms = $decision['rooms'] ?? [];
+        $byId = [];
+        foreach ($rooms as $room) {
+            $byId[(int) $room['id']] = $room;
+        }
+
+        // Walk the recommendation order, not the inventory order — the model's
+        // best-first ranking is the whole point of recommended_room_ids.
+        $picked = [];
+        foreach ($decision['recommended_room_ids'] ?? [] as $id) {
+            if (isset($byId[(int) $id])) {
+                $picked[] = $byId[(int) $id];
+            }
+        }
+
+        return $picked !== [] ? $picked : $rooms;
     }
 
     /**
