@@ -62,12 +62,57 @@ final class OpenAiCompatibleClient implements LlmClient
 
         $raw = json_decode((string) $response->getBody(), true) ?? [];
 
+        // A failure does not always arrive as a failure status. OpenRouter
+        // answers 200 with an error object in the body — routinely, for the
+        // rate limits on ':free' models — and that body carries no 'choices'
+        // at all. Read naively it yields an empty string, which is how an
+        // empty WhatsApp message reached Meta and came back "[100] The
+        // parameter text.body is required".
+        if (isset($raw['error'])) {
+            $message = is_array($raw['error'])
+                ? (string) ($raw['error']['message'] ?? json_encode($raw['error'], JSON_UNESCAPED_UNICODE))
+                : (string) $raw['error'];
+
+            throw new RuntimeException("{$this->providerLabel} error: " . mb_substr($message, 0, 400));
+        }
+
+        $choice = $raw['choices'][0] ?? null;
+        if ($choice === null) {
+            throw new RuntimeException(
+                "{$this->providerLabel} returned no choices for model '{$this->model}': "
+                . mb_substr((string) json_encode($raw, JSON_UNESCAPED_UNICODE), 0, 300)
+            );
+        }
+
         return [
-            'text'      => trim($raw['choices'][0]['message']['content'] ?? ''),
+            'text'      => self::textOf($choice['message'] ?? []),
             'raw'       => $raw,
             'model'     => $this->model,
-            'truncated' => ($raw['choices'][0]['finish_reason'] ?? '') === 'length',
+            'truncated' => ($choice['finish_reason'] ?? '') === 'length',
         ];
+    }
+
+    /**
+     * The assistant's words, whichever shape this provider used. `content` is
+     * usually a string but comes back as an array of typed parts from some
+     * models behind OpenRouter; a reasoning model can also leave `content`
+     * empty and put everything in `reasoning`.
+     */
+    private static function textOf(array $message): string
+    {
+        $content = $message['content'] ?? '';
+
+        if (is_array($content)) {
+            $parts = [];
+            foreach ($content as $part) {
+                $parts[] = is_array($part) ? (string) ($part['text'] ?? '') : (string) $part;
+            }
+            $content = implode('', $parts);
+        }
+
+        $content = trim((string) $content);
+
+        return $content !== '' ? $content : trim((string) ($message['reasoning'] ?? ''));
     }
 
     public function modelName(): string

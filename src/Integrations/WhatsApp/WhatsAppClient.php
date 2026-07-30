@@ -67,6 +67,18 @@ class WhatsAppClient
     /** @return array{message_id: string, dry_run: bool, failed: bool, error?: string} */
     public function sendText(string $toWaPhone, string $text): array
     {
+        // Meta rejects an empty body outright ("[100] The parameter text.body
+        // is required"), so there is nothing to gain from the round trip — and
+        // the log entry it produced described the symptom, not the cause.
+        // Caught here it names what actually went wrong: nothing was written.
+        if (trim($text) === '') {
+            return $this->failed(
+                $toWaPhone,
+                ['type' => 'text', 'text' => ['preview_url' => false, 'body' => '']],
+                'Refused to send: the reply text was empty (nothing was generated to say).'
+            );
+        }
+
         if (!$this->isConfigured()) {
             return $this->dryRun($toWaPhone, ['type' => 'text', 'text' => ['body' => $text]]);
         }

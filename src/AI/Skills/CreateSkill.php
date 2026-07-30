@@ -124,6 +124,35 @@ PROMPT;
             ['max_tokens' => 400, 'temperature' => 0.4, 'mock_hint' => 'create']
         ));
 
+        // An empty draft is not a reply. A model can return nothing at all —
+        // a free-tier rate limit, a safety stop, a turn spent entirely on
+        // reasoning tokens — and that blank went all the way to Meta, which
+        // rejected it and left the customer with photos and no words.
+        $text = trim($result['text']);
+        $note = '';
+        if ($text === '') {
+            [$retry, $retryMs] = SkillSupport::timed(fn () => $client->generate(
+                self::REPLY_SYSTEM,
+                [['role' => 'user', 'content' => $prompt]],
+                ['max_tokens' => 400, 'temperature' => 0.4, 'mock_hint' => 'create']
+            ));
+            $ms += $retryMs;
+            $text = trim($retry['text']);
+            $note = ' Model returned an empty draft; retried.';
+
+            if ($text === '') {
+                $text = self::fallbackReply($recommendedRooms, $decision);
+                $note = ' Model returned an empty draft twice; grounded fallback line sent instead.';
+                EpisodicLogger::activity(
+                    'empty_reply_fallback',
+                    $phase,
+                    $result['model'],
+                    (int) $lead['id'],
+                    'Reply generation returned nothing twice — a fallback built from inventory was sent.'
+                );
+            }
+        }
+
         $interactionId = EpisodicLogger::log([
             'lead_id'     => (int) $lead['id'],
             'phase'       => $phase,
@@ -132,12 +161,39 @@ PROMPT;
             'direction'   => 'internal',
             'reasoning'   => 'Drafted reply per decision (' . $decision['next_action']
                 . ($decision['send_photos_first'] ? ', photos before price' : '')
-                . (($decision['send_photos'] ?? false) ? ', photos attached' : '') . ').',
+                . (($decision['send_photos'] ?? false) ? ', photos attached' : '') . ').' . $note,
             'memory_used' => $memory['ids'] ?? [],
             'response_ms' => $ms,
         ]);
 
-        return ['text' => trim($result['text']), 'model' => $result['model'], 'interaction_id' => $interactionId];
+        return ['text' => $text, 'model' => $result['model'], 'interaction_id' => $interactionId];
+    }
+
+    /**
+     * A reply assembled from inventory alone, for when the model gives back
+     * nothing usable. It says less than a written reply would, but every word
+     * of it is a fact the catalog already holds — and it moves the
+     * conversation forward instead of leaving the customer on read.
+     *
+     * @param array<int, array<string, mixed>> $rooms already narrowed to the recommendation
+     */
+    private static function fallbackReply(array $rooms, array $decision): string
+    {
+        $room = $rooms[0] ?? null;
+
+        if ($room === null) {
+            return 'Which area are you looking at? I\'ll pull up what we have there for you.';
+        }
+
+        $where = trim((string) ($room['location'] ?? ''));
+        $name = trim((string) ($room['name'] ?? 'the room'));
+        $opening = $name . ($where !== '' ? " in $where" : '') . ' is available — fully furnished, zero deposit.';
+
+        return $opening . ' ' . match ($decision['next_action']) {
+            'book_viewing' => 'What day and time suit you for a viewing?',
+            'request_info' => 'What\'s your budget and move-in date?',
+            default        => 'Want the pricing, or shall we set up a viewing?',
+        };
     }
 
     /**
