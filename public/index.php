@@ -101,6 +101,10 @@ $router->get('/admin/activity_log', "$pages/admin/activity_log/index.php");
 $router->any('/admin/social', "$pages/admin/social/index.php");
 $router->any('/admin/content', "$pages/admin/content/index.php");
 $router->any('/admin/content/preview', "$pages/admin/content/preview.php");
+// Engagement accepts POST for its Refresh button; the export streams a CSV.
+$router->any('/admin/engagement', "$pages/admin/engagement/index.php");
+$router->get('/admin/reports', "$pages/admin/reports/index.php");
+$router->get('/admin/reports/export', "$pages/admin/reports/export.php");
 
 $router->get('/admin/bookings', "$pages/admin/bookings/index.php");
 $router->any('/admin/agreements', "$pages/admin/agreements/index.php");
