@@ -113,6 +113,12 @@ final class RoomPhotoEnhancer
         if (str_ends_with(strtolower($sourcePath), '.mp4')) {
             throw new RuntimeException('Video tours cannot be touched up — this only works on photos.');
         }
+        // The "photo coming soon" placeholders are SVG line art, which GD cannot
+        // decode — and there is no photograph in them to correct. Say so plainly
+        // instead of failing later with "could not be read from disk".
+        if (str_contains($sourcePath, '/rooms/placeholders/')) {
+            throw new RuntimeException('That is the "photo coming soon" placeholder, not a photograph. Upload a real room photo and it will replace it.');
+        }
 
         $absoluteSource = self::absolutePath($sourcePath);
         $bytes = is_file($absoluteSource) ? file_get_contents($absoluteSource) : false;

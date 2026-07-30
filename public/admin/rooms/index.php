@@ -510,11 +510,20 @@ else:
                     <?php if ($photos !== []): ?>
                         <div class="admin-room-gallery" aria-label="<?= e($room['name']) ?> photos">
                             <?php foreach ($photos as $index => $photo): ?>
-                                <?php $touchedUp = ($photo['original_path'] ?? null) !== null; ?>
+                                <?php
+                                $touchedUp = ($photo['original_path'] ?? null) !== null;
+                                // Not a photograph: the generated "photo coming soon" line art.
+                                // It has nothing to touch up, and uploading a real photo
+                                // removes it — so it gets a label, not the AI controls.
+                                $isPlaceholder = str_contains((string) $photo['image_path'], '/rooms/placeholders/');
+                                ?>
                                 <figure class="admin-room-shot">
-                                    <img src="<?= e($photo['image_path']) ?>" alt="<?= e($room['name']) ?> room photo <?= $index + 1 ?>" loading="lazy" width="180" height="120">
+                                    <img src="<?= e($photo['image_path']) ?>" alt="<?= $isPlaceholder ? e($room['name']) . ' has no photo yet' : e($room['name']) . ' room photo ' . ($index + 1) ?>" loading="lazy" width="180" height="120">
                                     <figcaption>
-                                        <?php if ($touchedUp): ?>
+                                        <?php if ($isPlaceholder): ?>
+                                            <span class="belive-badge muted">Placeholder</span>
+                                            <p class="admin-shot-meta">No photograph yet. Upload one below and it replaces this.</p>
+                                        <?php elseif ($touchedUp): ?>
                                             <span class="belive-badge">AI touch-up</span>
                                             <p class="admin-shot-note"><?= e((string) $photo['enhance_note']) ?></p>
                                             <p class="admin-shot-meta">Lighting and colour only, by <?= e((string) $photo['enhanced_by_model']) ?>. The room itself is unchanged.</p>
@@ -523,6 +532,7 @@ else:
                                         <?php endif; ?>
                                     </figcaption>
 
+                                    <?php if (!$isPlaceholder): ?>
                                     <div class="admin-shot-actions">
                                         <details>
                                             <summary><?= $touchedUp ? 'Redo the touch-up' : 'Improve with AI' ?></summary>
@@ -555,6 +565,7 @@ else:
                                             </form>
                                         <?php endif; ?>
                                     </div>
+                                    <?php endif; ?>
                                 </figure>
                             <?php endforeach; ?>
                         </div>
