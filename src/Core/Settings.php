@@ -55,6 +55,16 @@ final class Settings
         self::$cache[$key] = $value;
     }
 
+    /**
+     * Drop the cached copy. For the rare writer that goes straight to SQL —
+     * AutoDrafter claims its daily slot with a conditional UPDATE, which this
+     * class cannot express — so the next get() reads what really landed.
+     */
+    public static function refresh(): void
+    {
+        self::$cache = null;
+    }
+
     private static function load(): void
     {
         if (self::$cache !== null) {

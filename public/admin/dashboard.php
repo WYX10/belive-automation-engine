@@ -6,12 +6,18 @@ defined('APP_BOOTED') || exit('No direct access.');
 
 use App\Core\Auth;
 use App\Core\Database;
+use App\Core\Scheduler;
 use App\Models\Booking;
 use App\Models\Interaction;
 use App\Models\Lead;
 
 require __DIR__ . '/_layout.php';
 Auth::requireAdmin();
+
+// The dashboard is the page an admin lands on, so it is the best place to notice
+// that the day's content run is owed. Starts it out of band and returns at once;
+// AutoDrafter claims the slot, so this can never draft twice.
+Scheduler::tickAutoDraft();
 
 // --- The exact six metrics from the proposal's own dashboard mockup ---------
 // Leads and posts are counted for the calendar month to date: a single day's

@@ -154,3 +154,18 @@ needed, or add a scheduled GitHub Action calling the scripts:
 php cron/auto_draft_content.php
 php cron/publish_retry.php
 ```
+
+### The daily content run is the exception
+It keeps its own schedule in `app_settings`, so it does not need any of the
+above. Opening Admin → Dashboard or Admin → Content starts the day's run if it
+is owed, and the studio card shows the last run, the next slot, and the
+**Stop daily drafting** / **Run now** buttons.
+
+To have it run on a day when nobody logs in, set a `CRON_TOKEN` app setting and
+point any outside scheduler at the endpoint once or twice a day — it drafts only
+when the day's run is still owed, so calling it more often is harmless:
+```bash
+curl -s "https://belive-engine.azurewebsites.net/cron/auto_draft?token=$CRON_TOKEN"
+```
+A scheduled GitHub Action with `on: schedule` is the cheapest way to do this
+(the repo already deploys from Actions). Without the token the endpoint 404s.
