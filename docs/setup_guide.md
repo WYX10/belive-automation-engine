@@ -181,6 +181,7 @@ would otherwise loop forever.
 | `php cron/publish_scheduled.php` | every 5 min | publish content posts whose scheduled slot has arrived — this is what makes "pick a time" work |
 | `php cron/publish_retry.php` | every 30 min | retry approved posts whose platform publish errored |
 | `php cron/auto_draft_content.php` | daily | draft the day's posts for admin approval |
+| `php cron/refresh_engagement.php` | hourly | read viewers/likes/comments/shares back off the platforms into `content_post_metrics` — what Admin → Engagement and Admin → Reports display |
 
 Windows Task Scheduler or crontab both work — plain CLI PHP scripts. (The synchronous learning
 path — admin flags and customer corrections — needs no cron at all.)
