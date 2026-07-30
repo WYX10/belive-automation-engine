@@ -45,10 +45,20 @@ admin_header('Activity log', 'activity_log');
                         $break = mb_strrpos($short, ' ');
                         $short = rtrim($break === false ? $short : mb_substr($short, 0, $break), " ,.;:") . '…';
                     }
+
+                    // Learning events stand out; so do the degradations, which
+                    // are the ones worth acting on — a model whose output could
+                    // not be read is a phase quietly running on defaults.
+                    $badge = match (true) {
+                        (bool) preg_match('/failed|fallback|unavailable/', $row['action']) => 'danger',
+                        (bool) preg_match('/retry/', $row['action'])                       => 'orange',
+                        (bool) preg_match('/learn|rule/', $row['action'])                  => '',
+                        default                                                            => 'muted',
+                    };
                     ?>
                     <tr>
                         <td style="white-space:nowrap; font-size:13px"><?= e($row['created_at']) ?></td>
-                        <td><span class="belive-badge <?= str_contains($row['action'], 'learn') || str_contains($row['action'], 'rule') ? '' : 'muted' ?>"><?= e(str_replace('_', ' ', $row['action'])) ?></span></td>
+                        <td><span class="belive-badge <?= $badge ?>"><?= e(str_replace('_', ' ', $row['action'])) ?></span></td>
                         <td style="font-size:13px"><?= e($row['phase'] ? str_replace('_', ' ', $row['phase']) : '—') ?></td>
                         <td style="font-size:13px"><code><?= e($row['model_used'] ?? '—') ?></code></td>
                         <td style="font-size:13px">

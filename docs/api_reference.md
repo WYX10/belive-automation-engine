@@ -83,8 +83,19 @@ All admin POSTs require the session CSRF token (`csrf_token` field, provided by 
 - `App\AI\Skills\{UnderstandSkill, DecideSkill, CreateSkill, AutomateSkill}` — the four judged
   skills; every call logs to `ai_interactions` (with reasoning) via `EpisodicLogger` and to
   `ai_activity_log` (with model).
+- `App\AI\Skills\SkillSupport::generateJson(...)` — every skill whose answer must be JSON goes
+  through this: it asks the provider for its native JSON mode (`json => true` — Anthropic gets an
+  assistant prefill, Gemini `responseMimeType`, OpenAI `response_format`), repairs an answer cut
+  off by the token budget, and retries once before giving up. A phase running on defaults because
+  its model's output could not be read shows in `ai_activity_log` as `model_json_retry`,
+  `model_json_failed` or `decision_fallback` rather than passing silently.
+- Photo sends are two separate decisions. `send_photos_first` is the one-time show-the-room-
+  before-the-price opener (suppressed once pricing has come up); `send_photos` is the plain answer
+  to "can I see it?" and survives that suppression. `AutomateSkill` also honours a reply that
+  promises photos, so a message never claims a photo it did not send.
 - `App\AI\Memory\MemoryRetriever::forContext(?string $tag)` /
-  `MemoryStore::saveRule(...)` — read/write sides of `ai_learned_memory`.
+  `MemoryStore::saveRule(...)` — read/write sides of `ai_learned_memory`. A null tag (area not
+  known yet) retrieves the `general` rules only — never another area's.
 - `App\AI\Memory\FeedbackCollector` — `adminFlag()`, `detectImplicit()`, `detectDropoffPatterns()`.
 - `App\AI\Memory\LearningEngine::processFeedback(int $id): ?int` — one feedback row → one distilled
   rule (real model call; never hardcoded).

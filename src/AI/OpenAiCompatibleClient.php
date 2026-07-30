@@ -47,7 +47,13 @@ final class OpenAiCompatibleClient implements LlmClient
                     // OpenAI's newer models require max_completion_tokens;
                     // OpenRouter documents max_tokens — caller picks the field.
                     $this->maxTokensField => $maxTokens,
-                ] + (isset($opts['temperature']) ? ['temperature' => $opts['temperature']] : []),
+                ]
+                + (isset($opts['temperature']) ? ['temperature' => $opts['temperature']] : [])
+                // Same structured-output contract the other providers honour:
+                // a skill that parses JSON gets JSON, whichever model the admin
+                // assigned to the phase. (Every JSON system prompt here names
+                // "JSON object", which is what this mode requires.)
+                + (($opts['json'] ?? false) ? ['response_format' => ['type' => 'json_object']] : []),
             ]);
         } catch (BadResponseException $e) {
             $body = mb_substr((string) $e->getResponse()->getBody(), 0, 400);
@@ -57,9 +63,10 @@ final class OpenAiCompatibleClient implements LlmClient
         $raw = json_decode((string) $response->getBody(), true) ?? [];
 
         return [
-            'text'  => trim($raw['choices'][0]['message']['content'] ?? ''),
-            'raw'   => $raw,
-            'model' => $this->model,
+            'text'      => trim($raw['choices'][0]['message']['content'] ?? ''),
+            'raw'       => $raw,
+            'model'     => $this->model,
+            'truncated' => ($raw['choices'][0]['finish_reason'] ?? '') === 'length',
         ];
     }
 

@@ -48,13 +48,18 @@ PROMPT;
         $client = ModelRouter::clientForPhase($phase);
 
         $context = SkillSupport::historyBlock($history);
-        [$result, $ms] = SkillSupport::timed(fn () => $client->generate(
+        $call = SkillSupport::generateJson(
+            $client,
             self::SYSTEM,
-            [['role' => 'user', 'content' => "$context\nNEW CUSTOMER MESSAGE:\n$message"]],
-            ['max_tokens' => 500, 'temperature' => 0, 'mock_hint' => 'understand']
-        ));
+            "$context\nNEW CUSTOMER MESSAGE:\n$message",
+            ['max_tokens' => 500, 'temperature' => 0, 'mock_hint' => 'understand'],
+            $leadId,
+            $phase,
+            'understand'
+        );
+        [$result, $ms] = [$call['result'], $call['ms']];
 
-        $parsed = SkillSupport::extractJson($result['text']) ?? [];
+        $parsed = $call['parsed'] ?? [];
         $understanding = [
             'intent'         => $parsed['intent'] ?? 'other',
             'entities'       => [
@@ -70,6 +75,19 @@ PROMPT;
             'reasoning'      => $parsed['reasoning'] ?? 'Model returned unparseable output; defaults used.',
             'model'          => $result['model'],
         ];
+
+        // A dead model reading must not lose the two intents the pipeline acts
+        // on directly — an unread "send me photos" is how a customer ends up
+        // asking three times and getting a question back each time.
+        if ($call['parsed'] === null) {
+            $understanding['intent'] = match (true) {
+                (bool) preg_match('/\b(photos?|pictures?|pics?|images?|gambar|照片|图片|圖片)\b/iu', $message) => 'photo_request',
+                (bool) preg_match('/\b(price|pricing|cost|how much|berapa|harga|多少)\b/iu', $message)          => 'price_enquiry',
+                default                                                                                        => $understanding['intent'],
+            };
+            $understanding['reasoning'] = 'Model output unreadable after a retry; intent fell back to keyword matching ('
+                . $understanding['intent'] . ').';
+        }
 
         $understanding['interaction_id'] = EpisodicLogger::log([
             'lead_id'     => $leadId,
