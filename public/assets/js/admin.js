@@ -6,6 +6,44 @@ document.addEventListener('submit', (e) => {
   if (msg && !window.confirm(msg)) e.preventDefault();
 });
 
+// Catch an oversized room photo here rather than letting the browser POST it.
+// Past the web server's body limit nginx answers with its own bare "413
+// Request Entity Too Large" page, which throws away the whole admin screen and
+// never explains what to do — so say it in place, before anything is sent.
+const PHOTO_MAX_BYTES = 5 * 1024 * 1024; // matches RoomPhotoManager::MAX_BYTES
+document.addEventListener('change', (e) => {
+  const input = e.target;
+  if (!(input instanceof HTMLInputElement) || input.type !== 'file') return;
+
+  const tooBig = Array.from(input.files || []).filter((f) => f.size > PHOTO_MAX_BYTES);
+  const hint = input.getAttribute('aria-describedby');
+  const hintEl = hint ? document.getElementById(hint) : null;
+
+  // Remember the hint's own wording once, so clearing the error restores it
+  // instead of leaving the complaint on screen next to a valid file.
+  if (hintEl && hintEl.dataset.defaultHint === undefined) {
+    hintEl.dataset.defaultHint = hintEl.textContent;
+  }
+
+  if (tooBig.length === 0) {
+    input.setCustomValidity('');
+    if (hintEl) {
+      hintEl.textContent = hintEl.dataset.defaultHint;
+      hintEl.classList.remove('hint-error');
+    }
+    return;
+  }
+
+  const mb = (tooBig[0].size / 1048576).toFixed(1);
+  const message = `That photo is ${mb} MB — the limit is 5 MB. Resize it, or export it as JPG at a smaller size, then choose it again.`;
+  input.setCustomValidity(message);
+  if (hintEl) {
+    hintEl.textContent = message;
+    hintEl.classList.add('hint-error');
+  }
+  input.reportValidity();
+});
+
 document.addEventListener('click', (e) => {
   const el = e.target.closest('a[data-confirm]');
   if (el && !window.confirm(el.getAttribute('data-confirm'))) e.preventDefault();
