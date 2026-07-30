@@ -33,6 +33,18 @@ final class ClaudeClient implements LlmClient
             $messages = self::withImage($messages, $opts['image']);
         }
 
+        // Anthropic has no response_format switch. What it has instead is
+        // assistant prefill: seed the reply with "{" and the model continues
+        // the object rather than opening with "Here's the JSON:". Without this,
+        // Claude's preamble/trailing commentary is the single biggest reason a
+        // Claude-assigned phase logs "model returned unparseable output" and
+        // silently falls back to defaults — which is how a decided photo send
+        // quietly turned into a text-only message.
+        $prefill = ($opts['json'] ?? false) ? '{' : null;
+        if ($prefill !== null) {
+            $messages[] = ['role' => 'assistant', 'content' => $prefill];
+        }
+
         try {
             $response = $this->http->post(self::ENDPOINT, [
                 'headers' => [
@@ -64,7 +76,18 @@ final class ClaudeClient implements LlmClient
             }
         }
 
-        return ['text' => trim($text), 'raw' => $raw, 'model' => $this->model];
+        // The prefilled "{" is ours, not the model's — it never comes back in
+        // the response, so put it back before anyone tries to decode this.
+        if ($prefill !== null) {
+            $text = $prefill . $text;
+        }
+
+        return [
+            'text'      => trim($text),
+            'raw'       => $raw,
+            'model'     => $this->model,
+            'truncated' => ($raw['stop_reason'] ?? '') === 'max_tokens',
+        ];
     }
 
     public function modelName(): string

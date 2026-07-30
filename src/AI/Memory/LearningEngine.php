@@ -59,13 +59,17 @@ PROMPT;
         $context = self::buildContext($feedback);
 
         $client = ModelRouter::clientForPhase('conversion');
-        [$result, $ms] = SkillSupport::timed(fn () => $client->generate(
+        $call = SkillSupport::generateJson(
+            $client,
             self::SYSTEM,
-            [['role' => 'user', 'content' => $context]],
-            ['max_tokens' => 400, 'temperature' => 0, 'mock_hint' => 'learn']
-        ));
+            $context,
+            ['max_tokens' => 500, 'temperature' => 0, 'mock_hint' => 'learn'],
+            $feedback['lead_id'] !== null ? (int) $feedback['lead_id'] : null,
+            'conversion',
+            'learn'
+        );
+        [$result, $ms, $parsed] = [$call['result'], $call['ms'], $call['parsed']];
 
-        $parsed = SkillSupport::extractJson($result['text']);
         if ($parsed === null || trim((string) ($parsed['learned_rule'] ?? '')) === '') {
             // Real failure surfaces as a logged error — never a faked rule.
             EpisodicLogger::activity('rule_learning_failed', 'conversion', $result['model'], $feedback['lead_id'] ? (int) $feedback['lead_id'] : null, 'Model output unparseable for feedback #' . $feedbackId);

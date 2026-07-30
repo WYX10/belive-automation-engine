@@ -64,7 +64,7 @@ PROMPT;
         $result = $client->generate(
             self::SYSTEM,
             [['role' => 'user', 'content' => 'LISTING: ' . json_encode($listing, JSON_UNESCAPED_UNICODE)]],
-            ['max_tokens' => 500, 'temperature' => 0, 'mock_hint' => 'scam']
+            ['max_tokens' => 500, 'temperature' => 0, 'json' => true, 'mock_hint' => 'scam']
         );
 
         $parsed = SkillSupport::extractJson($result['text']) ?? ['flags' => []];
