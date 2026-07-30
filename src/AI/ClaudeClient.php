@@ -27,6 +27,15 @@ final class ClaudeClient implements LlmClient
         $this->http = $http ?? new Client(['timeout' => 60]);
     }
 
+    /**
+     * Models that answered "this model does not support assistant message
+     * prefill". Remembered for the rest of the request so one rejection is
+     * paid for once, not on every skill call in the same conversation.
+     *
+     * @var array<string, true>
+     */
+    private static array $noPrefill = [];
+
     public function generate(string $system, array $messages, array $opts = []): array
     {
         if (isset($opts['image'])) {
@@ -40,34 +49,32 @@ final class ClaudeClient implements LlmClient
         // Claude-assigned phase logs "model returned unparseable output" and
         // silently falls back to defaults — which is how a decided photo send
         // quietly turned into a text-only message.
-        $prefill = ($opts['json'] ?? false) ? '{' : null;
-        if ($prefill !== null) {
-            $messages[] = ['role' => 'assistant', 'content' => $prefill];
-        }
+        //
+        // Not every model accepts it: the reasoning models reject a prefilled
+        // assistant turn outright with a 400. For those, the instruction below
+        // does the same job in the system prompt.
+        $wantsJson = (bool) ($opts['json'] ?? false);
+        $prefill = $wantsJson && !isset(self::$noPrefill[$this->model]) ? '{' : null;
 
         try {
-            $response = $this->http->post(self::ENDPOINT, [
-                'headers' => [
-                    'x-api-key'         => $this->apiKey,
-                    'anthropic-version' => self::API_VERSION,
-                    'content-type'      => 'application/json',
-                ],
-                // No 'temperature': current Claude models (Sonnet 5, Opus 4.8 and
-                // newer) reject it outright — steer them with the prompt instead.
-                // Callers still pass it; the other providers' clients honour it.
-                'json' => [
-                    'model'      => $this->model,
-                    'max_tokens' => $opts['max_tokens'] ?? 1024,
-                    'system'     => $system,
-                    'messages'   => $messages,
-                ],
-            ]);
+            $raw = $this->post($system, $messages, $opts, $prefill);
         } catch (BadResponseException $e) {
-            $body = mb_substr((string) $e->getResponse()->getBody(), 0, 400);
-            throw new RuntimeException("Claude API error ({$e->getResponse()->getStatusCode()}): $body", 0, $e);
-        }
+            $body = (string) $e->getResponse()->getBody();
 
-        $raw = json_decode((string) $response->getBody(), true) ?? [];
+            // A model that cannot be prefilled is a shape difference, not a
+            // failure — ask again the way this one accepts.
+            if ($prefill !== null && stripos($body, 'prefill') !== false) {
+                self::$noPrefill[$this->model] = true;
+                $prefill = null;
+                $raw = $this->post($system, $messages, $opts, null);
+            } else {
+                throw new RuntimeException(
+                    "Claude API error ({$e->getResponse()->getStatusCode()}): " . mb_substr($body, 0, 400),
+                    0,
+                    $e
+                );
+            }
+        }
 
         $text = '';
         foreach ($raw['content'] ?? [] as $block) {
@@ -88,6 +95,44 @@ final class ClaudeClient implements LlmClient
             'model'     => $this->model,
             'truncated' => ($raw['stop_reason'] ?? '') === 'max_tokens',
         ];
+    }
+
+    /**
+     * One Messages API call. $prefill seeds the assistant turn when the model
+     * supports it; when it does not, the same requirement is stated in the
+     * system prompt instead.
+     *
+     * @throws BadResponseException so the caller can tell a prefill rejection
+     *                              from a genuine failure
+     */
+    private function post(string $system, array $messages, array $opts, ?string $prefill): array
+    {
+        if ($prefill !== null) {
+            $messages[] = ['role' => 'assistant', 'content' => $prefill];
+        } elseif ($opts['json'] ?? false) {
+            $system .= "\n\nOutput format: reply with the JSON object and nothing else — no preamble,"
+                . ' no explanation, no markdown code fence. The first character of your reply must be'
+                . ' "{" and the last must be "}".';
+        }
+
+        $response = $this->http->post(self::ENDPOINT, [
+            'headers' => [
+                'x-api-key'         => $this->apiKey,
+                'anthropic-version' => self::API_VERSION,
+                'content-type'      => 'application/json',
+            ],
+            // No 'temperature': current Claude models (Sonnet 5, Opus 4.8 and
+            // newer) reject it outright — steer them with the prompt instead.
+            // Callers still pass it; the other providers' clients honour it.
+            'json' => [
+                'model'      => $this->model,
+                'max_tokens' => $opts['max_tokens'] ?? 1024,
+                'system'     => $system,
+                'messages'   => $messages,
+            ],
+        ]);
+
+        return json_decode((string) $response->getBody(), true) ?? [];
     }
 
     public function modelName(): string
