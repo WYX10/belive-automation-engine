@@ -6,19 +6,22 @@ defined('APP_BOOTED') || exit('No direct access.');
 
 /**
  * Content module — AI-generated social post drafts from live room metrics.
- * Fully automated pipeline: drafts arrive on demand (button below) or on
- * schedule (cron/auto_draft_content.php); admin approval publishes straight
- * to the platform via SocialPublishManager, with a dry-run fallback badged
- * 'simulated' when no platform credential is active.
+ * Fully automated pipeline: drafts arrive on demand (button below) or once a day
+ * on the schedule this page owns (App\Content\AutoDrafter, started by the tick
+ * below, the cron file, or an outside scheduler); admin approval publishes
+ * straight to the platform via SocialPublishManager, with a dry-run fallback
+ * badged 'simulated' when no platform credential is active.
  */
 
 use App\AI\Skills\CreateSkill;
+use App\Content\AutoDrafter;
 use App\Content\MascotLibrary;
 use App\Content\PhotoPostDrafter;
 use App\Content\PostTimingAdvisor;
 use App\Content\PromoVideoDrafter;
 use App\Content\RoomVideoComposer;
 use App\Core\Auth;
+use App\Core\Scheduler;
 use App\Integrations\Social\SocialPublishManager;
 use App\Integrations\WhatsApp\WhatsAppLink;
 use App\Models\Room;
@@ -29,11 +32,52 @@ require dirname(__DIR__) . '/_layout.php';
 require __DIR__ . '/_timing.php';
 Auth::requireAdmin();
 
+// The stop / start controls for the daily run. Pausing leaves everything else
+// alone — Generate and Run now still work, nothing just happens on its own.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'automation') {
+    Auth::requireCsrf();
+    $by = (string) ($_SESSION['admin_username'] ?? 'admin');
+
+    if (($_POST['action'] ?? '') === 'run') {
+        // Drafting is a handful of model calls (a reel is more) — the admin
+        // asked for it and is waiting, so let it take the time it needs.
+        @set_time_limit(0);
+
+        try {
+            $run = AutoDrafter::runNow('admin:' . $by);
+
+            if ($run['aborted'] !== null) {
+                set_flash('danger', 'Run stopped — ' . $run['aborted']);
+            } elseif ($run['drafted'] === 0) {
+                set_flash('warning', 'Nothing to draft — ' . implode(' · ', $run['lines'] ?: ['every available room already has a pending post']));
+            } else {
+                set_flash('success', "Drafted {$run['drafted']} post(s) now — " . implode(' · ', $run['lines'])
+                    . '. They are waiting for your approval below.');
+            }
+        } catch (\Throwable $e) {
+            set_flash('danger', 'Run failed: ' . $e->getMessage());
+        }
+    } else {
+        $resume = ($_POST['action'] ?? '') === 'resume';
+        AutoDrafter::setEnabled($resume, $by);
+        set_flash(
+            'success',
+            $resume
+                ? 'Daily drafting is back on — next run ' . AutoDrafter::nextSlot()->format('D j M, H:i') . '.'
+                : 'Daily drafting stopped — nothing will be drafted on its own until you start it again.'
+        );
+    }
+
+    header('Location: /admin/content');
+    exit;
+}
+
 // Automation controls: drafts per cron run, platforms covered, standing brief.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'settings') {
     Auth::requireCsrf();
 
     $max = max(1, min(20, (int) ($_POST['content_auto_max'] ?? 3)));
+    $hour = max(0, min(23, (int) ($_POST['content_auto_hour'] ?? AutoDrafter::DEFAULT_HOUR)));
     $platforms = array_values(array_intersect((array) ($_POST['content_auto_platforms'] ?? []), CONTENT_PLATFORMS));
     $brief = trim((string) ($_POST['content_brief'] ?? ''));
     $mediaKind = in_array($_POST['content_auto_media'] ?? '', CONTENT_MEDIA_KINDS, true) ? $_POST['content_auto_media'] : 'image';
@@ -45,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'settings'
     } else {
         $by = (string) ($_SESSION['admin_username'] ?? 'admin');
         Settings::set('content_auto_max', (string) $max, $by);
+        AutoDrafter::setHour($hour, $by);
         Settings::set('content_auto_platforms', implode(',', $platforms), $by);
         Settings::set('content_auto_media', $mediaKind, $by);
         Settings::set('content_brief', mb_substr($brief, 0, 1000), $by);
@@ -52,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'settings'
         // What the preview page pre-selects when an admin approves a draft.
         Settings::set('content_schedule_default', ($_POST['content_schedule_default'] ?? '') === 'now' ? 'now' : 'suggested', $by);
         set_flash('success', "Automation saved — up to $max " . ($mediaKind === 'video' ? 'reel' : 'caption')
-            . "(s) per run across " . implode(', ', $platforms) . '.');
+            . '(s) a day from ' . sprintf('%02d:00', $hour) . ' across ' . implode(', ', $platforms) . '.');
     }
     header('Location: /admin/content');
     exit;
@@ -93,6 +138,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate'
     exit;
 }
 
+// Nothing outside the app calls the cron on App Service (no crontab), so the
+// schedule ticks off traffic: if today's run is owed, this hands it to a
+// detached process — or to the tail of this request, after the page is sent.
+$tick = Scheduler::tickAutoDraft();
+
 $filter = $_GET['status'] ?? 'all';
 $filterWhere = match ($filter) {
     'draft'     => "WHERE p.status = 'draft'",
@@ -118,6 +168,8 @@ $counts = SocialPublishManager::counts();
 $autoMax = Settings::getInt('content_auto_max', 3);
 $autoPlatforms = Settings::getList('content_auto_platforms', CONTENT_PLATFORMS);
 $autoMedia = Settings::get('content_auto_media', 'image');
+// Read after the tick, so a run this page load just started shows as running.
+$auto = AutoDrafter::status();
 // Rendering is the one thing the studio cannot do on its own — say so up front
 // rather than after an admin has waited on a failing Generate.
 $videoReady = RoomVideoComposer::isAvailable();
@@ -256,15 +308,95 @@ admin_header('Content', 'content');
 <div class="belive-card" style="margin-bottom:16px">
     <div class="belive-card-title">⚙️ Daily automation</div>
     <p class="belive-muted" style="font-size:13px; margin-top:-4px">
-        <code>cron/auto_draft_content.php</code> runs once a day and drafts up to the limit below — currently
-        <strong><?= (int) $autoMax ?> per run ≈ <?= (int) $autoMax * 7 ?> a week</strong>. Drafts still wait for your approval before publishing.
+        Once a day from <strong><?= sprintf('%02d:00', $auto['hour']) ?></strong> the AI drafts up to the limit below —
+        currently <strong><?= (int) $autoMax ?> a day ≈ <?= (int) $autoMax * 7 ?> a week</strong>. Drafts still wait for
+        your approval before publishing. The day's run happens by itself: the panel starts it, and so does
+        <code>cron/auto_draft_content.php --if-due</code> or <code>/cron/auto_draft</code> if you point an outside
+        scheduler at it — whichever gets there first, and only ever once a day.
     </p>
+
+    <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:center; justify-content:space-between;
+                padding:12px 14px; margin-bottom:14px; border-radius:10px;
+                background:var(--belive-teal-soft, #eef8f7)">
+        <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:center">
+            <span class="belive-badge <?= $auto['enabled'] ? '' : 'orange' ?>" style="font-size:12.5px">
+                <?= $auto['enabled'] ? '● Drafting daily' : '⏸ Stopped' ?>
+            </span>
+            <div style="font-size:13px">
+                <?php if (!$auto['enabled']): ?>
+                    <strong>Nothing is being drafted on its own.</strong>
+                    <div class="belive-muted" style="font-size:12px">Press Start daily drafting to switch the schedule back on.</div>
+                <?php elseif ($auto['running'] || ($tick !== null && $tick !== 'blocked')): ?>
+                    <strong>Running now</strong> — today's drafts are being written.
+                    <div class="belive-muted" style="font-size:12px">Reload this page in a moment and they will be in the list below.</div>
+                <?php elseif ($tick === 'blocked'): ?>
+                    <strong>Today's run is due, but this server will not let the panel start it.</strong>
+                    <div class="belive-muted" style="font-size:12px">
+                        Press Run now, or set <code>CRON_TOKEN</code> in <code>.env</code> and have an outside
+                        scheduler call <code>/cron/auto_draft?token=…</code> daily.
+                    </div>
+                <?php else: ?>
+                    <strong>Next run <?= e($auto['next_slot']->format('D j M, H:i')) ?></strong>
+                    <div class="belive-muted" style="font-size:12px">
+                        in <?= e((new DateTimeImmutable())->diff($auto['next_slot'])->format('%ad %hh %im')) ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <div style="font-size:12.5px; max-width:420px">
+                <?php if ($auto['last_finished'] !== null): ?>
+                    <span class="belive-muted">Last run <?= e($auto['last_finished']->format('D j M, H:i')) ?><?php
+                        $who = $auto['last_trigger'];
+                        echo ' · ' . e(match (true) {
+                            str_starts_with($who, 'admin:') => 'Run now, by ' . substr($who, 6),
+                            $who === 'web'      => 'started by the panel',
+                            $who === 'schedule' => 'started by the outside scheduler',
+                            $who === 'cron'     => 'started from the command line',
+                            default             => 'started by ' . $who,
+                        });
+                    ?></span>
+                    <div><?= e($auto['last_result']) ?></div>
+                <?php else: ?>
+                    <span class="belive-muted">No run recorded yet — the first one will show here.</span>
+                <?php endif; ?>
+            </div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <form method="post" action="/admin/content" style="margin:0">
+                <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                <input type="hidden" name="do" value="automation">
+                <input type="hidden" name="action" value="<?= $auto['enabled'] ? 'pause' : 'resume' ?>">
+                <button type="submit" class="<?= $auto['enabled'] ? 'belive-btn-ghost' : 'belive-btn-primary' ?>"
+                        style="padding:8px 16px; font-size:13px">
+                    <?= $auto['enabled'] ? '⏸ Stop daily drafting' : '▶ Start daily drafting' ?>
+                </button>
+            </form>
+            <form method="post" action="/admin/content" style="margin:0">
+                <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+                <input type="hidden" name="do" value="automation">
+                <input type="hidden" name="action" value="run">
+                <button type="submit" class="belive-btn-secondary" style="padding:8px 16px; font-size:13px"
+                        title="Draft this run's posts right now, without waiting for the daily slot">
+                    ⚡ Run now
+                </button>
+            </form>
+        </div>
+    </div>
+
     <form method="post" action="/admin/content" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start">
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
         <input type="hidden" name="do" value="settings">
-        <div class="belive-field" style="flex:0 0 150px; margin-bottom:0">
-            <label>Drafts per run</label>
+        <div class="belive-field" style="flex:0 0 130px; margin-bottom:0">
+            <label>Drafts per day</label>
             <input type="number" name="content_auto_max" min="1" max="20" value="<?= (int) $autoMax ?>">
+        </div>
+        <div class="belive-field" style="flex:0 0 130px; margin-bottom:0">
+            <label>Run from</label>
+            <select name="content_auto_hour">
+                <?php for ($hour = 0; $hour < 24; $hour++): ?>
+                    <option value="<?= $hour ?>"<?= $auto['hour'] === $hour ? ' selected' : '' ?>><?= sprintf('%02d:00', $hour) ?></option>
+                <?php endfor; ?>
+            </select>
+            <div class="hint">Asia/Kuala_Lumpur</div>
         </div>
         <div class="belive-field" style="flex:0 0 180px; margin-bottom:0">
             <label>Draft type</label>

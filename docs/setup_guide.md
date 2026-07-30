@@ -180,11 +180,30 @@ would otherwise loop forever.
 | `php cron/memory_decay.php` | daily | decay stale rules, retire below-threshold ones |
 | `php cron/publish_scheduled.php` | every 5 min | publish content posts whose scheduled slot has arrived — this is what makes "pick a time" work |
 | `php cron/publish_retry.php` | every 30 min | retry approved posts whose platform publish errored |
-| `php cron/auto_draft_content.php` | daily | draft the day's posts for admin approval |
+| `php cron/auto_draft_content.php --if-due` | daily (or as often as you like) | draft the day's posts for admin approval |
 | `php cron/refresh_engagement.php` | hourly | read viewers/likes/comments/shares back off the platforms into `content_post_metrics` — what Admin → Engagement and Admin → Reports display |
 
 Windows Task Scheduler or crontab both work — plain CLI PHP scripts. (The synchronous learning
 path — admin flags and customer corrections — needs no cron at all.)
+
+### The daily content run needs no cron at all
+
+`auto_draft_content.php` is the only job that keeps its own schedule, because the host it runs on
+(Azure App Service Linux) has no crontab and the drafts have to arrive anyway. The hour, the
+on/off switch and "which slot has already been drafted for" live in `app_settings`, and three
+doors lead to the same run:
+
+- **the admin panel** — Admin → Dashboard or Content notices the day's run is owed and starts it
+  out of band (detached CLI process, or the tail of that request after the page has been sent),
+- **`php cron/auto_draft_content.php --if-due`** — safe at any frequency; drafts only when owed.
+  Without `--if-due` it drafts immediately, which is what a person typing the command means,
+- **`GET /cron/auto_draft?token=<CRON_TOKEN>`** — for a scheduler outside the app (a scheduled
+  GitHub Action, an uptime pinger). This is the one that works on a day when nobody logs in.
+  404s until `CRON_TOKEN` is set in `.env`.
+
+Whichever gets there first wins: the slot is claimed with a conditional UPDATE, so the run
+happens once a day even if all three fire at once. Admin → Content shows the last run, what it
+produced, and the next slot, with **Stop daily drafting** / **Run now** beside it.
 
 ## 8. Tests
 

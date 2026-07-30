@@ -59,6 +59,15 @@ single entry point, one bootstrap.
 
 All admin POSTs require the session CSRF token (`csrf_token` field, provided by every form).
 
+`/admin/content` also carries the daily run's controls: `do=automation` with `action=pause|resume`
+is the Stop / Start switch, and `action=run` drafts this run's posts immediately.
+
+## Scheduler route (no login; token in the query string)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/cron/auto_draft?token={CRON_TOKEN}[&force=1]` | Run the day's content drafting if it is owed (`force=1` runs regardless). For a scheduler outside the app — App Service Linux has no crontab. Returns JSON: `{ran, drafted, lines, aborted, enabled, next_slot}`. 404s unless `CRON_TOKEN` is set in `.env`, and the token is compared in constant time |
+
 ## CLI entry points
 
 | Command | Purpose |
@@ -71,6 +80,7 @@ All admin POSTs require the session CSRF token (`csrf_token` field, provided by 
 | `php cron/publish_scheduled.php [--max=10] [--dry-run]` | Publish content posts whose scheduled slot has arrived (`--dry-run` lists the queue without sending) |
 | `php cron/publish_retry.php [--max=10]` | Retry approved posts whose platform publish errored |
 | `php cron/refresh_engagement.php [--max=25] [--stale=180] [--dry-run]` | Poll the platforms for viewers/likes/comments/shares on published posts (`--dry-run` lists the queue without calling out) |
+| `php cron/auto_draft_content.php [--if-due] [--platforms=] [--max=] [--media=] [--brief=]` | Draft the day's posts for approval. `--if-due` runs only when the day's slot is still owed and automation is not paused, so it is safe at any frequency; without it the run happens now |
 | `php tests/run.php` | 23-check learning/retrieval suite on a throwaway DB |
 | `php tests/concurrency_test.php [--url=]` | 6 simultaneous conversations, isolation assertions |
 | `php tests/simulate_whatsapp.php "<text>" [phone] [name] [--url=]` | One Meta-shaped inbound message |
