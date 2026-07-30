@@ -746,3 +746,48 @@ a.admin-hier-card:focus-visible { outline: 3px solid var(--belive-teal); outline
 @media (max-width: 560px) {
   .timing-pick { flex: 1 1 100%; }
 }
+
+/* --- Engagement + reports ---------------------------------------------------
+   Numbers read off a platform API. The one rule the styling has to carry: a
+   missing metric must LOOK missing. .metric-missing is deliberately dim and
+   dashed so a gap in Meta's insights can never be skimmed as a zero. */
+.metric-cell { text-align: right; white-space: nowrap; }
+.metric-number { font-variant-numeric: tabular-nums; font-weight: 600; }
+.metric-missing {
+  color: var(--belive-muted);
+  opacity: 0.55;
+  cursor: help;
+  border-bottom: 1px dashed currentColor;
+}
+.metric-row-empty { opacity: 0.6; }
+
+.metric-coverage {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  align-items: center; justify-content: space-between;
+  font-size: 13px;
+}
+.metric-coverage > * { min-width: 0; }
+
+.metric-trend { margin-top: 6px; }
+.metric-trend > summary {
+  cursor: pointer; font-size: 11.5px;
+  color: var(--belive-muted);
+}
+.metric-trend-table {
+  width: 100%; margin-top: 6px;
+  border-collapse: collapse; font-size: 11.5px;
+}
+.metric-trend-table th,
+.metric-trend-table td {
+  padding: 3px 6px; text-align: right;
+  border-top: 1px solid var(--belive-line);
+}
+.metric-trend-table th:first-child,
+.metric-trend-table td:first-child { text-align: left; }
+
+.metric-gap-list { list-style: none; display: grid; gap: 8px; font-size: 13px; }
+.metric-gap-list li {
+  display: flex; gap: 8px; align-items: baseline;
+  line-height: 1.5; word-break: break-word;
+}
+.metric-gap-list .belive-badge { flex-shrink: 0; }

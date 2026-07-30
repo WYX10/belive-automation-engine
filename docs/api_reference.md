@@ -45,6 +45,8 @@ single entry point, one bootstrap.
 | GET | `/admin/learning_log` · `/admin/learning_log/rule?id=` | Mistake \| Correction \| Rule \| Reinforced \| Status · rule detail with source feedback + shaped replies |
 | GET | `/admin/activity_log` | Every AI action with the model that handled it |
 | GET/POST | `/admin/content` · `/admin/content/preview?id=` | Generate caption drafts — or a rendered 9:16 promo video — from room metrics, mascot-branded and carrying `#BeLiveSolopreneur` · preview the reel and its shot list · one-week best-time-to-post heatmap built from our own engagement (`?heat=facebook\|instagram\|tiktok`) · approve → publish now, or schedule for a suggested slot and let the publisher cron post it |
+| GET/POST | `/admin/engagement` | Per-post engagement: viewers, likes, comments and shares read from each platform's own API, with daily snapshots and a Refresh button (`?platform=facebook\|instagram\|tiktok`). A metric the platform did not return shows as "—" with the reason, never as a zero |
+| GET | `/admin/reports` · `/admin/reports/export` | Performance report for a period (`?days=7\|30\|90\|365`, `?platform=`): totals, per-channel and photo-vs-reel breakdowns, top posts, studio throughput, and the content → comment → WhatsApp → booking funnel · CSV download of the same figures |
 | GET/POST | `/admin/social` | Social auto-reply: on/off, who gets a DM, the WhatsApp number and link prefill, the three reply templates, and the answered-events receipt (which comment, which reply, who actually landed on WhatsApp) |
 | GET/POST | `/admin/bookings` | Zero-touch bookings; complete/cancel controls |
 | GET/POST | `/admin/staff` | Viewing-staff roster: weekly shifts, time off, per-agent viewing modes and daily caps; 7-day coverage grid and manual assignment of unstaffed viewings |
@@ -68,6 +70,7 @@ All admin POSTs require the session CSRF token (`csrf_token` field, provided by 
 | `php cron/memory_decay.php [--stale-days=30]` | Confidence decay + below-threshold retirement |
 | `php cron/publish_scheduled.php [--max=10] [--dry-run]` | Publish content posts whose scheduled slot has arrived (`--dry-run` lists the queue without sending) |
 | `php cron/publish_retry.php [--max=10]` | Retry approved posts whose platform publish errored |
+| `php cron/refresh_engagement.php [--max=25] [--stale=180] [--dry-run]` | Poll the platforms for viewers/likes/comments/shares on published posts (`--dry-run` lists the queue without calling out) |
 | `php tests/run.php` | 23-check learning/retrieval suite on a throwaway DB |
 | `php tests/concurrency_test.php [--url=]` | 6 simultaneous conversations, isolation assertions |
 | `php tests/simulate_whatsapp.php "<text>" [phone] [name] [--url=]` | One Meta-shaped inbound message |
