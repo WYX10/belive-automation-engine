@@ -144,6 +144,12 @@ script and GitHub PHP build do not install or supervise this client automaticall
 7. Approve and schedule the reviewed video using the existing posting controls.
 
 One short generated introduction is followed by original room media and a CTA.
+If the script-writing text model returns a 429 rate limit, the app uses a
+labelled inventory template for scenes and captions and still queues Wan
+generation. It does not retry the text request or switch providers. Custom
+script wording from the admin brief is not applied in this case; the interaction
+log records that limitation. Prices retain their tenure and benefits come from
+the room's saved amenities. Other text-provider failures remain errors.
 This bounds free-GPU usage and preserves verified photography for the room
 presentation. An illustrated mascot is not pasted a second time over the
 model-generated presenter. Photos in the room gallery are never overwritten.

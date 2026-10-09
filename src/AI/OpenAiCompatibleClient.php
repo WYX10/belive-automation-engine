@@ -57,7 +57,7 @@ final class OpenAiCompatibleClient implements LlmClient
             ]);
         } catch (BadResponseException $e) {
             $body = mb_substr((string) $e->getResponse()->getBody(), 0, 400);
-            throw new RuntimeException("{$this->providerLabel} API error ({$e->getResponse()->getStatusCode()}): $body", 0, $e);
+            throw new RuntimeException("{$this->providerLabel} API error ({$e->getResponse()->getStatusCode()}): $body", $e->getResponse()->getStatusCode(), $e);
         }
 
         $raw = json_decode((string) $response->getBody(), true) ?? [];
@@ -73,7 +73,8 @@ final class OpenAiCompatibleClient implements LlmClient
                 ? (string) ($raw['error']['message'] ?? json_encode($raw['error'], JSON_UNESCAPED_UNICODE))
                 : (string) $raw['error'];
 
-            throw new RuntimeException("{$this->providerLabel} error: " . mb_substr($message, 0, 400));
+            $code = is_array($raw['error']) ? (int) ($raw['error']['code'] ?? 0) : 0;
+            throw new RuntimeException("{$this->providerLabel} error: " . mb_substr($message, 0, 400), $code);
         }
 
         $choice = $raw['choices'][0] ?? null;

@@ -8,6 +8,7 @@ use App\AI\Memory\EpisodicLogger;
 use App\AI\Memory\FeedbackCollector;
 use App\AI\Memory\LearningEngine;
 use App\AI\ModelRouter;
+use App\AI\LlmClient;
 use App\Core\Settings;
 use App\Integrations\WhatsApp\WhatsAppLink;
 use App\Models\Room;
@@ -288,9 +289,9 @@ PROMPT;
      * @param int $shotCount how many distinct shots the composer can draw on
      * @return array{caption:string, scenes:array<int, array{headline:string, sub:string, seconds:float}>, model:string}
      */
-    public static function videoPromo(array $room, string $platform, ?string $brief = null, int $shotCount = 1): array
+    public static function videoPromo(array $room, string $platform, ?string $brief = null, int $shotCount = 1, ?LlmClient $client = null): array
     {
-        $client = ModelRouter::clientForPhase('content_creation');
+        $client ??= ModelRouter::clientForPhase('content_creation');
 
         $metrics = self::roomMetrics($room, $platform);
         $whatsappLink = self::captionWhatsappLink($room, $platform);
@@ -303,11 +304,24 @@ PROMPT;
             $brief !== '' ? "ADMIN BRIEF (what this video should be about):\n" . mb_substr($brief, 0, 1000) : '',
         ]));
 
-        [$result, $ms] = SkillSupport::timed(fn () => $client->generate(
-            self::VIDEO_SYSTEM,
-            [['role' => 'user', 'content' => $prompt]],
-            ['max_tokens' => 1100, 'temperature' => 0.6, 'json' => true, 'mock_hint' => 'video']
-        ));
+        $rateLimited = false;
+        $started = microtime(true);
+        try {
+            [$result, $ms] = SkillSupport::timed(fn () => $client->generate(
+                self::VIDEO_SYSTEM,
+                [['role' => 'user', 'content' => $prompt]],
+                ['max_tokens' => 1100, 'temperature' => 0.6, 'json' => true, 'mock_hint' => 'video']
+            ));
+        } catch (\RuntimeException $e) {
+            if ($e->getCode() !== 429) {
+                throw $e;
+            }
+            // A throttled text provider must not block the separate video model.
+            // Use verified inventory once; do not retry or select a paid model.
+            $rateLimited = true;
+            $result = ['text' => '', 'model' => 'inventory-template'];
+            $ms = (int) round((microtime(true) - $started) * 1000);
+        }
 
         $parsed = self::parseVideoScript($result['text']);
         $scenes = $parsed['scenes'] !== [] ? $parsed['scenes'] : self::fallbackScenes($metrics);
@@ -319,7 +333,8 @@ PROMPT;
             $scene['camera'] ??= $index === 0 ? 'reveal' : ($index % 2 ? 'pan_right' : 'pan_left');
         }
         unset($scene);
-        $model = $parsed['scenes'] !== [] ? $result['model'] : $result['model'] . ' (fallback script)';
+        $model = $rateLimited ? 'inventory-template (text model rate-limited)'
+            : ($parsed['scenes'] !== [] ? $result['model'] : $result['model'] . ' (fallback script)');
 
         $caption = self::withCampaignHashtag(self::withWhatsappLink(
             $parsed['caption'] !== '' ? $parsed['caption'] : self::fallbackCaption($metrics),
@@ -339,8 +354,9 @@ PROMPT;
                 array_sum(array_column($scenes, 'seconds')),
                 $platform,
                 (int) $room['id'],
-                $brief !== '' ? ' Admin brief applied.' : '',
-                $parsed['scenes'] === [] ? ' Model returned no usable scenes — metrics fallback used.' : ''
+                $brief !== '' ? ($rateLimited ? ' Custom script brief was not applied to the inventory template.' : ' Admin brief applied.') : '',
+                $rateLimited ? ' Text provider rate-limited (429); inventory template used without retry or provider switch.'
+                    : ($parsed['scenes'] === [] ? ' Model returned no usable scenes — metrics fallback used.' : '')
             ),
             'response_ms' => $ms,
         ]);
@@ -366,7 +382,7 @@ PROMPT;
             'room_type'         => $room['room_type'],
             'price_rm_monthly'  => $prices['monthly']['price'] ?? null,
             'price_rm_12_month' => $prices['12_month']['price'] ?? null,
-            'deposit_rm'        => (float) ($room['deposit_amount'] ?? 0),
+            'deposit_rm'        => isset($room['deposit_amount']) ? (float) $room['deposit_amount'] : null,
             'features'          => Room::amenities($roomId),
         ];
     }
@@ -448,7 +464,7 @@ PROMPT;
                 'seconds'  => 3.5,
             ];
         }
-        if ((float) ($metrics['deposit_rm'] ?? 0) === 0.0) {
+        if (isset($metrics['deposit_rm']) && (float) $metrics['deposit_rm'] === 0.0) {
             $scenes[] = ['headline' => 'Zero deposit', 'sub' => 'Move in without the upfront hit', 'seconds' => 3.0];
         }
         if ($features !== []) {
@@ -468,12 +484,12 @@ PROMPT;
         $price = $metrics['price_rm_12_month'] ?? $metrics['price_rm_monthly'] ?? null;
 
         return implode("\n", array_filter([
-            ucfirst((string) $metrics['room_type']) . ' room in ' . (string) $metrics['area'] . ' — ready when you are.',
+            ucfirst((string) $metrics['room_type']) . ' room in ' . (string) $metrics['area'] . ' — take a look around.',
             $price !== null
                 ? 'RM ' . number_format((float) $price) . '/mo on a '
                     . ($metrics['price_rm_12_month'] !== null ? '12-month' : 'flexible monthly') . ' stay.'
                 : '',
-            'Fully furnished. Weekly cleaning. Just bring your bag.',
+            implode(' · ', array_slice((array) ($metrics['features'] ?? []), 0, 3)),
         ]));
     }
 

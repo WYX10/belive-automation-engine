@@ -17,6 +17,7 @@ declare(strict_types=1);
  */
 
 use App\AI\Skills\CreateSkill;
+use App\AI\OpenAiCompatibleClient;
 use App\Content\MascotLibrary;
 use App\Content\MascotNarrator;
 use App\Content\PhotoPostDrafter;
@@ -78,6 +79,48 @@ check('the video caption carries the tap-to-chat WhatsApp link',
     str_contains($promo['caption'], 'https://wa.me/60123456789'), $promo['caption']);
 check('the video caption carries the campaign hashtag',
     str_contains($promo['caption'], CONTENT_REQUIRED_HASHTAG), $promo['caption']);
+
+// Rate-limited text scripting must not block the separate video generator.
+foreach ([429, 200] as $transportStatus) {
+    $requests = [];
+    $handler = HandlerStack::create(new MockHandler([new Response($transportStatus, [], json_encode([
+        'error' => ['code' => 429, 'message' => 'Provider temporarily rate-limited', 'metadata' => ['raw' => 'PRIVATE_PROVIDER_DETAIL']],
+    ]))]));
+    $handler->push(Middleware::history($requests));
+    $limitedClient = new OpenAiCompatibleClient('test-key', 'free/text-model', 'https://openrouter.invalid/api/v1',
+        'OpenRouter', 'max_tokens', new Client(['handler' => $handler]));
+    $limited = CreateSkill::videoPromo($videoRoom, 'instagram', 'Invent a rooftop pool.', 2, $limitedClient);
+    check("HTTP $transportStatus rate limit uses a labelled inventory script", str_contains($limited['model'], 'inventory-template')
+        && str_contains($limited['model'], 'rate-limited') && $limited['scenes'] !== []);
+    check("HTTP $transportStatus rate limit makes exactly one text request", count($requests) === 1);
+    $limitedText = json_encode($limited);
+    check("HTTP $transportStatus fallback keeps verified price, tenure and WhatsApp CTA", str_contains($limitedText, '820')
+        && str_contains($limitedText, '12-month') && str_contains($limited['caption'], 'https://wa.me/60123456789'));
+    check("HTTP $transportStatus fallback ignores invented brief and provider details", !str_contains($limitedText, 'rooftop')
+        && !str_contains($limitedText, 'PRIVATE_PROVIDER_DETAIL') && !str_contains($limitedText, 'Weekly cleaning'));
+    $log = Database::run("SELECT reasoning FROM ai_interactions WHERE message_kind = 'video_script' ORDER BY id DESC LIMIT 1")->fetchColumn();
+    check("HTTP $transportStatus fallback records why the custom script was not applied", str_contains($log, '429')
+        && str_contains($log, 'was not applied') && !str_contains($log, 'PRIVATE_PROVIDER_DETAIL'));
+}
+foreach ([401, 503] as $transportStatus) {
+    $handler = HandlerStack::create(new MockHandler([new Response($transportStatus, [], '{"error":{"message":"failed"}}')]));
+    $errorClient = new OpenAiCompatibleClient('test-key', 'free/text-model', 'https://openrouter.invalid/api/v1',
+        'OpenRouter', 'max_tokens', new Client(['handler' => $handler]));
+    $raised = false;
+    try {
+        CreateSkill::videoPromo($videoRoom, 'instagram', null, 2, $errorClient);
+    } catch (RuntimeException $e) {
+        $raised = $e->getCode() === $transportStatus;
+    }
+    check("HTTP $transportStatus error remains visible instead of using the rate-limit template", $raised);
+}
+$noDepositRoom = $videoRoom;
+unset($noDepositRoom['deposit_amount']);
+$handler = HandlerStack::create(new MockHandler([new Response(429, [], '{"error":{"code":429,"message":"limited"}}')]));
+$noDeposit = CreateSkill::videoPromo($noDepositRoom, 'instagram', null, 2, new OpenAiCompatibleClient(
+    'test-key', 'free/text-model', 'https://openrouter.invalid/api/v1', 'OpenRouter', 'max_tokens', new Client(['handler' => $handler])
+));
+check('rate-limit template does not claim zero deposit when unknown', !str_contains(json_encode($noDeposit), 'Zero deposit'));
 
 $sceneShapeOk = true;
 foreach ($promo['scenes'] as $scene) {
