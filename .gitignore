@@ -7,4 +7,5 @@ composer.phar
 .DS_Store
 Thumbs.db
 /mcp/tenant_marketing/.venv/
+/ai_video/huggingface/.venv/
 __pycache__/

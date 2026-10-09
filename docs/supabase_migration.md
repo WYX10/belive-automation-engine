@@ -47,10 +47,11 @@ For a row-by-row contents check after restoration:
 python3 database/convert_mysql_shell_dump.py \
   --dump /private/path/belive-backup \
   --verify /private/path/belive-supabase-import.verification.json \
-  --host <session-pooler-host> --port 5432 \
-  --database postgres --user postgres.<project-ref>
+  --host "SESSION_POOLER_HOST" --port 5432 \
+  --database postgres --user "postgres.PROJECT_REF"
 ```
 
+Replace the host/user placeholders with the project's Session pooler parameters.
 `psql` obtains the password from its standard private `PGPASSFILE` or prompt. JSON
 is compared semantically; every other original cell is compared exactly. New default
 settings are excluded from the original settings comparison.
@@ -80,6 +81,14 @@ DB_SSL_ROOT_CERT=/etc/ssl/certs/ca-certificates.crt
 Use a trusted CA bundle/certificate from Supabase's database settings if the
 runtime's CA store cannot verify the pooler. Preserve TLS/certificate verification.
 Windows deployments must supply their actual CA file path.
+
+The Azure installation encountered `certificate verify failed` before its
+successful connection check. For a repeatable Azure installation, follow the
+[IT handover certificate steps](IT_HANDOVER.md#82-supabase-and-trusted-tls):
+download the project's CA, combine it with system trust in
+`/home/belive-certs/database-ca.pem`, and set `DB_SSL_ROOT_CERT` to that path.
+Keep `DB_SSL_MODE=verify-full`. Certificate and worker provisioning belong to the
+running runtime, not only to the GitHub build.
 
 **Keep the existing Azure `APP_ENCRYPTION_KEY` unchanged.** The backup contains
 encrypted provider keys; a different application encryption key cannot decrypt

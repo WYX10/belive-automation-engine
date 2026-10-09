@@ -1,19 +1,22 @@
 # Setup Guide — The BeLive Automation Engine
 
-From zero to a live, judge-testable system. Windows/XAMPP instructions (the team's environment);
-any PHP 8.1+ + MySQL/MariaDB host works the same way.
+This guide covers the original local Windows/XAMPP demo and provider-account
+setup. For the company installation, hardware/software requirements and the
+current Azure + Supabase deployment, use [IT_HANDOVER.md](IT_HANDOVER.md).
+The full MCP workflow needs Linux; native Windows uses built-in guidance unless
+the bridge's virtualenv launch path is adapted. Preserve the existing encryption
+key and data when taking over an installed system.
 
 ## 1. Requirements
 
 - PHP 8.1+ (XAMPP's PHP is fine) with `openssl`, `pdo_mysql`, `curl` extensions (XAMPP defaults)
 - MySQL / MariaDB running
-- Composer (a `composer.phar` is checked into the project root — `php composer.phar` works without
-  a global install)
+- Composer installed locally (the Composer binary is not tracked in Git)
 
 ## 2. Install
 
 ```bash
-php composer.phar install
+composer install
 copy .env.example .env
 ```
 
@@ -22,7 +25,7 @@ Edit `.env`:
 | Key | What to put |
 |---|---|
 | `APP_URL` | The public base URL (see §5 for exposing it) |
-| `APP_ENCRYPTION_KEY` | `php -r "echo base64_encode(random_bytes(32));"` — **generate a fresh one, never reuse the example** |
+| `APP_ENCRYPTION_KEY` | `php -r "echo base64_encode(random_bytes(32));"` — **generate only for an empty new installation; preserve the existing key for a migration** |
 | `DB_*` | Your MySQL credentials (XAMPP default: root, empty password) |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD_HASH` | Login for the admin panel. Hash: `php -r "echo password_hash('yourpassword', PASSWORD_BCRYPT);"` |
 | `WA_VERIFY_TOKEN` | Any random string — you'll paste the same value into the Meta dashboard in §5 |
@@ -39,7 +42,7 @@ php database/seed.php        # demo rooms (real BeLive media) + the Setapak scen
 
 Development / demo-day local:
 
-```bash
+```cmd
 set PHP_CLI_SERVER_WORKERS=6
 php -S 0.0.0.0:8080 -t public public/index.php
 ```
@@ -172,43 +175,40 @@ would otherwise loop forever.
   (see `docs/judge_demo_script.md`, Demo 2). The learned rule itself is **not** seeded —
   judges watch it being learned live.
 
-## 7. Cron jobs (production)
+## 7. Background jobs
+
+For dependable publishing, run a supervised
+`php cron/content_worker.php --interval=30 --max=10`, or invoke
+**POST `/cron/content`** every minute with a private
+`Authorization: Bearer <CRON_TOKEN>` header. The HTTP route processes delivery
+and dispatches daily drafting. Website traffic alone is insufficient. See
+[IT_HANDOVER.md, section 11](IT_HANDOVER.md#11-scheduling-and-background-services)
+for supervision, cron examples and Azure alternatives.
 
 | Job | Schedule | Purpose |
 |---|---|---|
-| `php cron/learning_job.php` | every 15–30 min | drop-off pattern detection (aggregate), batch rule distillation, rule reinforcement |
-| `php cron/memory_decay.php` | daily | decay stale rules, retire below-threshold ones |
-| `php cron/publish_scheduled.php` | every 5 min | publish content posts whose scheduled slot has arrived — this is what makes "pick a time" work |
-| `php cron/publish_retry.php` | every 30 min | retry approved posts whose platform publish errored |
-| `php cron/auto_draft_content.php --if-due` | daily (or as often as you like) | draft the day's posts for admin approval |
-| `php cron/refresh_engagement.php` | hourly | read viewers/likes/comments/shares back off the platforms into `content_post_metrics` — what Admin → Engagement and Admin → Reports display |
+| `php cron/learning_job.php` | Every 15–30 minutes | Pending feedback and aggregate learning |
+| `php cron/memory_decay.php` | Daily | Retire stale low-confidence lessons |
+| `php cron/refresh_engagement.php` | Hourly | Update platform engagement snapshots |
 
-Windows Task Scheduler or crontab both work — plain CLI PHP scripts. (The synchronous learning
-path — admin flags and customer corrections — needs no cron at all.)
+The persistent content worker handles delivery/retries and dispatches the day's
+creation job separately. For a scheduled CLI `--once` worker, also schedule
+`php cron/auto_draft_content.php --if-due`: once mode only processes delivery.
+Do not add legacy publisher/retry tasks alongside the chosen worker by default.
 
-### The daily content run needs no cron at all
-
-`auto_draft_content.php` is the only job that keeps its own schedule, because the host it runs on
-(Azure App Service Linux) has no crontab and the drafts have to arrive anyway. The hour, the
-on/off switch and "which slot has already been drafted for" live in `app_settings`, and three
-doors lead to the same run:
-
-- **the admin panel** — Admin → Dashboard or Content notices the day's run is owed and starts it
-  out of band (detached CLI process, or the tail of that request after the page has been sent),
-- **`php cron/auto_draft_content.php --if-due`** — safe at any frequency; drafts only when owed.
-  Without `--if-due` it drafts immediately, which is what a person typing the command means,
-- **`GET /cron/auto_draft?token=<CRON_TOKEN>`** — for a scheduler outside the app (a scheduled
-  GitHub Action, an uptime pinger). This is the one that works on a day when nobody logs in.
-  404s until `CRON_TOKEN` is set in `.env`.
-
-Whichever gets there first wins: the slot is claimed with a conditional UPDATE, so the run
-happens once a day even if all three fire at once. Admin → Content shows the last run, what it
-produced, and the next slot, with **Stop daily drafting** / **Run now** beside it.
+Content studio posting times use Asia/Kuala_Lumpur. The automatic daily
+scheduling option starts disabled; review its approval policy before enabling.
+A due post begins on the next poll, followed by provider processing latency.
+A scheduled post on an unconnected account remains queued. Check an uncertain
+publish outcome on the provider before retrying.
 
 ## 8. Tests
 
+Run these in an isolated local development environment, never with production
+credentials. Live simulator calls may invoke real providers when configured.
+
 ```bash
-php tests/run.php               # 23 checks: retrieval filtering + real learning loop (throwaway DB)
+php tests/run.php               # rebuilds a throwaway local _test database
 php tests/concurrency_test.php  # 25 checks: 6 simultaneous conversations, context isolation
 php tests/simulate_whatsapp.php "any room in Cheras?" 60123456789 "Tester"   # one simulated inbound
 ```

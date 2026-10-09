@@ -83,7 +83,7 @@ final class RoomVideoComposer
      * @param array<string, mixed> $room
      * @param array<int, array{headline:string, sub:string, seconds:float, cta?:bool}> $scenes
      */
-    public static function render(array $room, array $scenes, ?array &$details = null, ?string $brief = null): string
+    public static function render(array $room, array $scenes, ?array &$details = null, ?string $brief = null, array $generatedShots = []): string
     {
         $ffmpeg = self::binary()
             ?? throw new RuntimeException('ffmpeg is not installed (or FFMPEG_BIN in .env points nowhere), so a promo video cannot be rendered on this machine.');
@@ -108,7 +108,8 @@ final class RoomVideoComposer
             $plan = [];
             $polished = [];
             foreach (array_values($scenes) as $i => $scene) {
-                $shot = $shots[$i % count($shots)];
+                $shot = $generatedShots !== [] && $i === 0 ? $generatedShots[0]
+                    : $shots[($generatedShots !== [] ? max(0, $i - 1) : $i) % count($shots)];
                 $seconds = max(2.5, min(6.0, (float) $scene['seconds']));
                 if ($shot['kind'] === 'photo') {
                     if (!isset($polished[$shot['file']])) {
@@ -263,7 +264,7 @@ final class RoomVideoComposer
     }
 
     /** Seconds of a tour clip, 0.0 when ffprobe cannot read it. */
-    private static function clipDuration(string $file): float
+    public static function clipDuration(string $file): float
     {
         $probe = self::binary();
         if ($probe === null) {
@@ -331,19 +332,25 @@ final class RoomVideoComposer
             $filters[] = '[' . ($count + $i) . ":v]format=rgba[o$i]";
             $filters[] = "[room$i][o$i]overlay=0:0:format=auto[card$i]";
 
-            $cta = !empty($step['scene']['cta']);
-            $x = $cta ? '(W-w)/2' : '84';
-            $baseY = $cta ? 350 : 1070;
-            $entry = $cta ? $x : 'if(lt(t,0.6),-w+(84+w)*(1-pow(1-t/0.6,3)),84)';
-            $bounce = $step['scene']['presenter_action'] === 'celebrate' ? '12*abs(sin(t*5))' : '5*sin(t*4)';
-            $switch = round(min(1.5, $step['seconds'] * 0.4), 2);
-            foreach ([0, 1] as $j) {
-                $input = 2 * $count + 2 * $i + $j;
-                $angle = $j === 0 ? '0.025*sin(t*5)' : '0.018*sin(t*4)';
-                $filters[] = "[$input:v]format=rgba,rotate='$angle':c=none:ow=rotw(0.03):oh=roth(0.03)[host{$i}_$j]";
+            if (!empty($step['shot']['generated_presenter'])) {
+                // The model already animated the supplied mascot. Do not paste
+                // a second mascot over those generated frames.
+                $filters[] = "[card$i]format=yuv420p,setpts=PTS-STARTPTS,fps=30[v$i]";
+            } else {
+                $cta = !empty($step['scene']['cta']);
+                $x = $cta ? '(W-w)/2' : '84';
+                $baseY = $cta ? 350 : 1070;
+                $entry = $cta ? $x : 'if(lt(t,0.6),-w+(84+w)*(1-pow(1-t/0.6,3)),84)';
+                $bounce = $step['scene']['presenter_action'] === 'celebrate' ? '12*abs(sin(t*5))' : '5*sin(t*4)';
+                $switch = round(min(1.5, $step['seconds'] * 0.4), 2);
+                foreach ([0, 1] as $j) {
+                    $input = 2 * $count + 2 * $i + $j;
+                    $angle = $j === 0 ? '0.025*sin(t*5)' : '0.018*sin(t*4)';
+                    $filters[] = "[$input:v]format=rgba,rotate='$angle':c=none:ow=rotw(0.03):oh=roth(0.03)[host{$i}_$j]";
+                }
+                $filters[] = "[card$i][host{$i}_0]overlay=x='$entry':y='$baseY-$bounce':enable='lt(t,$switch)':format=auto[first$i]";
+                $filters[] = "[first$i][host{$i}_1]overlay=x='$x':y='$baseY-$bounce':enable='gte(t,$switch)':format=auto,format=yuv420p,setpts=PTS-STARTPTS,fps=30[v$i]";
             }
-            $filters[] = "[card$i][host{$i}_0]overlay=x='$entry':y='$baseY-$bounce':enable='lt(t,$switch)':format=auto[first$i]";
-            $filters[] = "[first$i][host{$i}_1]overlay=x='$x':y='$baseY-$bounce':enable='gte(t,$switch)':format=auto,format=yuv420p,setpts=PTS-STARTPTS,fps=30[v$i]";
             if ($step['voice'] !== null) {
                 $voiceIndex = $nextInput++;
                 $args = array_merge($args, ['-i', $step['voice']['file']]);

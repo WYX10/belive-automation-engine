@@ -1,5 +1,10 @@
 # Content studio
 
+For model-generated video frames, use the optional **AI-generated marketing
+video (Wan)** workflow described in [ai_video_setup.md](ai_video_setup.md).
+It queues hosted image-to-video generation, labels the footage and requires
+review. The animated presenter described below is the separate local renderer.
+
 Photo posts analyse the actual room photo with the same vision/histogram engine
 as the listing's Improve Photo action. Exposure, colour, contrast, tilt and detail
 corrections are bounded. The campaign copy gets inventory-based title, area and
@@ -45,11 +50,15 @@ Keep the worker running independently of website traffic:
 php cron/content_worker.php --interval=30 --max=10
 ```
 
-Supervise it with systemd/Supervisor or a continuous WebJob and restart it on
+Supervise it with systemd/Supervisor or a hosting-supported worker service and restart it on
 deployment. `--once` performs one delivery cycle, suitable for a task scheduled
 each minute. A persistent worker also dispatches the daily creation job in a
 separate process so video rendering does not delay due deliveries. The local
 cloud startup script starts this worker alongside PHP and MariaDB.
+
+That local development startup is separate from `deploy/azure/startup.sh`:
+the Azure script configures Nginx/upload limits and does not start a worker.
+For production provisioning, see [IT_HANDOVER.md](IT_HANDOVER.md).
 
 On hosting without background processes, call **POST `/cron/content`** each
 minute with `Authorization: Bearer <CRON_TOKEN>`. The endpoint processes delivery

@@ -88,7 +88,7 @@ final class PromoVideoDrafter
      * @param array<string, mixed> $room
      * @return array{headline:string, sub:string, seconds:float, cta:bool}
      */
-    private static function endCard(array $room): array
+    public static function endCard(array $room): array
     {
         $number = WhatsAppLink::number();
 

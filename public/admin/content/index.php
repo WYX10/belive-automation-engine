@@ -15,6 +15,7 @@ defined('APP_BOOTED') || exit('No direct access.');
 
 use App\AI\Skills\CreateSkill;
 use App\Content\AutoDrafter;
+use App\Content\AiVideoJobs;
 use App\Content\MascotLibrary;
 use App\Content\PhotoPostDrafter;
 use App\Content\PostTimingAdvisor;
@@ -116,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate'
 
     $room = Room::find((int) ($_POST['room_id'] ?? 0));
     $platform = in_array($_POST['platform'] ?? '', CONTENT_PLATFORMS, true) ? $_POST['platform'] : 'facebook';
-    $mediaKind = in_array($_POST['media_kind'] ?? '', CONTENT_MEDIA_KINDS, true) ? $_POST['media_kind'] : 'image';
+    $mediaKind = in_array($_POST['media_kind'] ?? '', ['image', 'video', 'ai_video'], true) ? $_POST['media_kind'] : 'image';
     // Per-post steer wins; otherwise fall back to the standing brief.
     $brief = trim((string) ($_POST['brief'] ?? '')) ?: Settings::get('content_brief', '');
 
@@ -124,7 +125,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate'
         set_flash('danger', 'Pick a room to feature.');
     } else {
         try {
-            if ($mediaKind === 'video') {
+            if ($mediaKind === 'ai_video') {
+                $jobId = AiVideoJobs::enqueue($room, $platform, $brief);
+                set_flash('success', "AI video request #$jobId is queued. Review the generated draft here when it is ready.");
+            } elseif ($mediaKind === 'video') {
                 $video = PromoVideoDrafter::draft($room, $platform, $brief);
                 set_flash('success', sprintf(
                     'Promo video rendered from this room\'s own photos — %d scenes, %.1fs, scripted by %s.',
@@ -182,6 +186,8 @@ $auto = AutoDrafter::status();
 // Rendering is the one thing the studio cannot do on its own — say so up front
 // rather than after an admin has waited on a failing Generate.
 $videoReady = RoomVideoComposer::isAvailable();
+$aiVideoReady = AiVideoJobs::available();
+$aiVideoJobs = AiVideoJobs::recent();
 $mascotReady = MascotLibrary::isAvailable();
 $standingBrief = Settings::get('content_brief', '');
 $waPrefill = Settings::get('content_wa_prefill', '');
@@ -287,7 +293,8 @@ admin_header('Content', 'content');
             <label>Post type</label>
             <select name="media_kind">
                 <option value="image">🖼 Photo post</option>
-                <option value="video"<?= $videoReady ? '' : ' disabled' ?>>🎬 Promo video (9:16 reel)</option>
+                <option value="video"<?= $videoReady ? '' : ' disabled' ?>>🎬 Animated room tour (9:16 reel)</option>
+                <option value="ai_video"<?= $aiVideoReady ? '' : ' disabled' ?>>✨ AI-generated marketing video (Wan)</option>
             </select>
         </div>
         <div class="belive-field" style="flex:1 1 100%; margin-bottom:0">
@@ -297,6 +304,12 @@ admin_header('Content', 'content');
         </div>
         <button type="submit" class="belive-btn-primary">Generate post</button>
         <div class="belive-muted" style="flex:1 1 100%; font-size:12.5px">
+            <?php if ($aiVideoReady): ?>
+                ✨ Wan generates a moving mascot introduction from the room photo. Generation runs in the background and depends on the free GPU allowance.
+                Review the room layout, mascot and claims before approving the draft.<br>
+            <?php else: ?>
+                ✨ Generative AI video needs the hosted Wan client enabled by IT. The animated room tour below uses local rendering.<br>
+            <?php endif; ?>
             <?php if ($videoReady): ?>
                 🎬 A promo video is cut from the room's <em>own</em> photos and tour clips — the AI writes the scenes and the
                 caption, never the footage. Rendering takes a few seconds per scene, so give Generate a moment.<br>
@@ -313,6 +326,23 @@ admin_header('Content', 'content');
         </div>
     </form>
 </div>
+
+<?php if ($aiVideoJobs !== []): ?>
+<div class="belive-card" style="margin-bottom:16px">
+    <div class="belive-card-title">AI video requests</div>
+    <p class="belive-muted">Refresh this page to see progress. Generated videos become drafts and require your approval.</p>
+    <?php foreach ($aiVideoJobs as $job): ?>
+        <p>
+            #<?= (int) $job['id'] ?> · Room #<?= (int) $job['room_id'] ?> · <?= e($job['platform']) ?> · <strong><?= e($job['status']) ?></strong>
+            <?php if ($job['post_id']): ?>
+                <a href="/admin/content/preview?id=<?= (int) $job['post_id'] ?>">Review generated video</a>
+            <?php elseif ($job['error_code']): ?>
+                — <?= e(AiVideoJobs::errorMessage($job['error_code'])) ?>
+            <?php endif; ?>
+        </p>
+    <?php endforeach; ?>
+</div>
+<?php endif; ?>
 
 <div class="belive-card" style="margin-bottom:16px">
     <div class="belive-card-title">🕒 Scheduled publishing</div>

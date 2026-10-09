@@ -19,6 +19,7 @@ if ($expected === '' || $given === '' || !hash_equals($expected, $given)) {
 @set_time_limit(0);
 try {
     $result = ContentPublishWorker::runDue();
+    \App\Content\AiVideoJobs::dispatch();
     $draft = Scheduler::tickAutoDraft();
     echo json_encode(['ok' => true, 'delivery' => $result, 'draft_dispatch' => $draft]);
 } catch (Throwable $e) {

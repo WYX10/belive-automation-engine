@@ -156,7 +156,12 @@ admin_header('Post preview', 'content');
                        style="width:100%; max-width:300px; border-radius:12px; margin-bottom:10px; background:#000; display:block"></video>
                 <div class="belive-muted" style="font-size:12.5px; margin-bottom:10px">
                     This is exactly the file that gets published — 9:16, <?= e(number_format($videoSeconds, 1)) ?>s,
-                    cut from this room's own photos and tour clips.
+                    <?php if (!empty($creative['ai_generated_footage'])): ?>
+                        AI-generated mascot introduction by <?= e($creative['video_model'] ?? 'Wan') ?>, followed by original room media.
+                        <strong>Review room layout, furnishings and character consistency before approval.</strong>
+                    <?php else: ?>
+                        cut from this room's own photos and tour clips.
+                    <?php endif; ?>
                     <?php if (($creative['style'] ?? '') === 'mascot_guided_tour'): ?>
                         Animated mascot host · <?= !empty($creative['narrated']) ? 'spoken introduction' : 'captions (voice unavailable)' ?>.
                     <?php endif; ?>

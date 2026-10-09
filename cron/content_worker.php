@@ -29,6 +29,7 @@ do {
     @set_time_limit(0);
     try {
         $result = ContentPublishWorker::runDue($max);
+        \App\Content\AiVideoJobs::dispatch();
         echo '[' . date('c') . '] delivery ' . json_encode($result) . "\n";
         // Draft in a separate process so an expensive render cannot delay a
         // scheduled delivery. Slot claims already protect overlapping ticks.

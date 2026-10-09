@@ -9,8 +9,11 @@ for the catalog and portals. Admin → Leads → View displays the saved profile
 
 ## Install and run
 
-Use PHP 8.1+ with the repository's extensions, Composer, MariaDB/MySQL, Python
-3.10+, and [uv](https://docs.astral.sh/uv/). For the prepared cloud environment,
+Use supported PHP with the repository's extensions, Composer, PostgreSQL or
+MariaDB/MySQL, Python 3.10+, and [uv](https://docs.astral.sh/uv/). The full bridge
+uses Linux's `.venv/bin/python`; native Windows needs a launch-path adaptation
+or uses built-in guidance. For company provisioning, follow
+[IT_HANDOVER.md](IT_HANDOVER.md). For the prepared cloud environment,
 activate PHP with `source /workspace/.belive-cloud/activate` first.
 
 From `/workspace/belive-automation-engine`:

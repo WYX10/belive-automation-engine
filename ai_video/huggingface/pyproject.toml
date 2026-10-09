@@ -1,0 +1,9 @@
+[project]
+name = "belive-ai-video-client"
+version = "0.1.0"
+description = "Quota-limited hosted Wan image-to-video integration for BeLive"
+requires-python = ">=3.10"
+dependencies = ["gradio-client==2.7.2"]
+
+[tool.uv]
+package = false
