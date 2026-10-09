@@ -147,16 +147,16 @@ final class DigitalAgreement extends BaseModel
                AND a.starts_on IS NOT NULL
                AND a.ends_on IS NOT NULL
              ORDER BY CASE
-                          WHEN CURDATE() BETWEEN a.starts_on AND a.ends_on THEN 0
-                          WHEN a.starts_on > CURDATE() THEN 1
+                          WHEN CAST(? AS date) BETWEEN a.starts_on AND a.ends_on THEN 0
+                          WHEN a.starts_on > CAST(? AS date) THEN 1
                           ELSE 2
                       END,
                       -- Soonest to start, for the upcoming bucket only: this key
                       -- is NULL, and so inert, for the other two.
-                      CASE WHEN a.starts_on > CURDATE() THEN a.starts_on END ASC,
+                      CASE WHEN a.starts_on > CAST(? AS date) THEN a.starts_on END ASC,
                       a.ends_on DESC, a.id DESC
              LIMIT 1",
-            [$leadId]
+            [$leadId, date('Y-m-d'), date('Y-m-d'), date('Y-m-d')]
         )->fetch();
 
         return $row ?: null;

@@ -1,0 +1,9 @@
+[project]
+name = "belive-tenant-marketing-mcp"
+version = "0.1.0"
+description = "Local MCP skills for BeLive tenant conversations"
+requires-python = ">=3.10"
+dependencies = ["mcp==2.3.0"]
+
+[tool.uv]
+package = false

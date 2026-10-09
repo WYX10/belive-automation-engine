@@ -1,0 +1,1638 @@
+{
+  "agreement_events": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "agreement_id": {
+      "json": false,
+      "identity": false
+    },
+    "actor_role": {
+      "json": false,
+      "identity": false
+    },
+    "actor_name": {
+      "json": false,
+      "identity": false
+    },
+    "action": {
+      "json": false,
+      "identity": false
+    },
+    "from_status": {
+      "json": false,
+      "identity": false
+    },
+    "to_status": {
+      "json": false,
+      "identity": false
+    },
+    "note": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "ai_activity_log": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "action": {
+      "json": false,
+      "identity": false
+    },
+    "phase": {
+      "json": false,
+      "identity": false
+    },
+    "model_used": {
+      "json": false,
+      "identity": false
+    },
+    "lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "detail": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "ai_custom_models": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "model_key": {
+      "json": false,
+      "identity": false
+    },
+    "provider": {
+      "json": false,
+      "identity": false
+    },
+    "label": {
+      "json": false,
+      "identity": false
+    },
+    "purpose": {
+      "json": false,
+      "identity": false
+    },
+    "cost_tier": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "ai_feedback": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "interaction_id": {
+      "json": false,
+      "identity": false
+    },
+    "lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "feedback_source": {
+      "json": false,
+      "identity": false
+    },
+    "error_type": {
+      "json": false,
+      "identity": false
+    },
+    "comment": {
+      "json": false,
+      "identity": false
+    },
+    "processed": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "feedback_hash": {
+      "json": false,
+      "identity": false
+    },
+    "memory_id": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "ai_interactions": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "phase": {
+      "json": false,
+      "identity": false
+    },
+    "skill": {
+      "json": false,
+      "identity": false
+    },
+    "model_used": {
+      "json": false,
+      "identity": false
+    },
+    "direction": {
+      "json": false,
+      "identity": false
+    },
+    "message_in": {
+      "json": false,
+      "identity": false
+    },
+    "message_out": {
+      "json": false,
+      "identity": false
+    },
+    "message_kind": {
+      "json": false,
+      "identity": false
+    },
+    "intent": {
+      "json": false,
+      "identity": false
+    },
+    "entities": {
+      "json": true,
+      "identity": false
+    },
+    "reasoning": {
+      "json": false,
+      "identity": false
+    },
+    "memory_used": {
+      "json": true,
+      "identity": false
+    },
+    "response_ms": {
+      "json": false,
+      "identity": false
+    },
+    "flagged": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "ai_learned_memory": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "context_tag": {
+      "json": false,
+      "identity": false
+    },
+    "rule_type": {
+      "json": false,
+      "identity": false
+    },
+    "learned_rule": {
+      "json": false,
+      "identity": false
+    },
+    "source_feedback_id": {
+      "json": false,
+      "identity": false
+    },
+    "confidence_score": {
+      "json": false,
+      "identity": false
+    },
+    "times_reinforced": {
+      "json": false,
+      "identity": false
+    },
+    "times_contradicted": {
+      "json": false,
+      "identity": false
+    },
+    "active": {
+      "json": false,
+      "identity": false
+    },
+    "last_used_at": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    },
+    "lesson_hash": {
+      "json": false,
+      "identity": false
+    },
+    "lesson_key": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "ai_model_config": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "phase": {
+      "json": false,
+      "identity": false
+    },
+    "model_key": {
+      "json": false,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "api_credentials": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "service": {
+      "json": false,
+      "identity": false
+    },
+    "label": {
+      "json": false,
+      "identity": false
+    },
+    "encrypted_key": {
+      "json": false,
+      "identity": false
+    },
+    "meta": {
+      "json": true,
+      "identity": false
+    },
+    "is_active": {
+      "json": false,
+      "identity": false
+    },
+    "last_tested_at": {
+      "json": false,
+      "identity": false
+    },
+    "test_status": {
+      "json": false,
+      "identity": false
+    },
+    "test_detail": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "app_settings": {
+    "setting_key": {
+      "json": false,
+      "identity": false
+    },
+    "setting_value": {
+      "json": false,
+      "identity": false
+    },
+    "updated_by": {
+      "json": false,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "bookings": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "room_id": {
+      "json": false,
+      "identity": false
+    },
+    "viewing_datetime": {
+      "json": false,
+      "identity": false
+    },
+    "viewing_mode": {
+      "json": false,
+      "identity": false
+    },
+    "staff_id": {
+      "json": false,
+      "identity": false
+    },
+    "status": {
+      "json": false,
+      "identity": false
+    },
+    "confirmation_sent": {
+      "json": false,
+      "identity": false
+    },
+    "notes": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "content_post_metrics": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "content_post_id": {
+      "json": false,
+      "identity": false
+    },
+    "platform": {
+      "json": false,
+      "identity": false
+    },
+    "captured_on": {
+      "json": false,
+      "identity": false
+    },
+    "captured_at": {
+      "json": false,
+      "identity": false
+    },
+    "source": {
+      "json": false,
+      "identity": false
+    },
+    "views": {
+      "json": false,
+      "identity": false
+    },
+    "likes": {
+      "json": false,
+      "identity": false
+    },
+    "comments": {
+      "json": false,
+      "identity": false
+    },
+    "shares": {
+      "json": false,
+      "identity": false
+    },
+    "note": {
+      "json": false,
+      "identity": false
+    },
+    "raw": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "content_posts": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "platform": {
+      "json": false,
+      "identity": false
+    },
+    "media_kind": {
+      "json": false,
+      "identity": false
+    },
+    "room_id": {
+      "json": false,
+      "identity": false
+    },
+    "caption": {
+      "json": false,
+      "identity": false
+    },
+    "status": {
+      "json": false,
+      "identity": false
+    },
+    "review_version": {
+      "json": false,
+      "identity": false
+    },
+    "reviewed_by": {
+      "json": false,
+      "identity": false
+    },
+    "reviewed_at": {
+      "json": false,
+      "identity": false
+    },
+    "review_note": {
+      "json": false,
+      "identity": false
+    },
+    "publish_status": {
+      "json": false,
+      "identity": false
+    },
+    "publish_error": {
+      "json": false,
+      "identity": false
+    },
+    "external_post_id": {
+      "json": false,
+      "identity": false
+    },
+    "image_url": {
+      "json": false,
+      "identity": false
+    },
+    "video_url": {
+      "json": false,
+      "identity": false
+    },
+    "video_script": {
+      "json": false,
+      "identity": false
+    },
+    "generated_by_model": {
+      "json": false,
+      "identity": false
+    },
+    "generated_via": {
+      "json": false,
+      "identity": false
+    },
+    "posted_at": {
+      "json": false,
+      "identity": false
+    },
+    "scheduled_for": {
+      "json": false,
+      "identity": false
+    },
+    "scheduled_by": {
+      "json": false,
+      "identity": false
+    },
+    "schedule_source": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "creative_meta": {
+      "json": true,
+      "identity": false
+    },
+    "publish_attempts": {
+      "json": false,
+      "identity": false
+    },
+    "publish_attempted_at": {
+      "json": false,
+      "identity": false
+    },
+    "next_retry_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "digital_agreements": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "room_id": {
+      "json": false,
+      "identity": false
+    },
+    "tenure": {
+      "json": false,
+      "identity": false
+    },
+    "starts_on": {
+      "json": false,
+      "identity": false
+    },
+    "ends_on": {
+      "json": false,
+      "identity": false
+    },
+    "monthly_rent_rm": {
+      "json": false,
+      "identity": false
+    },
+    "deposit_rm": {
+      "json": false,
+      "identity": false
+    },
+    "agreement_text": {
+      "json": false,
+      "identity": false
+    },
+    "status": {
+      "json": false,
+      "identity": false
+    },
+    "stage_version": {
+      "json": false,
+      "identity": false
+    },
+    "owner_name": {
+      "json": false,
+      "identity": false
+    },
+    "owner_full_name": {
+      "json": false,
+      "identity": false
+    },
+    "owner_ic_enc": {
+      "json": false,
+      "identity": false
+    },
+    "owner_ic_last4": {
+      "json": false,
+      "identity": false
+    },
+    "owner_email": {
+      "json": false,
+      "identity": false
+    },
+    "owner_phone": {
+      "json": false,
+      "identity": false
+    },
+    "owner_address": {
+      "json": false,
+      "identity": false
+    },
+    "owner_bank_name": {
+      "json": false,
+      "identity": false
+    },
+    "owner_bank_holder": {
+      "json": false,
+      "identity": false
+    },
+    "owner_bank_account_enc": {
+      "json": false,
+      "identity": false
+    },
+    "owner_bank_account_last4": {
+      "json": false,
+      "identity": false
+    },
+    "owner_extra_terms": {
+      "json": false,
+      "identity": false
+    },
+    "owner_signed_name": {
+      "json": false,
+      "identity": false
+    },
+    "owner_signed_at": {
+      "json": false,
+      "identity": false
+    },
+    "sent_to_owner_at": {
+      "json": false,
+      "identity": false
+    },
+    "admin_review_note": {
+      "json": false,
+      "identity": false
+    },
+    "admin_reviewed_by": {
+      "json": false,
+      "identity": false
+    },
+    "admin_reviewed_at": {
+      "json": false,
+      "identity": false
+    },
+    "sent_to_tenant_at": {
+      "json": false,
+      "identity": false
+    },
+    "tenant_note": {
+      "json": false,
+      "identity": false
+    },
+    "acknowledged_name": {
+      "json": false,
+      "identity": false
+    },
+    "acknowledged_at": {
+      "json": false,
+      "identity": false
+    },
+    "access_code": {
+      "json": false,
+      "identity": false
+    },
+    "generated_by_model": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "electric_bills": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "meter_id": {
+      "json": false,
+      "identity": false
+    },
+    "lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "period_start": {
+      "json": false,
+      "identity": false
+    },
+    "period_end": {
+      "json": false,
+      "identity": false
+    },
+    "previous_reading": {
+      "json": false,
+      "identity": false
+    },
+    "current_reading": {
+      "json": false,
+      "identity": false
+    },
+    "units_kwh": {
+      "json": false,
+      "identity": false
+    },
+    "rate_rm_per_kwh": {
+      "json": false,
+      "identity": false
+    },
+    "standing_charge_rm": {
+      "json": false,
+      "identity": false
+    },
+    "amount_rm": {
+      "json": false,
+      "identity": false
+    },
+    "status": {
+      "json": false,
+      "identity": false
+    },
+    "reading_source": {
+      "json": false,
+      "identity": false
+    },
+    "issued_on": {
+      "json": false,
+      "identity": false
+    },
+    "due_on": {
+      "json": false,
+      "identity": false
+    },
+    "paid_at": {
+      "json": false,
+      "identity": false
+    },
+    "notes": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "electric_meters": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "room_id": {
+      "json": false,
+      "identity": false
+    },
+    "meter_serial": {
+      "json": false,
+      "identity": false
+    },
+    "tariff_rm_per_kwh": {
+      "json": false,
+      "identity": false
+    },
+    "standing_charge_rm": {
+      "json": false,
+      "identity": false
+    },
+    "installed_on": {
+      "json": false,
+      "identity": false
+    },
+    "active": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "leads": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "wa_phone": {
+      "json": false,
+      "identity": false
+    },
+    "name": {
+      "json": false,
+      "identity": false
+    },
+    "source_channel": {
+      "json": false,
+      "identity": false
+    },
+    "status": {
+      "json": false,
+      "identity": false
+    },
+    "location": {
+      "json": false,
+      "identity": false
+    },
+    "budget": {
+      "json": false,
+      "identity": false
+    },
+    "move_in_date": {
+      "json": false,
+      "identity": false
+    },
+    "room_type": {
+      "json": false,
+      "identity": false
+    },
+    "tenant_profile": {
+      "json": false,
+      "identity": false
+    },
+    "closing_probability": {
+      "json": false,
+      "identity": false
+    },
+    "lead_signals": {
+      "json": true,
+      "identity": false
+    },
+    "ai_recommendation": {
+      "json": false,
+      "identity": false
+    },
+    "notes": {
+      "json": false,
+      "identity": false
+    },
+    "referral_code_used": {
+      "json": false,
+      "identity": false
+    },
+    "merged_into_lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "last_contact_at": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    },
+    "enquired_room_id": {
+      "json": false,
+      "identity": false
+    },
+    "preferred_tenure": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "migrations": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "filename": {
+      "json": false,
+      "identity": false
+    },
+    "applied_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "move_in_logs": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "room_id": {
+      "json": false,
+      "identity": false
+    },
+    "lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "photo_path": {
+      "json": false,
+      "identity": false
+    },
+    "caption": {
+      "json": false,
+      "identity": false
+    },
+    "taken_at": {
+      "json": false,
+      "identity": false
+    },
+    "uploaded_by": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "processed_webhook_messages": {
+    "wamid": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "properties": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "owner_name": {
+      "json": false,
+      "identity": false
+    },
+    "name": {
+      "json": false,
+      "identity": false
+    },
+    "location": {
+      "json": false,
+      "identity": false
+    },
+    "address": {
+      "json": false,
+      "identity": false
+    },
+    "description": {
+      "json": false,
+      "identity": false
+    },
+    "review_status": {
+      "json": false,
+      "identity": false
+    },
+    "review_version": {
+      "json": false,
+      "identity": false
+    },
+    "review_note": {
+      "json": false,
+      "identity": false
+    },
+    "reviewed_by": {
+      "json": false,
+      "identity": false
+    },
+    "reviewed_at": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "property_units": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "property_id": {
+      "json": false,
+      "identity": false
+    },
+    "name": {
+      "json": false,
+      "identity": false
+    },
+    "notes": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "referral_redemptions": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "reward_type": {
+      "json": false,
+      "identity": false
+    },
+    "points_spent": {
+      "json": false,
+      "identity": false
+    },
+    "rent_credit_amount": {
+      "json": false,
+      "identity": false
+    },
+    "status": {
+      "json": false,
+      "identity": false
+    },
+    "requested_at": {
+      "json": false,
+      "identity": false
+    },
+    "reviewed_at": {
+      "json": false,
+      "identity": false
+    },
+    "applied_at": {
+      "json": false,
+      "identity": false
+    },
+    "review_note": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "referrals": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "referral_code": {
+      "json": false,
+      "identity": false
+    },
+    "referring_lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "referred_lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "reward_room_id": {
+      "json": false,
+      "identity": false
+    },
+    "reward_room_name": {
+      "json": false,
+      "identity": false
+    },
+    "reward_property_name": {
+      "json": false,
+      "identity": false
+    },
+    "reward_points": {
+      "json": false,
+      "identity": false
+    },
+    "reward_status": {
+      "json": false,
+      "identity": false
+    },
+    "clicks": {
+      "json": false,
+      "identity": false
+    },
+    "credited_at": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "renewal_offers": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "agreement_id": {
+      "json": false,
+      "identity": false
+    },
+    "lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "room_id": {
+      "json": false,
+      "identity": false
+    },
+    "owner_name": {
+      "json": false,
+      "identity": false
+    },
+    "tenure": {
+      "json": false,
+      "identity": false
+    },
+    "current_rent_rm": {
+      "json": false,
+      "identity": false
+    },
+    "promo_rent_rm": {
+      "json": false,
+      "identity": false
+    },
+    "starts_on": {
+      "json": false,
+      "identity": false
+    },
+    "ends_on": {
+      "json": false,
+      "identity": false
+    },
+    "message": {
+      "json": false,
+      "identity": false
+    },
+    "expires_on": {
+      "json": false,
+      "identity": false
+    },
+    "status": {
+      "json": false,
+      "identity": false
+    },
+    "responded_at": {
+      "json": false,
+      "identity": false
+    },
+    "response_note": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "room_amenities": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "room_id": {
+      "json": false,
+      "identity": false
+    },
+    "amenity": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "room_images": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "room_id": {
+      "json": false,
+      "identity": false
+    },
+    "image_path": {
+      "json": false,
+      "identity": false
+    },
+    "original_path": {
+      "json": false,
+      "identity": false
+    },
+    "enhanced_at": {
+      "json": false,
+      "identity": false
+    },
+    "enhanced_by_model": {
+      "json": false,
+      "identity": false
+    },
+    "enhance_note": {
+      "json": false,
+      "identity": false
+    },
+    "enhance_recipe": {
+      "json": false,
+      "identity": false
+    },
+    "sort_order": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "room_pricing": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "room_id": {
+      "json": false,
+      "identity": false
+    },
+    "tenure": {
+      "json": false,
+      "identity": false
+    },
+    "price": {
+      "json": false,
+      "identity": false
+    },
+    "is_best_value": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "rooms": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "property_id": {
+      "json": false,
+      "identity": false
+    },
+    "unit_id": {
+      "json": false,
+      "identity": false
+    },
+    "room_code": {
+      "json": false,
+      "identity": false
+    },
+    "name": {
+      "json": false,
+      "identity": false
+    },
+    "property_name": {
+      "json": false,
+      "identity": false
+    },
+    "location": {
+      "json": false,
+      "identity": false
+    },
+    "room_type": {
+      "json": false,
+      "identity": false
+    },
+    "owner_name": {
+      "json": false,
+      "identity": false
+    },
+    "address": {
+      "json": false,
+      "identity": false
+    },
+    "description": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "status": {
+      "json": false,
+      "identity": false
+    },
+    "deposit_amount": {
+      "json": false,
+      "identity": false
+    },
+    "referral_reward_points": {
+      "json": false,
+      "identity": false
+    },
+    "available_from": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "social_replies": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "platform": {
+      "json": false,
+      "identity": false
+    },
+    "event_type": {
+      "json": false,
+      "identity": false
+    },
+    "object_id": {
+      "json": false,
+      "identity": false
+    },
+    "sender_id": {
+      "json": false,
+      "identity": false
+    },
+    "sender_name": {
+      "json": false,
+      "identity": false
+    },
+    "lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "ref_token": {
+      "json": false,
+      "identity": false
+    },
+    "public_reply": {
+      "json": false,
+      "identity": false
+    },
+    "private_reply": {
+      "json": false,
+      "identity": false
+    },
+    "error": {
+      "json": false,
+      "identity": false
+    },
+    "claimed_by_lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "claimed_at": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "staff": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "name": {
+      "json": false,
+      "identity": false
+    },
+    "role": {
+      "json": false,
+      "identity": false
+    },
+    "wa_phone": {
+      "json": false,
+      "identity": false
+    },
+    "email": {
+      "json": false,
+      "identity": false
+    },
+    "handles_video": {
+      "json": false,
+      "identity": false
+    },
+    "handles_in_person": {
+      "json": false,
+      "identity": false
+    },
+    "max_daily_viewings": {
+      "json": false,
+      "identity": false
+    },
+    "active": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "staff_shifts": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "staff_id": {
+      "json": false,
+      "identity": false
+    },
+    "weekday": {
+      "json": false,
+      "identity": false
+    },
+    "starts_at": {
+      "json": false,
+      "identity": false
+    },
+    "ends_at": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "staff_time_off": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "staff_id": {
+      "json": false,
+      "identity": false
+    },
+    "starts_at": {
+      "json": false,
+      "identity": false
+    },
+    "ends_at": {
+      "json": false,
+      "identity": false
+    },
+    "reason": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "tenant_requirements": {
+    "lead_id": {
+      "json": false,
+      "identity": false
+    },
+    "location": {
+      "json": false,
+      "identity": false
+    },
+    "budget": {
+      "json": false,
+      "identity": false
+    },
+    "move_in_date": {
+      "json": false,
+      "identity": false
+    },
+    "room_type": {
+      "json": false,
+      "identity": false
+    },
+    "tenure": {
+      "json": false,
+      "identity": false
+    },
+    "tenant_profile": {
+      "json": false,
+      "identity": false
+    },
+    "occupants": {
+      "json": false,
+      "identity": false
+    },
+    "amenities": {
+      "json": true,
+      "identity": false
+    },
+    "preferences": {
+      "json": true,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    }
+  },
+  "verified_listings": {
+    "id": {
+      "json": false,
+      "identity": true
+    },
+    "room_id": {
+      "json": false,
+      "identity": false
+    },
+    "ownership_doc_path": {
+      "json": false,
+      "identity": false
+    },
+    "ownership_evidence_version": {
+      "json": false,
+      "identity": false
+    },
+    "ownership_verified": {
+      "json": false,
+      "identity": false
+    },
+    "ownership_review_status": {
+      "json": false,
+      "identity": false
+    },
+    "ownership_review_note": {
+      "json": false,
+      "identity": false
+    },
+    "ownership_reviewed_by": {
+      "json": false,
+      "identity": false
+    },
+    "ownership_reviewed_at": {
+      "json": false,
+      "identity": false
+    },
+    "gps_lat": {
+      "json": false,
+      "identity": false
+    },
+    "gps_lng": {
+      "json": false,
+      "identity": false
+    },
+    "gps_evidence_version": {
+      "json": false,
+      "identity": false
+    },
+    "gps_matched": {
+      "json": false,
+      "identity": false
+    },
+    "gps_review_status": {
+      "json": false,
+      "identity": false
+    },
+    "gps_review_note": {
+      "json": false,
+      "identity": false
+    },
+    "gps_reviewed_by": {
+      "json": false,
+      "identity": false
+    },
+    "gps_reviewed_at": {
+      "json": false,
+      "identity": false
+    },
+    "scam_flags": {
+      "json": true,
+      "identity": false
+    },
+    "scam_checked_at": {
+      "json": false,
+      "identity": false
+    },
+    "verified_badge": {
+      "json": false,
+      "identity": false
+    },
+    "verified_at": {
+      "json": false,
+      "identity": false
+    },
+    "created_at": {
+      "json": false,
+      "identity": false
+    },
+    "updated_at": {
+      "json": false,
+      "identity": false
+    }
+  }
+}

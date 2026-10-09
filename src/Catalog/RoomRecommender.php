@@ -34,12 +34,23 @@ final class RoomRecommender
         // the cheapest tenure so commitment-affordable rooms aren't hidden.
         $tenure = $entities['tenure'] ?? $lead['preferred_tenure'] ?? '12_month';
 
-        $rooms = Room::matches($location, $budget !== null ? (int) $budget : null, $roomType, (string) $tenure);
+        $rooms = Room::matches($location, $budget !== null ? (int) $budget : null, $roomType, (string) $tenure, 30);
+        $requestedAmenities = $understanding['tenant_requirements']['amenities'] ?? [];
+        if ($requestedAmenities !== []) {
+            $normalize = static fn (string $value) => strtr(mb_strtolower(trim($value)), ['wi-fi' => 'wifi', 'air conditioning' => 'aircon', 'air conditioner' => 'aircon']);
+            $requestedAmenities = array_map($normalize, $requestedAmenities);
+            $gaps = [];
+            foreach ($rooms as $room) {
+                $gaps[(int) $room['id']] = count(array_diff($requestedAmenities, array_map($normalize, Room::amenities((int) $room['id']))));
+            }
+            usort($rooms, static fn ($a, $b) => $gaps[(int) $a['id']] <=> $gaps[(int) $b['id']]);
+        }
+        $rooms = array_slice($rooms, 0, 3);
 
         // The exact room a website visitor enquired about always leads the list.
         if (!empty($lead['enquired_room_id'])) {
             $enquired = Room::find((int) $lead['enquired_room_id']);
-            if ($enquired !== null) {
+            if ($enquired !== null && $enquired['status'] === 'available') {
                 $rooms = array_values(array_filter($rooms, fn ($r) => (int) $r['id'] !== (int) $enquired['id']));
                 array_unshift($rooms, $enquired + ['is_enquired_room' => true]);
                 $rooms = array_slice($rooms, 0, 3);
@@ -48,7 +59,7 @@ final class RoomRecommender
 
         $block = "LIVE ROOM INVENTORY (ranked candidates):\n" . Room::promptBlock($rooms);
 
-        if (!empty($lead['enquired_room_id'])) {
+        if (!empty($rooms[0]['is_enquired_room'])) {
             $block .= "\nNote: the FIRST room is the one this customer enquired about on the website — address it directly.";
         }
         if (!empty($lead['preferred_tenure'])) {

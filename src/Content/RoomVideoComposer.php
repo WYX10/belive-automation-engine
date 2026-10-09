@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Content;
 
 use App\Models\Room;
+use App\Properties\RoomPhotoEnhancer;
 use RuntimeException;
 
 /**
@@ -19,11 +20,11 @@ use RuntimeException;
  *
  * Pipeline: GD draws one transparent 1080x1920 text layer per scene (scrim,
  * brand chip, headline, progress bar); ffmpeg pans/zooms each shot under its
- * layer and cross-fades the scenes into a single H.264 file with a silent AAC
- * track — platforms reject a video with no audio stream far more often than
- * one that is quiet.
+ * layer. An independent mascot enters, gestures and changes pose as it narrates
+ * the tour. eSpeak NG provides optional offline speech; captions remain available
+ * on hosts without it. Full-width room reveals preserve the real layout.
  *
- * ffmpeg is the one external dependency. It is probed, never assumed:
+ * GD, fonts and ffmpeg are required; offline speech is optional:
  * isAvailable() is what the studio asks before offering a video draft.
  */
 final class RoomVideoComposer
@@ -49,7 +50,7 @@ final class RoomVideoComposer
 
     public static function isAvailable(): bool
     {
-        return self::binary() !== null;
+        return function_exists('imagecreatetruecolor') && self::fonts() !== null && MascotLibrary::isAvailable() && self::binary() !== null;
     }
 
     /**
@@ -82,7 +83,7 @@ final class RoomVideoComposer
      * @param array<string, mixed> $room
      * @param array<int, array{headline:string, sub:string, seconds:float, cta?:bool}> $scenes
      */
-    public static function render(array $room, array $scenes): string
+    public static function render(array $room, array $scenes, ?array &$details = null, ?string $brief = null): string
     {
         $ffmpeg = self::binary()
             ?? throw new RuntimeException('ffmpeg is not installed (or FFMPEG_BIN in .env points nowhere), so a promo video cannot be rendered on this machine.');
@@ -100,19 +101,57 @@ final class RoomVideoComposer
             ?? throw new RuntimeException('No TrueType font was found for the on-screen text. Point PROMO_FONT_BOLD and PROMO_FONT_REGULAR in .env at a .ttf pair.');
 
         $workDir = self::workDir();
-        $overlays = [];
+        $voiceAvailable = MascotNarrator::isAvailable();
         try {
             // Pair each scene with a shot, reusing shots when the script is
             // longer than the gallery, and clamp a clip scene to the clip.
             $plan = [];
+            $polished = [];
             foreach (array_values($scenes) as $i => $scene) {
                 $shot = $shots[$i % count($shots)];
-                $seconds = (float) $scene['seconds'];
-                if ($shot['kind'] === 'clip') {
-                    $seconds = min($seconds, max(1.5, $shot['duration'] - 0.2));
+                $seconds = max(2.5, min(6.0, (float) $scene['seconds']));
+                if ($shot['kind'] === 'photo') {
+                    if (!isset($polished[$shot['file']])) {
+                        $photo = @imagecreatefromstring((string) file_get_contents($shot['file']));
+                        if ($photo === false) {
+                            throw new RuntimeException('The room photo could not be decoded.');
+                        }
+                        try {
+                            $result = RoomPhotoEnhancer::polish($photo, $brief, $roomId);
+                            $copy = $workDir . '/room_' . count($polished) . '.jpg';
+                            imagejpeg($result['image'], $copy, 92);
+                            if ($result['image'] !== $photo) {
+                                imagedestroy($result['image']);
+                            }
+                            $polished[$shot['file']] = $copy;
+                        } finally {
+                            imagedestroy($photo);
+                        }
+                    }
+                    $shot['file'] = $polished[$shot['file']];
                 }
 
                 $isCta = (bool) ($scene['cta'] ?? false);
+                $action = $scene['presenter_action'] ?? ($i === 0 ? 'wave' : 'point');
+                $narration = trim((string) ($scene['narration'] ?? ''));
+                if ($narration === '') {
+                    $narration = $i === 0 ? "Hi, I'm beLive. Let me show you this room."
+                        : trim($scene['headline'] . '. ' . ($scene['sub'] ?? ''));
+                }
+                $voice = $voiceAvailable ? MascotNarrator::speak($narration, $workDir, $i) : null;
+                $pose = $isCta ? 'megaphone' : ($action === 'wave' ? 'waving' : 'wink-point');
+                $reaction = $isCta ? 'cheering' : MascotLibrary::forScene(max(1, $i), trim($scene['headline'] . ' ' . ($scene['sub'] ?? '')));
+                $sprites = [];
+                foreach ([$pose, $reaction] as $j => $name) {
+                    $sprite = MascotLibrary::cutout($name, $isCta ? 460 : 430);
+                    if ($sprite === null) {
+                        throw new RuntimeException('The mascot artwork is missing — restore assets/img/mascot before rendering a guided tour.');
+                    }
+                    $file = $workDir . '/host_' . $i . '_' . $j . '.png';
+                    imagepng($sprite, $file);
+                    imagedestroy($sprite);
+                    $sprites[] = $file;
+                }
                 $overlay = $workDir . '/overlay_' . $i . '.png';
                 self::drawOverlay(
                     $overlay,
@@ -122,10 +161,14 @@ final class RoomVideoComposer
                     $isCta,
                     $i + 1,
                     count($scenes),
-                    MascotLibrary::forScene($i, trim($scene['headline'] . ' ' . ($scene['sub'] ?? '')), $isCta)
+                    $narration
                 );
-                $overlays[] = $overlay;
-                $plan[] = ['shot' => $shot, 'seconds' => round($seconds, 2), 'overlay' => $overlay];
+                $scene['seconds'] = round($seconds, 2);
+                $scene['narration'] = $narration;
+                $scene['presenter_action'] = $action;
+                $scene['camera'] ??= $i === 0 ? 'reveal' : ($i % 2 ? 'pan_right' : 'pan_left');
+                $plan[] = ['shot' => $shot, 'seconds' => $scene['seconds'], 'overlay' => $overlay,
+                    'sprites' => $sprites, 'voice' => $voice, 'scene' => $scene];
             }
 
             $outputPath = self::outputPath($roomId);
@@ -136,10 +179,19 @@ final class RoomVideoComposer
                 throw new RuntimeException('ffmpeg finished but wrote no usable video file.');
             }
 
+            $details = ['style' => 'mascot_guided_tour', 'animated' => true,
+                'narrated' => count(array_filter(array_column($plan, 'voice'))) === count($plan),
+                'voice' => $voiceAvailable ? 'espeak-ng/en-us' : 'captions only',
+                'photos_polished' => count($polished), 'scenes' => array_column($plan, 'scene')];
             return $outputPath['site'];
+        } catch (\Throwable $e) {
+            if (isset($outputPath)) {
+                @unlink($outputPath['absolute']);
+            }
+            throw $e;
         } finally {
-            foreach ($overlays as $overlay) {
-                @unlink($overlay);
+            foreach (glob($workDir . '/*') ?: [] as $artifact) {
+                @unlink($artifact);
             }
             @rmdir($workDir);
         }
@@ -239,77 +291,87 @@ final class RoomVideoComposer
      */
     private static function arguments(array $plan, string $outputPath): array
     {
-        $sceneCount = count($plan);
-        $total = self::duration(array_map(static fn (array $step): array => ['seconds' => $step['seconds']], $plan));
-
-        $args = ['-y', '-hide_banner', '-loglevel', 'error'];
+        $count = count($plan);
+        $total = self::duration($plan);
+        $args = ['-y', '-hide_banner', '-loglevel', 'error', '-filter_complex_threads', '1'];
         foreach ($plan as $step) {
-            if ($step['shot']['kind'] === 'clip') {
-                $args = array_merge($args, ['-ss', '0', '-t', (string) $step['seconds'], '-i', $step['shot']['file']]);
-            } else {
-                $args = array_merge($args, ['-loop', '1', '-t', (string) $step['seconds'], '-i', $step['shot']['file']]);
+            $args = array_merge($args, $step['shot']['kind'] === 'clip'
+                ? ['-stream_loop', '-1', '-t', (string) $step['seconds'], '-i', $step['shot']['file']]
+                : ['-loop', '1', '-framerate', '30', '-t', (string) $step['seconds'], '-i', $step['shot']['file']]);
+        }
+        foreach ($plan as $step) {
+            $args = array_merge($args, ['-loop', '1', '-framerate', '30', '-t', (string) $step['seconds'], '-i', $step['overlay']]);
+        }
+        foreach ($plan as $step) {
+            foreach ($step['sprites'] as $sprite) {
+                $args = array_merge($args, ['-loop', '1', '-framerate', '30', '-t', (string) $step['seconds'], '-i', $sprite]);
             }
         }
-        foreach ($plan as $step) {
-            $args = array_merge($args, ['-loop', '1', '-t', (string) $step['seconds'], '-i', $step['overlay']]);
-        }
+        $audioIndex = 4 * $count;
         $args = array_merge($args, ['-f', 'lavfi', '-t', (string) $total, '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100']);
-
+        $nextInput = $audioIndex + 1;
         $filters = [];
+        $audioLabels = ['[' . $audioIndex . ':a]'];
+        $elapsed = 0.0;
         foreach ($plan as $i => $step) {
-            $fill = sprintf(
-                'scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d',
-                CONTENT_VIDEO_WIDTH,
-                CONTENT_VIDEO_HEIGHT,
-                CONTENT_VIDEO_WIDTH,
-                CONTENT_VIDEO_HEIGHT
-            );
-            // A still needs the slow push to stop reading as a slideshow; a
-            // tour clip already moves, so it only gets normalised.
-            $motion = $step['shot']['kind'] === 'clip'
-                ? sprintf('fps=%d,setsar=1', CONTENT_VIDEO_FPS)
-                : sprintf(
-                    "zoompan=z='min(zoom+0.0009,1.12)':d=%d:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=%dx%d:fps=%d,setsar=1",
-                    (int) round($step['seconds'] * CONTENT_VIDEO_FPS),
-                    CONTENT_VIDEO_WIDTH,
-                    CONTENT_VIDEO_HEIGHT,
-                    CONTENT_VIDEO_FPS
-                );
+            $frames = max(1, (int) round($step['seconds'] * 30));
+            $camera = $step['scene']['camera'];
+            $zoom = $camera === 'detail' ? "1.05+0.04*on/$frames" : "1.0+0.025*on/$frames";
+            $pan = match ($camera) {
+                'pan_left' => "(iw-iw/zoom)*(1-on/$frames)",
+                'pan_right' => "(iw-iw/zoom)*on/$frames",
+                default => 'iw/2-iw/zoom/2',
+            };
+            $filters[] = "[$i:v]fps=30,trim=duration={$step['seconds']},setpts=PTS-STARTPTS,split=2[b$i][f$i]";
+            $filters[] = "[b$i]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.13:saturation=0.75,setsar=1[bg$i]";
+            // Show the whole room inside the portrait canvas instead of
+            // discarding both sides of a landscape upload with a centre crop.
+            $filters[] = "[f$i]scale=1080:1180:force_original_aspect_ratio=decrease,format=rgba,pad=1080:1180:(ow-iw)/2:(oh-ih)/2:color=black@0,zoompan=z='$zoom':x='$pan':y='ih/2-ih/zoom/2':d=1:s=1080x1180:fps=30,setsar=1[fg$i]";
+            $filters[] = "[bg$i][fg$i]overlay=0:210:format=auto[room$i]";
+            $filters[] = '[' . ($count + $i) . ":v]format=rgba[o$i]";
+            $filters[] = "[room$i][o$i]overlay=0:0:format=auto[card$i]";
 
-            $filters[] = sprintf('[%d:v]%s,%s[m%d]', $i, $fill, $motion, $i);
-            $filters[] = sprintf('[%d:v]scale=%d:%d[o%d]', $sceneCount + $i, CONTENT_VIDEO_WIDTH, CONTENT_VIDEO_HEIGHT, $i);
-            $filters[] = sprintf('[m%d][o%d]overlay=0:0:format=auto,format=yuv420p[v%d]', $i, $i, $i);
+            $cta = !empty($step['scene']['cta']);
+            $x = $cta ? '(W-w)/2' : '84';
+            $baseY = $cta ? 350 : 1070;
+            $entry = $cta ? $x : 'if(lt(t,0.6),-w+(84+w)*(1-pow(1-t/0.6,3)),84)';
+            $bounce = $step['scene']['presenter_action'] === 'celebrate' ? '12*abs(sin(t*5))' : '5*sin(t*4)';
+            $switch = round(min(1.5, $step['seconds'] * 0.4), 2);
+            foreach ([0, 1] as $j) {
+                $input = 2 * $count + 2 * $i + $j;
+                $angle = $j === 0 ? '0.025*sin(t*5)' : '0.018*sin(t*4)';
+                $filters[] = "[$input:v]format=rgba,rotate='$angle':c=none:ow=rotw(0.03):oh=roth(0.03)[host{$i}_$j]";
+            }
+            $filters[] = "[card$i][host{$i}_0]overlay=x='$entry':y='$baseY-$bounce':enable='lt(t,$switch)':format=auto[first$i]";
+            $filters[] = "[first$i][host{$i}_1]overlay=x='$x':y='$baseY-$bounce':enable='gte(t,$switch)':format=auto,format=yuv420p,setpts=PTS-STARTPTS,fps=30[v$i]";
+            if ($step['voice'] !== null) {
+                $voiceIndex = $nextInput++;
+                $args = array_merge($args, ['-i', $step['voice']['file']]);
+                $window = max(1.0, $step['seconds'] - self::TRANSITION - 0.35);
+                $speed = max(1.0, min(2.0, $step['voice']['duration'] / $window));
+                $delay = (int) round(($elapsed + 0.15) * 1000);
+                $filters[] = "[$voiceIndex:a]aresample=44100,atempo=$speed,atrim=duration=$window,afade=t=out:st=" . max(0, $window - 0.08)
+                    . ":d=0.08,adelay={$delay}|{$delay}[voice$i]";
+                $audioLabels[] = "[voice$i]";
+            }
+            $elapsed += $step['seconds'] - self::TRANSITION;
         }
-
-        // Chain the cross-fades: each offset is where the outgoing scene has
-        // TRANSITION seconds left, minus the overlap already spent.
         $current = '[v0]';
         $elapsed = $plan[0]['seconds'];
-        for ($i = 1; $i < $sceneCount; $i++) {
+        for ($i = 1; $i < $count; $i++) {
             $offset = round($elapsed - self::TRANSITION, 2);
-            $label = $i === $sceneCount - 1 ? '[vout]' : "[x$i]";
-            $filters[] = sprintf('%s[v%d]xfade=transition=fade:duration=%s:offset=%s%s', $current, $i, self::TRANSITION, $offset, $label);
+            $label = "[fade$i]";
+            $filters[] = "$current" . "[v$i]xfade=transition=fade:duration=0.5:offset=$offset,fps=30$label";
             $current = $label;
             $elapsed = $offset + $plan[$i]['seconds'];
         }
-        $videoLabel = $sceneCount === 1 ? '[v0]' : '[vout]';
+        $filters[] = implode('', $audioLabels) . 'amix=inputs=' . count($audioLabels)
+            . ":normalize=0:duration=longest,alimiter=limit=0.92,atrim=duration={$total}[aout]";
 
-        return array_merge($args, [
-            '-filter_complex', implode(';', $filters),
-            '-map', $videoLabel,
-            '-map', (string) (2 * $sceneCount) . ':a',
-            '-c:v', 'libx264',
-            '-preset', 'veryfast',
-            '-crf', '23',
-            '-profile:v', 'high',
-            '-pix_fmt', 'yuv420p',
-            '-r', (string) CONTENT_VIDEO_FPS,
-            '-c:a', 'aac',
-            '-b:a', '96k',
-            '-shortest',
-            '-movflags', '+faststart',
-            $outputPath,
-        ]);
+        return array_merge($args, ['-filter_complex', implode(';', $filters), '-map', $current, '-map', '[aout]',
+            '-c:v', 'libx264', '-threads', '2', '-preset', 'veryfast', '-crf', '23', '-profile:v', 'high',
+            '-pix_fmt', 'yuv420p', '-r', '30', '-c:a', 'aac', '-b:a', '128k', '-t', (string) $total,
+            '-movflags', '+faststart', $outputPath]);
     }
 
     /** @param string[] $args */
@@ -340,79 +402,50 @@ final class RoomVideoComposer
         bool $isCta,
         int $position,
         int $total,
-        ?string $mascotPose = null
+        ?string $narration = null
     ): void {
         $width = CONTENT_VIDEO_WIDTH;
         $height = CONTENT_VIDEO_HEIGHT;
-
         $canvas = imagecreatetruecolor($width, $height);
         imagesavealpha($canvas, true);
         imagealphablending($canvas, false);
         imagefilledrectangle($canvas, 0, 0, $width, $height, imagecolorallocatealpha($canvas, 0, 0, 0, 127));
         imagealphablending($canvas, true);
-
         try {
             $white = imagecolorallocate($canvas, 255, 255, 255);
             $teal = imagecolorallocate($canvas, ...self::TEAL);
-            $softWhite = imagecolorallocatealpha($canvas, 255, 255, 255, 30);
-
+            $softWhite = imagecolorallocate($canvas, 226, 237, 238);
             if ($isCta) {
-                // The end card earns a full wash: it is the one frame a viewer
-                // is meant to read rather than look at.
-                imagefilledrectangle($canvas, 0, 0, $width, $height, imagecolorallocatealpha($canvas, 12, 34, 45, 45));
+                imagefilledrectangle($canvas, 0, 0, $width, $height, imagecolorallocatealpha($canvas, 12, 34, 45, 30));
             } else {
-                $scrimTop = (int) ($height * 0.52);
-                for ($y = $scrimTop; $y < $height; $y++) {
-                    $progress = ($y - $scrimTop) / ($height - $scrimTop);
-                    $alpha = (int) round(127 - 127 * min(1.0, $progress * 1.35) * 0.82);
-                    imagefilledrectangle($canvas, 0, $y, $width, $y, imagecolorallocatealpha($canvas, ...array_merge(self::INK, [$alpha])));
+                for ($y = 1390; $y < $height; $y++) {
+                    $alpha = (int) round(127 - 105 * min(1, ($y - 1390) / 300));
+                    imageline($canvas, 0, $y, $width, $y, imagecolorallocatealpha($canvas, 15, 28, 36, $alpha));
                 }
+                // A caption bubble beside the independently animated host.
+                $bubble = imagecolorallocatealpha($canvas, 244, 253, 252, 5);
+                imagefilledrectangle($canvas, 450, 1180, 996, 1380, $bubble);
+                imagefilledpolygon($canvas, [450, 1260, 420, 1290, 450, 1320], $bubble);
+                self::writeLines($canvas, array_slice(self::wrap($fonts['regular'], 28, 470, (string) $narration), 0, 3),
+                    $fonts['regular'], 28, 44, 482, 1192, imagecolorallocate($canvas, 26, 47, 54));
             }
-
-            // Brand chip, top left — a teal pill with the wordmark in it.
-            $chipHeight = 74;
-            imagefilledrectangle($canvas, 64, 88, 64 + 214, 88 + $chipHeight, $teal);
-            imagettftext($canvas, 34, 0, 96, 88 + 50, $white, $fonts['bold'], 'beLive');
-
+            imagefilledrectangle($canvas, 64, 88, 278, 162, $teal);
+            imagettftext($canvas, 34, 0, 96, 138, $white, $fonts['bold'], 'beLive');
+            imagettftext($canvas, 24, 0, 310, 136, $white, $fonts['regular'], $isCta ? 'LET\'S MEET' : 'YOUR ROOM TOUR');
             $margin = 72;
-            $maxWidth = $width - $margin * 2;
-
-            if ($isCta) {
-                $lines = self::wrap($fonts['bold'], 74, $maxWidth, $headline);
-                $blockTop = (int) ($height / 2) - count($lines) * 50;
-                // The end card is the mascot's frame: it stands over the ask,
-                // centred, at the size a sticker would be.
-                MascotLibrary::stamp($canvas, $mascotPose, 560, (int) ($width / 2), $blockTop - 60, 'centre');
-                $y = self::writeLines($canvas, $lines, $fonts['bold'], 74, 96, $margin, $blockTop, $white);
-                if ($sub !== '') {
-                    $y = self::writeLines($canvas, self::wrap($fonts['regular'], 44, $maxWidth, $sub), $fonts['regular'], 44, 62, $margin, $y + 34, $softWhite);
-                }
-                // The teal rule under an end card reads as a button edge.
-                imagefilledrectangle($canvas, $margin, $y + 46, $margin + 260, $y + 56, $teal);
-            } else {
-                // On a room shot the mascot stands to the right, its feet on the
-                // line where the scrim begins, clear of the words underneath.
-                MascotLibrary::stamp($canvas, $mascotPose, 520, $width - 40, (int) ($height * 0.52) + 90, 'right');
-
-                $headlineLines = self::wrap($fonts['bold'], 66, $maxWidth, $headline);
-                $subLines = $sub !== '' ? self::wrap($fonts['regular'], 40, $maxWidth, $sub) : [];
-                $blockHeight = count($headlineLines) * 86 + count($subLines) * 58;
-                $blockTop = $height - 250 - $blockHeight;
-
-                $y = self::writeLines($canvas, $headlineLines, $fonts['bold'], 66, 86, $margin, $blockTop, $white);
-                if ($subLines !== []) {
-                    self::writeLines($canvas, $subLines, $fonts['regular'], 40, 58, $margin, $y + 24, $softWhite);
-                }
+            $lines = self::wrap($fonts['bold'], 60, $width - 2 * $margin, $headline);
+            $top = $isCta ? 880 : 1510;
+            $y = self::writeLines($canvas, array_slice($lines, 0, 2), $fonts['bold'], 60, 80, $margin, $top, $white);
+            if ($sub !== '') {
+                self::writeLines($canvas, array_slice(self::wrap($fonts['regular'], 35, $width - 2 * $margin, $sub), 0, 2),
+                    $fonts['regular'], 35, 52, $margin, $y + 18, $softWhite);
             }
-
-            // Progress bar along the very bottom.
-            $barY = $height - 34;
-            imagefilledrectangle($canvas, $margin, $barY, $width - $margin, $barY + 8, imagecolorallocatealpha($canvas, 255, 255, 255, 90));
-            $filled = (int) round(($width - $margin * 2) * ($position / max(1, $total)));
-            imagefilledrectangle($canvas, $margin, $barY, $margin + $filled, $barY + 8, $teal);
-
+            imagefilledrectangle($canvas, $margin, $height - 134, $width - $margin, $height - 126,
+                imagecolorallocatealpha($canvas, 255, 255, 255, 85));
+            imagefilledrectangle($canvas, $margin, $height - 134,
+                $margin + (int) (($width - 2 * $margin) * $position / max(1, $total)), $height - 126, $teal);
             if (!imagepng($canvas, $file)) {
-                throw new RuntimeException('The promo video text layer could not be written.');
+                throw new RuntimeException('The tour caption layer could not be written.');
             }
         } finally {
             imagedestroy($canvas);
@@ -466,7 +499,7 @@ final class RoomVideoComposer
     }
 
     /** @return array{bold:string, regular:string}|null */
-    private static function fonts(): ?array
+    public static function fonts(): ?array
     {
         $bold = trim((string) ($_ENV['PROMO_FONT_BOLD'] ?? ''));
         $regular = trim((string) ($_ENV['PROMO_FONT_REGULAR'] ?? ''));

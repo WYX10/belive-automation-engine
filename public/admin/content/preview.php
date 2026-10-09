@@ -5,6 +5,8 @@ declare(strict_types=1);
 defined('APP_BOOTED') || exit('No direct access.');
 
 use App\Content\PostTimingAdvisor;
+use App\Content\PostingSchedule;
+use App\Content\RoomVideoComposer;
 use App\Core\Auth;
 use App\Core\Database;
 use App\Core\Settings;
@@ -40,8 +42,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 // 'custom' takes the datetime field; anything else is one of
                 // the advisor's slots, posted as a literal timestamp.
-                $at = $when === 'custom' ? (string) ($_POST['schedule_custom'] ?? '') : $when;
-                $post = SocialPublishManager::schedule($id, $reviewer, $version, $at, $when === 'custom' ? 'custom' : 'suggested');
+                $at = match ($when) {
+                    'custom' => (string) ($_POST['schedule_custom'] ?? ''),
+                    'fixed' => PostingSchedule::next()->format('Y-m-d H:i:s'),
+                    default => $when,
+                };
+                $post = SocialPublishManager::schedule($id, $reviewer, $version, $at, match ($when) {'custom' => 'custom', 'fixed' => 'auto', default => 'suggested'});
                 $slot = new DateTimeImmutable((string) $post['scheduled_for']);
                 set_flash('success', "Scheduled for {$slot->format('D j M Y, H:i')} — it publishes to {$post['platform']} on its own, no one has to be at the desk.");
             }
@@ -55,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             SocialPublishManager::updateCaption($id, (string) ($_POST['caption'] ?? ''), $reviewer, $version);
             set_flash('success', 'Caption saved — this is exactly what will be published.');
         } elseif ($action === 'retry') {
-            $post = SocialPublishManager::retryPublish($id, $reviewer, $version);
+            $post = SocialPublishManager::retryPublish($id, $reviewer, $version, confirmedAbsent: ($_POST['confirmed_absent'] ?? '') === '1');
             match ($post['publish_status']) {
                 'published' => set_flash('success', "Published to {$post['platform']} — post id {$post['external_post_id']}."),
                 'simulated' => set_flash('success', "Publish simulated (no active {$post['platform']} credential; payload logged)."),
@@ -90,12 +96,13 @@ $isBranded = str_starts_with((string) ($post['image_url'] ?? ''), '/assets/img/u
 // absolute APP_URL form is for the platforms fetching it, not for this page.
 $videoPath = $isVideo ? (string) ($post['video_url'] ?? '') : '';
 $scenes = $isVideo ? (json_decode((string) ($post['video_script'] ?? ''), true) ?: []) : [];
-$videoSeconds = array_sum(array_map(static fn (array $scene): float => (float) ($scene['seconds'] ?? 0), $scenes));
+$videoSeconds = RoomVideoComposer::duration($scenes);
+$creative = json_decode((string) ($post['creative_meta'] ?? ''), true) ?: [];
 
 // A caption is the admin's to rewrite right up until it leaves for the
 // platform; after that the platform holds the copy.
 $editable = !in_array($post['status'], ['posted', 'rejected'], true)
-    && !in_array($post['publish_status'], ['published', 'simulated'], true);
+    && !in_array($post['publish_status'], ['published', 'simulated', 'publishing', 'uncertain'], true);
 $hasWhatsAppLink = str_contains($post['caption'], 'wa.me/') || str_contains($post['caption'], 'wa.link/');
 
 // The timing advisor, narrowed to the platform this post is actually going to.
@@ -103,6 +110,7 @@ $heatmap = PostTimingAdvisor::heatmap($post['platform']);
 $suggestions = PostTimingAdvisor::suggestions($post['platform'], 3, $heatmap);
 $scheduleDefault = Settings::get('content_schedule_default', 'suggested');
 $now = PostTimingAdvisor::now();
+$fixedSlot = PostingSchedule::next($now);
 $scheduledAt = $post['scheduled_for'] ? new DateTimeImmutable((string) $post['scheduled_for'], new DateTimeZone(PostTimingAdvisor::TIMEZONE)) : null;
 $decidable = in_array($post['status'], ['draft', 'scheduled'], true);
 // The bounds the manager enforces server-side, mirrored into the date field so
@@ -118,7 +126,8 @@ $statusBadge = match ($post['status']) {
 $publishBadge = match ($post['publish_status']) {
     'published' => '',
     'simulated' => 'orange',
-    'failed'    => 'danger',
+    'failed', 'uncertain' => 'danger',
+    'publishing' => 'orange',
     default     => null,
 };
 
@@ -148,6 +157,9 @@ admin_header('Post preview', 'content');
                 <div class="belive-muted" style="font-size:12.5px; margin-bottom:10px">
                     This is exactly the file that gets published — 9:16, <?= e(number_format($videoSeconds, 1)) ?>s,
                     cut from this room's own photos and tour clips.
+                    <?php if (($creative['style'] ?? '') === 'mascot_guided_tour'): ?>
+                        Animated mascot host · <?= !empty($creative['narrated']) ? 'spoken introduction' : 'captions (voice unavailable)' ?>.
+                    <?php endif; ?>
                     <a href="<?= e($videoPath) ?>" download>Download</a>
                 </div>
             <?php elseif ($isVideo): ?>
@@ -158,7 +170,7 @@ admin_header('Post preview', 'content');
                 <img src="<?= e($imageUrl) ?>" alt="Attached room photo" style="width:100%; border-radius:12px; margin-bottom:10px; max-height:260px; object-fit:cover">
                 <?php if ($isBranded): ?>
                     <div class="belive-muted" style="font-size:12.5px; margin-bottom:10px">
-                        🔒 Mascot-branded copy — this is what publishes. The room's gallery photo is untouched.
+                        🔒 Enhanced room story — corrected exposure and colour, with a mascot presenter and soft shadows. This is the copy that publishes.
                     </div>
                 <?php endif; ?>
             <?php else: ?>
@@ -205,8 +217,8 @@ admin_header('Post preview', 'content');
                 </div>
             <?php endif; ?>
 
-            <?php if ($post['publish_status'] === 'failed'): ?>
-                <div class="belive-badge danger" style="margin-top:10px; white-space:normal">Publish failed: <?= e($post['publish_error']) ?></div>
+            <?php if ($post['publish_status'] === 'failed' || $post['publish_status'] === 'uncertain' || ($post['status'] === 'scheduled' && $post['publish_error'])): ?>
+                <div class="belive-badge <?= $post['status'] === 'scheduled' ? 'orange' : 'danger' ?>" style="margin-top:10px; white-space:normal"><?= $post['status'] === 'scheduled' ? 'Waiting to publish: ' : 'Delivery issue: ' ?><?= e($post['publish_error']) ?></div>
             <?php elseif ($post['external_post_id']): ?>
                 <div class="belive-muted" style="font-size:12.5px; margin-top:4px">
                     <?= $post['publish_status'] === 'simulated' ? 'Simulated post id' : 'Platform post id' ?>:
@@ -235,7 +247,7 @@ admin_header('Post preview', 'content');
                         This post goes out to <strong><?= e(ucfirst($post['platform'])) ?></strong> on
                         <strong><?= e($scheduledAt->format('l j F, H:i')) ?></strong>
                         <?= $scheduledAt <= $now
-                            ? '— due now, the publisher cron takes it on its next run (every 5 minutes).'
+                            ? '— due now, the background publisher takes it on its next check.'
                             : '— that is ' . e($now->diff($scheduledAt)->format('%a day(s), %h hour(s) and %i minute(s)')) . ' from now.' ?>
                         Nobody needs to be at the desk for it. You can still edit the caption until it leaves.
                     </p>
@@ -276,7 +288,7 @@ admin_header('Post preview', 'content');
                     <div class="timing-picks" style="margin-bottom:10px">
                         <?php foreach ($suggestions as $rank => $slot):
                             $value = $slot['next']->format('Y-m-d H:i:s');
-                            $checked = $rank === 0 && $scheduleDefault !== 'now' && $post['status'] === 'draft';
+                            $checked = $rank === 0 && $scheduleDefault === 'suggested' && $post['status'] === 'draft';
                             ?>
                             <label class="timing-pick">
                                 <input type="radio" name="schedule_when" value="<?= e($value) ?>"
@@ -290,6 +302,13 @@ admin_header('Post preview', 'content');
 
                     <div class="timing-picks">
                         <label class="timing-pick">
+                            <input type="radio" name="schedule_when" value="fixed" data-label="Approve &amp; schedule for <?= e($fixedSlot->format('D j M H:i')) ?>"
+                                <?= $scheduleDefault === 'fixed' && $post['status'] === 'draft' ? ' checked' : '' ?>>
+                            <strong>🕒 Daily posting time</strong>
+                            <div class="timing-pick-when"><?= e($fixedSlot->format('D j M H:i')) ?> · UTC+8</div>
+                            <div class="timing-pick-why">Uses the posting time saved in the studio settings.</div>
+                        </label>
+                        <label class="timing-pick">
                             <input type="radio" name="schedule_when" value="now" data-label="Approve &amp; publish now"
                                 <?= $scheduleDefault === 'now' || $post['status'] === 'scheduled' ? ' checked' : '' ?>>
                             <strong>⚡ Publish now</strong>
@@ -297,7 +316,7 @@ admin_header('Post preview', 'content');
                         </label>
                         <label class="timing-pick">
                             <input type="radio" name="schedule_when" value="custom" data-label="Approve &amp; schedule">
-                            <strong>📅 A time I choose</strong>
+                            <strong>📅 A time I choose (UTC+8)</strong>
                             <input type="datetime-local" name="schedule_custom" style="margin-top:6px"
                                    min="<?= e($customMin) ?>" max="<?= e($customMax) ?>"
                                    value="<?= e(($scheduledAt ?? $suggestions[0]['next'] ?? $now)->format('Y-m-d\TH:i')) ?>">
@@ -310,8 +329,7 @@ admin_header('Post preview', 'content');
                     </button>
                     <div class="belive-muted" style="font-size:12px; margin-top:6px">
                         Approving signs off the caption. Only the delivery waits —
-                        <code>cron/publish_scheduled.php</code> publishes the queue every five minutes,
-                        and a slot that fails falls through to the existing retry job rather than being lost.
+                        the background publisher checks due posts every 30 seconds. Failed deliveries retry with increasing delays, starting at ten minutes.
                     </div>
                 </form>
 
@@ -329,19 +347,22 @@ admin_header('Post preview', 'content');
             </div>
         <?php endif; ?>
 
-        <?php if ($post['status'] === 'approved' && in_array($post['publish_status'], ['failed', null], true)): ?>
+        <?php if ($post['status'] === 'approved' && in_array($post['publish_status'], ['failed', 'uncertain', null], true)): ?>
             <div class="belive-card" style="margin-bottom:16px">
-                <div class="belive-card-title"><?= $post['publish_status'] === 'failed' ? '⚠ Publish failed' : '⏳ Approved, not yet published' ?></div>
+                <div class="belive-card-title"><?= $post['publish_status'] === 'failed' ? '⚠ Publish failed' : ($post['publish_status'] === 'uncertain' ? 'Delivery needs confirmation' : '⏳ Approved, not yet published') ?></div>
                 <p class="belive-muted" style="font-size:13px; margin-top:-4px">
                     <?= $post['publish_status'] === 'failed'
-                        ? 'cron/publish_retry.php will try again on its own every 30 minutes — this button skips the wait.'
-                        : 'This post was approved but its publish never ran.' ?>
+                        ? 'The publisher retries with increasing delays, starting at ten minutes, for up to eight attempts. This button retries now.'
+                        : ($post['publish_status'] === 'uncertain' ? 'Delivery ended without confirmation. Check the social account before retrying to avoid a duplicate.' : 'This post was approved but its publish never ran.') ?>
                 </p>
                 <form method="post">
                     <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
                     <input type="hidden" name="id" value="<?= $id ?>">
                     <input type="hidden" name="review_version" value="<?= (int) $post['review_version'] ?>">
                     <input type="hidden" name="do" value="retry">
+                    <?php if ($post['publish_status'] === 'uncertain'): ?>
+                        <label style="display:block; margin-bottom:12px"><input type="checkbox" name="confirmed_absent" value="1" required> I checked the social account and confirmed this post was not published.</label>
+                    <?php endif; ?>
                     <button type="submit" class="belive-btn-secondary"><?= $post['publish_status'] === 'failed' ? 'Retry publish' : 'Publish now' ?></button>
                 </form>
             </div>
@@ -352,7 +373,7 @@ admin_header('Post preview', 'content');
                 <div class="belive-card-title">🎬 Shot list</div>
                 <p class="belive-muted" style="font-size:13px; margin-top:-4px">
                     What the AI wrote onto each shot. The closing WhatsApp card is added by the studio, not the model —
-                    every reel ends with a way to reach Eve.
+                    every reel ends with a way to reach Eve. Host narration and gestures are shown below.
                 </p>
                 <div class="belive-table-wrap">
                     <table class="belive-table">
@@ -363,6 +384,10 @@ admin_header('Post preview', 'content');
                                 <td><?= $index + 1 ?><?= !empty($scene['cta']) ? ' 💬' : '' ?></td>
                                 <td style="font-size:13px">
                                     <strong><?= e((string) ($scene['headline'] ?? '')) ?></strong>
+                                    <?php if (!empty($scene['narration'])): ?>
+                                        <div style="margin-top:6px">Host: <?= e((string) $scene['narration']) ?></div>
+                                        <div class="belive-muted"><?= e((string) ($scene['presenter_action'] ?? 'point')) ?> · <?= e(str_replace('_', ' ', (string) ($scene['camera'] ?? 'reveal'))) ?></div>
+                                    <?php endif; ?>
                                     <?php if (($scene['sub'] ?? '') !== ''): ?>
                                         <div class="belive-muted"><?= e((string) $scene['sub']) ?></div>
                                     <?php endif; ?>

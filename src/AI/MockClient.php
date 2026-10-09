@@ -39,7 +39,7 @@ final class MockClient implements LlmClient
             'understand' => $this->mockUnderstand($lastUser),
             'decide'     => $this->mockDecide($lastUser),
             'create'     => $this->mockCreate($lastUser),
-            'learn'      => $this->mockLearn($system . ' ' . $lastUser),
+            'learn'      => $this->mockLearn($lastUser),
             'caption'    => "[MOCK] Fully furnished room, ready when you are. Just bring your bag — we handle the rest.",
             'video'      => $this->mockVideo($lastUser),
             'photo'      => $this->mockPhoto($lastUser),
@@ -91,6 +91,9 @@ final class MockClient implements LlmClient
         if (preg_match('/\b(price|how much|rent|rental)\b/i', $msg) && $intent === 'general_enquiry') {
             $intent = 'price_enquiry';
         }
+        if (preg_match('/\b(wrong|incorrect|you made a mistake|that is not right|that\x27s not right)\b/i', $msg)) {
+            $intent = 'correction';
+        }
 
         $profile = preg_match('/\b(student|college|university|uni|tarumt)\b/i', $msg) ? 'student'
             : (preg_match('/\b(work|working|professional|job|office)\b/i', $msg) ? 'working_professional' : null);
@@ -117,6 +120,15 @@ final class MockClient implements LlmClient
                 'tenure'       => $tenure,
             ],
             'tenant_profile'  => $profile,
+            'requirements' => [
+                'occupants' => preg_match('/\b(\d+)\s*(?:people|persons?|occupants?|tenants?)\b/i', $msg, $o) ? (int) $o[1] : null,
+                'amenities' => array_values(array_filter([
+                    preg_match('/\b(wifi|wi-fi)\b/i', $msg) ? 'wifi' : null,
+                    preg_match('/\b(aircon|air conditioning)\b/i', $msg) ? 'aircon' : null,
+                ])),
+                'preferences' => preg_match('/\bquiet\b/i', $msg) ? ['quiet room'] : [],
+            ],
+            'clear_requirements' => preg_match('/\b(no budget limit|remove my budget)\b/i', $msg) ? ['budget'] : [],
             'language'        => 'en',
             'reasoning'       => '[MOCK] Keyword heuristics only — offline stub, not a real model.',
         ], JSON_UNESCAPED_UNICODE);
@@ -212,9 +224,9 @@ final class MockClient implements LlmClient
         $link = preg_match('#(https://wa\.(?:me|link)/\S+)#', $userPrompt, $m) ? $m[1] : '';
 
         $scenes = [
-            ['headline' => "[MOCK] $type room, $area", 'sub' => 'Fully furnished — bring your bag', 'seconds' => 3.5],
-            ['headline' => $price !== null ? 'RM ' . number_format((float) $price) . '/mo' : 'Move-in ready', 'sub' => 'Zero deposit', 'seconds' => 3.5],
-            ['headline' => 'Weekly cleaning included', 'sub' => '', 'seconds' => 3.0],
+            ['headline' => "[MOCK] $type room, $area", 'sub' => 'Let me show you around', 'narration' => "Hi, I'm beLive. Come explore this $type room with me.", 'presenter_action' => 'wave', 'camera' => 'reveal', 'seconds' => 4.5],
+            ['headline' => 'Take a look around', 'sub' => 'See the actual room', 'narration' => 'Here is the room. Take a closer look at the space.', 'presenter_action' => 'point', 'camera' => 'pan_right', 'seconds' => 4.5],
+            ['headline' => $price !== null ? 'RM ' . number_format((float) $price) . '/mo' : 'Explore your next home', 'sub' => $get('price_rm_12_month') !== null ? 'On a 12-month stay' : 'Flexible monthly stay', 'narration' => 'Ask us about the stay that works best for you.', 'presenter_action' => 'celebrate', 'camera' => 'detail', 'seconds' => 4.0],
         ];
 
         return json_encode([
@@ -275,6 +287,7 @@ final class MockClient implements LlmClient
 
     private function mockLearn(string $context): string
     {
+        $context = explode('EXISTING LESSONS', $context, 2)[0];
         $isSequencing = (bool) preg_match('/drop-?off|sequenc|photo|engag/i', $context);
 
         $tag = 'general';
@@ -285,6 +298,7 @@ final class MockClient implements LlmClient
         return json_encode([
             'context_tag'  => $tag,
             'rule_type'    => $isSequencing ? 'sequencing' : 'fact',
+            'lesson_key'   => $isSequencing ? 'photos_before_first_price' : 'verified_fact_correction',
             'learned_rule' => $isSequencing
                 ? "For $tag enquiries, send room photos before quoting the price — price-first replies correlate with drop-off."
                 : "Corrected fact for $tag enquiries (see source feedback for detail).",

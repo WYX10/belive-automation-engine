@@ -8,6 +8,7 @@ use App\Core\Auth;
 use App\Models\Booking;
 use App\Models\Interaction;
 use App\Models\Lead;
+use App\Models\TenantRequirement;
 use App\Pipeline\Referral\ReferralLinkGenerator;
 
 require dirname(__DIR__) . '/_layout.php';
@@ -21,6 +22,7 @@ if ($lead === null) {
 }
 
 $signals = json_decode($lead['lead_signals'] ?? '[]', true) ?: [];
+$requirements = TenantRequirement::forLead((int) $lead['id']);
 $transcript = Interaction::transcript((int) $lead['id'], 50);
 $bookings = Booking::forLead((int) $lead['id']);
 $referralLink = ReferralLinkGenerator::linkFor((int) $lead['id']);
@@ -34,6 +36,14 @@ admin_header('Lead #' . $lead['id'], 'leads');
 
 <div class="belive-row">
     <div style="flex:0 0 340px; min-width:300px">
+        <div class="belive-card" style="margin-bottom:16px">
+            <div class="belive-card-title">Tenant requirements</div>
+            <table class="belive-table">
+                <?php foreach (['location' => 'Area', 'budget' => 'Budget (RM)', 'move_in_date' => 'Move-in', 'room_type' => 'Room type', 'tenure' => 'Stay', 'occupants' => 'Occupants', 'amenities' => 'Amenities', 'preferences' => 'Preferences'] as $field => $label): ?>
+                    <tr><th><?= e($label) ?></th><td><?= e(is_array($requirements[$field]) ? (implode(', ', $requirements[$field]) ?: 'Not stated') : ($requirements[$field] ?? 'Not stated')) ?></td></tr>
+                <?php endforeach; ?>
+            </table>
+        </div>
         <div class="belive-card">
             <div class="belive-card-title">🎯 AI assessment</div>
             <div style="margin:6px 0; font-size:13px; display:flex; justify-content:space-between">

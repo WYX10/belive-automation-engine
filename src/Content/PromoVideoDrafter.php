@@ -38,11 +38,14 @@ final class PromoVideoDrafter
         // Rendering is the slow part (a 15s reel is a few seconds of encode per
         // scene) and PHP's default limit is written for page loads.
         set_time_limit(300);
-        $videoUrl = RoomVideoComposer::render($room, $scenes);
+        $creative = null;
+        $videoUrl = RoomVideoComposer::render($room, $scenes, $creative, $brief);
+        $scenes = $creative['scenes'];
+        unset($creative['scenes']);
 
         Database::run(
-            'INSERT INTO content_posts (platform, media_kind, room_id, caption, status, generated_by_model, generated_via, image_url, video_url, video_script)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO content_posts (platform, media_kind, room_id, caption, status, generated_by_model, generated_via, image_url, video_url, video_script, creative_meta)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 $platform,
                 'video',
@@ -51,9 +54,10 @@ final class PromoVideoDrafter
                 'draft',
                 $promo['model'],
                 $via,
-                $photos[0] ?? null, // poster frame — and what Facebook falls back to
+                $photos[0] ?? null,
                 $videoUrl,
                 json_encode($scenes, JSON_UNESCAPED_UNICODE),
+                json_encode($creative, JSON_UNESCAPED_UNICODE),
             ]
         );
         $postId = (int) Database::pdo()->lastInsertId();
@@ -96,6 +100,9 @@ final class PromoVideoDrafter
                 ? 'WhatsApp us on ' . $number . ' to book a viewing'
                 : 'WhatsApp us to book a viewing',
             'seconds'  => 3.5,
+            'narration' => 'Message us on WhatsApp. Let us book your room viewing.',
+            'presenter_action' => 'invite',
+            'camera' => 'reveal',
             'cta'      => true,
         ];
     }

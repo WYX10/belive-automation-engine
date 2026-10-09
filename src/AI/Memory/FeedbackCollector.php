@@ -170,12 +170,20 @@ final class FeedbackCollector
 
     private static function insert(?int $interactionId, ?int $leadId, string $source, string $errorType, string $comment): int
     {
-        Database::run(
-            'INSERT INTO ai_feedback (interaction_id, lead_id, feedback_source, error_type, comment) VALUES (?, ?, ?, ?, ?)',
-            [$interactionId, $leadId, $source, $errorType, $comment]
+        $hash = hash('sha256', json_encode([$interactionId, $leadId, $source, $errorType, LessonIdentity::normalize($comment)], JSON_THROW_ON_ERROR));
+        return Database::insert(
+            'INSERT INTO ai_feedback (interaction_id, lead_id, feedback_source, error_type, comment, feedback_hash) VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)',
+            [$interactionId, $leadId, $source, $errorType, $comment, $hash]
         );
 
-        return (int) Database::pdo()->lastInsertId();
+    }
+
+    /** A draft rejected by the inventory guard is an observed assistant mistake. */
+    public static function assistantMistake(int $interactionId, int $leadId, string $comment): int
+    {
+        Interaction::flag($interactionId);
+        return self::insert($interactionId, $leadId, 'system_detection', 'wrong_price', $comment);
     }
 
     private static function lastOutbound(array $history): ?array
@@ -203,7 +211,11 @@ final class FeedbackCollector
             return false;
         }
 
-        return ($previous['intent'] ?? '') === $understanding['intent']
-            && count($history) > count($inbounds); // at least one Eve reply exists
+        $question = LessonIdentity::normalize((string) ($understanding['message'] ?? ''));
+        $prior = LessonIdentity::normalize((string) ($previous['message_in'] ?? ''));
+        $outbound = self::lastOutbound($history);
+        return $question !== '' && $question === $prior
+            && ($previous['intent'] ?? '') === $understanding['intent']
+            && $outbound !== null && (int) $outbound['id'] > (int) $previous['id'];
     }
 }

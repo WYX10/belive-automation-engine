@@ -209,8 +209,8 @@ final class EngagementReport
             ? ['answered' => 0, 'delivered' => 0, 'converted' => 0]
             : (Database::run(
                 "SELECT COUNT(*) AS answered,
-                        SUM(private_reply = 'sent') AS delivered,
-                        SUM(claimed_at IS NOT NULL) AS converted
+                        SUM(CASE WHEN private_reply = 'sent' THEN 1 ELSE 0 END) AS delivered,
+                        SUM(CASE WHEN claimed_at IS NOT NULL THEN 1 ELSE 0 END) AS converted
                  FROM social_replies
                  WHERE created_at >= (NOW() - INTERVAL $days DAY)$replyWhere",
                 $replyParams
@@ -253,13 +253,13 @@ final class EngagementReport
 
         $row = Database::run(
             "SELECT COUNT(*) AS drafted,
-                    SUM(generated_via = 'cron') AS auto_drafted,
-                    SUM(status = 'posted') AS posted,
-                    SUM(publish_status = 'published') AS published,
-                    SUM(publish_status = 'simulated') AS simulated,
-                    SUM(status = 'rejected') AS rejected,
-                    SUM(status = 'draft') AS awaiting,
-                    SUM(status = 'scheduled') AS scheduled
+                    SUM(CASE WHEN generated_via = 'cron' THEN 1 ELSE 0 END) AS auto_drafted,
+                    SUM(CASE WHEN status = 'posted' THEN 1 ELSE 0 END) AS posted,
+                    SUM(CASE WHEN publish_status = 'published' THEN 1 ELSE 0 END) AS published,
+                    SUM(CASE WHEN publish_status = 'simulated' THEN 1 ELSE 0 END) AS simulated,
+                    SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected,
+                    SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) AS awaiting,
+                    SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled
              FROM content_posts
              WHERE created_at >= (NOW() - INTERVAL $days DAY)$where",
             $platform === null ? [] : [$platform]

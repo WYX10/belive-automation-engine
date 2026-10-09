@@ -49,7 +49,7 @@ final class SocialPublishManager
             match (true) {
                 $row['status'] === 'draft'     => $counts['pending'] += $total,
                 $row['status'] === 'scheduled' => $counts['scheduled'] += $total,
-                $row['status'] === 'approved'  => $counts['failed'] += $total,
+                $row['status'] === 'approved' && $row['publish_status'] !== 'publishing' => $counts['failed'] += $total,
                 $row['status'] === 'posted'    => $counts['posted'] += $total,
                 $row['status'] === 'rejected'  => $counts['rejected'] += $total,
                 default => null,
@@ -65,12 +65,29 @@ final class SocialPublishManager
      *
      * @return array<string, mixed> the post row after approval + publish attempt
      */
-    public static function approveAndPublish(int $postId, string $reviewer, int $expectedVersion): array
+    public static function approveAndPublish(int $postId, string $reviewer, int $expectedVersion, ?SocialPublisherInterface $publisher = null): array
     {
         $post = self::transition($postId, $reviewer, $expectedVersion, 'approved', null, ['draft', 'scheduled']);
         EpisodicLogger::activity('content_approved', 'content_creation', $post['generated_by_model'], null, "post #$postId on {$post['platform']} by $reviewer");
 
-        return self::attemptPublish($post);
+        return self::attemptPublish($post, $publisher);
+    }
+
+    /** The worker must recheck the slot under the same row lock as approval. */
+    public static function publishScheduled(int $postId, int $expectedVersion, ?SocialPublisherInterface $publisher = null): array
+    {
+        $row = Database::run('SELECT * FROM content_posts WHERE id = ?', [$postId])->fetch();
+        if (!$row || $row['status'] !== 'scheduled' || (int) $row['review_version'] !== $expectedVersion) {
+            throw new RuntimeException('This scheduled post changed. Reload the queue.');
+        }
+        $publisher ??= self::publisherFor($row['platform']);
+        if (!$publisher->isConfigured()) {
+            Database::run("UPDATE content_posts SET publish_error = ?, next_retry_at = UTC_TIMESTAMP() + INTERVAL 5 MINUTE WHERE id = ? AND status = 'scheduled' AND review_version = ?",
+                ['Waiting for a connected ' . $row['platform'] . ' account. The post remains queued.', $postId, $expectedVersion]);
+            return Database::run('SELECT * FROM content_posts WHERE id = ?', [$postId])->fetch();
+        }
+        $post = self::transition($postId, 'scheduler', $expectedVersion, 'approved', null, ['scheduled'], requireDue: true);
+        return self::attemptPublish($post, $publisher);
     }
 
     /**
@@ -147,9 +164,11 @@ final class SocialPublishManager
     {
         return Database::run(
             "SELECT id, platform, review_version, scheduled_for FROM content_posts
-             WHERE status = 'scheduled' AND scheduled_for IS NOT NULL AND scheduled_for <= NOW()
+             WHERE status = 'scheduled' AND scheduled_for IS NOT NULL AND scheduled_for <= ?
+                AND (next_retry_at IS NULL OR next_retry_at <= UTC_TIMESTAMP())
              ORDER BY scheduled_for ASC
-             LIMIT " . max(1, min(100, $max))
+             LIMIT " . max(1, min(100, $max)),
+            [PostTimingAdvisor::now()->format('Y-m-d H:i:s')]
         )->fetchAll();
     }
 
@@ -165,9 +184,14 @@ final class SocialPublishManager
         $when = str_replace('T', ' ', $when);
         $zone = new \DateTimeZone(PostTimingAdvisor::TIMEZONE);
 
-        try {
-            $at = new \DateTimeImmutable($when, $zone);
-        } catch (\Throwable) {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?$/D', $when)) {
+            throw new InvalidArgumentException('That is not a valid date and time.');
+        }
+        if (strlen($when) === 16) {
+            $when .= ':00';
+        }
+        $at = \DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $when, $zone);
+        if ($at === false || $at->format('Y-m-d H:i:s') !== $when) {
             throw new InvalidArgumentException('That is not a valid date and time.');
         }
 
@@ -245,6 +269,9 @@ final class SocialPublishManager
             if ($post['status'] === 'rejected') {
                 throw new RuntimeException('A rejected draft cannot be edited.');
             }
+            if (in_array($post['publish_status'], ['publishing', 'uncertain'], true)) {
+                throw new RuntimeException('Delivery is in progress or awaiting confirmation — check the platform before changing this post.');
+            }
 
             Database::run(
                 'UPDATE content_posts SET caption = ?, review_version = ? WHERE id = ?',
@@ -270,11 +297,11 @@ final class SocialPublishManager
      *
      * @return array<string, mixed>
      */
-    public static function retryPublish(int $postId, string $reviewer, int $expectedVersion): array
+    public static function retryPublish(int $postId, string $reviewer, int $expectedVersion, ?SocialPublisherInterface $publisher = null, bool $confirmedAbsent = false): array
     {
-        $post = self::transition($postId, $reviewer, $expectedVersion, 'approved', null, ['approved'], requireUnpublished: true);
+        $post = self::transition($postId, $reviewer, $expectedVersion, 'approved', null, ['approved'], requireUnpublished: true, confirmedAbsent: $confirmedAbsent);
 
-        return self::attemptPublish($post);
+        return self::attemptPublish($post, $publisher);
     }
 
     /**
@@ -292,7 +319,9 @@ final class SocialPublishManager
         ?string $note,
         array $fromStatuses,
         bool $requireUnpublished = false,
-        array $set = []
+        array $set = [],
+        bool $requireDue = false,
+        bool $confirmedAbsent = false
     ): array {
         $reviewer = trim($reviewer);
         if ($reviewer === '') {
@@ -318,13 +347,20 @@ final class SocialPublishManager
             if (!in_array($post['status'], $fromStatuses, true)) {
                 throw new RuntimeException("Only a {$fromStatuses[0]} post can be {$toStatus} — this one is {$post['status']}.");
             }
-            if ($requireUnpublished && !in_array($post['publish_status'], ['failed', null], true)) {
+            if ($requireUnpublished && !in_array($post['publish_status'], ['failed', null], true)
+                && !($confirmedAbsent && $post['publish_status'] === 'uncertain')) {
                 throw new RuntimeException('This post already published — nothing to retry.');
+            }
+            if ($requireDue && (empty($post['scheduled_for']) || $post['scheduled_for'] > PostTimingAdvisor::now()->format('Y-m-d H:i:s'))) {
+                throw new RuntimeException('This post is still waiting for its scheduled time.');
             }
 
             // Only the schedule columns may ride along — the caller passes
             // column names, so the whitelist is what keeps that safe.
             $extra = '';
+            if ($confirmedAbsent && $post['publish_status'] === 'uncertain') {
+                $extra = ", publish_status = 'failed'";
+            }
             $extraValues = [];
             foreach ($set as $column => $value) {
                 if (!in_array($column, ['scheduled_for', 'scheduled_by', 'schedule_source'], true)) {
@@ -358,7 +394,7 @@ final class SocialPublishManager
      *
      * @return array<string, mixed> the updated row
      */
-    private static function attemptPublish(array $post): array
+    private static function attemptPublish(array $post, ?SocialPublisherInterface $publisher = null): array
     {
         $postId = (int) $post['id'];
         $mediaKind = $post['media_kind'] ?? 'image';
@@ -367,6 +403,18 @@ final class SocialPublishManager
         // and a reel is transcoded, not just fetched, so it needs longer again.
         set_time_limit($mediaKind === 'video' ? 300 : 120);
 
+        // Atomically claim delivery before an external call. A retry that
+        // races the first request cannot publish while its outcome is pending.
+        $claimed = Database::run(
+            "UPDATE content_posts SET publish_status = 'publishing', publish_attempted_at = UTC_TIMESTAMP(),
+                publish_attempts = publish_attempts + 1, next_retry_at = NULL
+             WHERE id = ? AND review_version = ? AND status = 'approved' AND (publish_status IS NULL OR publish_status = 'failed')",
+            [$postId, (int) $post['review_version']]
+        )->rowCount();
+        if ($claimed !== 1) {
+            return Database::run('SELECT * FROM content_posts WHERE id = ?', [$postId])->fetch();
+        }
+        $unconfirmedResult = false;
         try {
             $mediaUrl = self::resolveMediaUrl($post);
             // A reel whose render never landed must fail as a reel. Falling
@@ -376,15 +424,19 @@ final class SocialPublishManager
                 throw new RuntimeException('This post is a promo video but has no rendered video attached — regenerate it in the content studio.');
             }
 
-            $result = self::publisherFor($post['platform'])
+            $result = ($publisher ?? self::publisherFor($post['platform']))
                 ->publish($post['caption'], $mediaUrl, $mediaKind);
+            if (trim((string) ($result['external_id'] ?? '')) === '') {
+                $unconfirmedResult = true;
+                throw new RuntimeException('The platform returned no post ID. Check the social account before retrying.');
+            }
 
             $publishStatus = $result['dry_run'] ? 'simulated' : 'published';
             Database::run(
                 "UPDATE content_posts
-                 SET status = 'posted', publish_status = ?, publish_error = NULL, external_post_id = ?, posted_at = NOW()
+                 SET status = 'posted', publish_status = ?, publish_error = NULL, external_post_id = ?, posted_at = ?, next_retry_at = NULL
                  WHERE id = ?",
-                [$publishStatus, $result['external_id'], $postId]
+                [$publishStatus, $result['external_id'], PostTimingAdvisor::now()->format('Y-m-d H:i:s'), $postId]
             );
             EpisodicLogger::activity(
                 $result['dry_run'] ? 'content_publish_simulated' : 'content_published',
@@ -395,9 +447,14 @@ final class SocialPublishManager
             );
         } catch (Throwable $e) {
             $error = mb_substr($e->getMessage(), 0, 500);
+            $uncertain = $unconfirmedResult || ($e instanceof \GuzzleHttp\Exception\TransferException
+                && !($e instanceof \GuzzleHttp\Exception\RequestException && $e->hasResponse()));
+            $state = $uncertain ? 'uncertain' : 'failed';
+            $attempts = (int) Database::run('SELECT publish_attempts FROM content_posts WHERE id = ?', [$postId])->fetchColumn();
+            $delay = min(360, 10 * (2 ** min(5, max(0, $attempts - 1))));
             Database::run(
-                'UPDATE content_posts SET publish_status = ?, publish_error = ? WHERE id = ?',
-                ['failed', $error, $postId]
+                'UPDATE content_posts SET publish_status = ?, publish_error = ?, next_retry_at = ? WHERE id = ?',
+                [$state, $error, $uncertain ? null : gmdate('Y-m-d H:i:s', time() + $delay * 60), $postId]
             );
             EpisodicLogger::activity('content_publish_failed', 'content_creation', $post['generated_by_model'], null, "post #$postId on {$post['platform']}: $error");
         }

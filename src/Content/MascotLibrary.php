@@ -90,6 +90,74 @@ final class MascotLibrary
         return self::fromCues($caption) ?? 'hero';
     }
 
+    /** A trimmed character bitmap; transparent artwork margins aren't its height. */
+    public static function cutout(string $pose, int $height, bool $flip = false): ?\GdImage
+    {
+        $file = self::file($pose);
+        $source = $file !== null ? @imagecreatefrompng($file) : false;
+        if ($source === false) {
+            return null;
+        }
+        $trimmed = imagecropauto($source, IMG_CROP_TRANSPARENT);
+        if ($trimmed !== false) {
+            imagedestroy($source);
+            $source = $trimmed;
+        }
+        $height = max(1, $height);
+        $width = max(1, (int) round(imagesx($source) * $height / imagesy($source)));
+        $scaled = self::transparentCanvas($width, $height);
+        imagecopyresampled($scaled, $source, 0, 0, 0, 0, $width, $height, imagesx($source), imagesy($source));
+        imagedestroy($source);
+        if ($flip) {
+            imageflip($scaled, IMG_FLIP_HORIZONTAL);
+        }
+
+        return $scaled;
+    }
+
+    /**
+     * Place the character in the room with ambient tone and soft contact/cast
+     * shadows. No white sticker border is drawn across the room photography.
+     */
+    public static function place(\GdImage $photo, string $pose, int $height, int $x, int $bottom, bool $flip = false): void
+    {
+        $sprite = self::cutout($pose, $height, $flip);
+        if ($sprite === null) {
+            return;
+        }
+        $width = imagesx($sprite);
+        $left = $x - (int) ($width / 2);
+        $top = $bottom - $height;
+        $sample = imagecolorsforindex($photo, imagecolorat($photo,
+            max(0, min(imagesx($photo) - 1, $x)), max(0, min(imagesy($photo) - 1, $top))));
+        $luma = 0.2126 * $sample['red'] + 0.7152 * $sample['green'] + 0.0722 * $sample['blue'];
+        imagefilter($sprite, IMG_FILTER_BRIGHTNESS, (int) round(max(-16, min(8, ($luma - 150) * 0.12))));
+
+        $shadow = self::transparentCanvas($width + 40, $height + 40);
+        imagealphablending($shadow, false);
+        for ($sy = 0; $sy < $height; $sy++) {
+            for ($sx = 0; $sx < $width; $sx++) {
+                $alpha = (imagecolorat($sprite, $sx, $sy) >> 24) & 127;
+                if ($alpha < 127) {
+                    imagesetpixel($shadow, $sx + 20, $sy + 20,
+                        imagecolorallocatealpha($shadow, 15, 24, 28, 100 + (int) round($alpha * 27 / 127)));
+                }
+            }
+        }
+        for ($i = 0; $i < 4; $i++) {
+            imagefilter($shadow, IMG_FILTER_GAUSSIAN_BLUR);
+        }
+        imagealphablending($photo, true);
+        imagecopy($photo, $shadow, $left - 6, $top + 2, 0, 0, imagesx($shadow), imagesy($shadow));
+        for ($i = 8; $i >= 1; $i--) {
+            imagefilledellipse($photo, $x, $bottom - 2, (int) ($width * (0.58 + $i * 0.045)),
+                max(2, (int) ($height * (0.014 + $i * 0.004))), imagecolorallocatealpha($photo, 12, 20, 24, 122));
+        }
+        imagecopy($photo, $sprite, $left, $top, 0, 0, $width, $height);
+        imagedestroy($shadow);
+        imagedestroy($sprite);
+    }
+
     /**
      * Stamp a pose onto a GD canvas, anchored by its feet so it always stands
      * on the line it was given rather than floating off it, and ringed in a

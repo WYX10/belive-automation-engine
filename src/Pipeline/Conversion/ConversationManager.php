@@ -16,6 +16,7 @@ use App\AI\Skills\UnderstandSkill;
 use App\Integrations\WhatsApp\WhatsAppClient;
 use App\Models\Interaction;
 use App\Models\Lead;
+use App\Models\TenantRequirement;
 use App\Pipeline\LeadGeneration\SocialRefMerger;
 
 /**
@@ -77,10 +78,7 @@ final class ConversationManager
         $understanding = UnderstandSkill::run($leadId, $message['text'], $history);
         $understanding['message'] = $message['text'];
 
-        Lead::mergeEnquiryDetails($leadId, $understanding['entities']);
-        if ($understanding['tenant_profile'] !== null) {
-            Lead::update($leadId, ['tenant_profile' => $understanding['tenant_profile']]);
-        }
+        $understanding['tenant_requirements'] = TenantRequirement::capture($leadId, $understanding);
         $lead = Lead::find($leadId) + ['is_returning' => $lead['is_returning'] ?? false];
 
         // 1b. Implicit feedback — customer corrections and repeated questions.

@@ -7,6 +7,7 @@ namespace App\Content;
 use App\AI\Memory\EpisodicLogger;
 use App\Core\Database;
 use App\Core\Settings;
+use App\Integrations\Social\SocialPublishManager;
 use DateTimeImmutable;
 
 /**
@@ -22,8 +23,8 @@ use DateTimeImmutable;
  * it. The cron file, the web tick and the studio's Run now button are three
  * doors into this one method.
  *
- * Every draft still waits for admin approval — automation writes, it does not
- * publish.
+ * Daily drafts can be queued for the saved posting time when the admin enables
+ * automatic scheduling. Otherwise they wait for individual review.
  */
 final class AutoDrafter
 {
@@ -240,6 +241,7 @@ final class AutoDrafter
 
                     if ($media === 'video') {
                         $video = PromoVideoDrafter::draft($room, $platform, $brief, $via);
+                        $postId = $video['post_id'];
                         $lines[] = sprintf(
                             '%s: reel for %s — %d scenes, %.1fs, by %s',
                             $platform,
@@ -250,8 +252,16 @@ final class AutoDrafter
                         );
                     } else {
                         $photo = PhotoPostDrafter::draft($room, $platform, $brief, $via);
+                        $postId = $photo['post_id'];
                         $lines[] = "$platform: caption for {$room['name']} by {$photo['model']}"
                             . ($photo['branded'] ? ' (mascot branded)' : '');
+                    }
+
+                    if (Settings::get('content_auto_publish_enabled', '0') === '1') {
+                        $post = Database::run('SELECT review_version FROM content_posts WHERE id = ?', [$postId])->fetch();
+                        $at = PostingSchedule::next();
+                        SocialPublishManager::schedule((int) $postId, 'daily-automation', (int) $post['review_version'], $at->format('Y-m-d H:i:s'), 'auto');
+                        $lines[] = "$platform: post #$postId queued for " . $at->format('D j M H:i') . ' (Asia/Kuala_Lumpur)';
                     }
 
                     $drafted++;

@@ -81,7 +81,7 @@ final class Referral extends BaseModel
         } catch (PDOException $e) {
             // uq_referral_referred_lead guarantees one immutable attribution per friend,
             // including when two referral links arrive concurrently.
-            if ($e->getCode() === '23000') {
+            if (str_starts_with((string) $e->getCode(), '23')) {
                 return false;
             }
             throw $e;

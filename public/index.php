@@ -117,6 +117,7 @@ $router->any('/admin/listing_reviews/view', "$pages/admin/listing_reviews/view.p
 
 // --- Scheduler endpoint (token-gated; for an external cron, no login) ----------
 $router->get('/cron/auto_draft', "$pages/cron/auto_draft.php");
+$router->post('/cron/content', "$pages/cron/content.php");
 
 // --- Webhooks (Meta calls GET for verification, POST for events) ---------------
 $router->get('/webhook/whatsapp', "$pages/webhook/verify.php");

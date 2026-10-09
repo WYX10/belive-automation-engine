@@ -58,9 +58,9 @@ final class RenewalOffer extends BaseModel
             "SELECT o.*, r.name AS room_name, r.room_code, r.location
              FROM renewal_offers o
              LEFT JOIN rooms r ON r.id = o.room_id
-             WHERE o.lead_id = ? AND o.status = 'offered' AND o.expires_on >= CURDATE()
+             WHERE o.lead_id = ? AND o.status = 'offered' AND o.expires_on >= ?
              ORDER BY o.id DESC LIMIT 1",
-            [$leadId]
+            [$leadId, date('Y-m-d')]
         )->fetch();
 
         return $row ?: null;

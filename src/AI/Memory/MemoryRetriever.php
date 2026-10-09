@@ -44,7 +44,7 @@ final class MemoryRetriever
             LearnedMemory::markUsed((int) $rule['id']);
         }
 
-        $block = "LEARNED RULES (from Eve's self-learning memory — follow these; they override defaults):\n"
+        $block = "LEARNED RULES (apply across tenants in matching contexts; live inventory, current tenant requirements and safety rules take precedence):\n"
             . implode("\n", $lines);
 
         return ['block' => $block, 'ids' => $ids];
@@ -54,6 +54,6 @@ final class MemoryRetriever
     {
         $tag = trim((string) $tag);
 
-        return $tag === '' ? null : ucwords(strtolower($tag));
+        return $tag === '' ? null : (strcasecmp($tag, 'general') === 0 ? 'general' : ucwords(strtolower($tag)));
     }
 }

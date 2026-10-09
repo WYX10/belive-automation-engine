@@ -142,8 +142,8 @@ final class RoomRepository
              WHERE r.status = 'available'
                AND r.id <> ?
                AND r.location = ?
-             ORDER BY COALESCE(r.unit_id = ?, 0) DESC,
-                      COALESCE(r.property_id = ?, 0) DESC,
+             ORDER BY CASE WHEN r.unit_id = ? THEN 1 ELSE 0 END DESC,
+                      CASE WHEN r.property_id = ? THEN 1 ELSE 0 END DESC,
                       (r.room_type = ?) DESC,
                       ABS(rp.price - ?) ASC,
                       rp.price ASC, r.id ASC

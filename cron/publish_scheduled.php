@@ -60,11 +60,15 @@ foreach ($due as $row) {
         // Same version-checked, row-locked path the admin's Publish button
         // takes, so two overlapping cron runs cannot double-post: the second
         // one loses the version check and is skipped.
-        $post = SocialPublishManager::approveAndPublish((int) $row['id'], 'scheduler', (int) $row['review_version']);
+        $post = SocialPublishManager::publishScheduled((int) $row['id'], (int) $row['review_version']);
+        if ($post['status'] === 'scheduled') {
+            echo "post #{$row['id']}: account disconnected; still queued\n";
+            continue;
+        }
         echo "post #{$row['id']} ({$row['platform']}): {$post['publish_status']}"
             . ($post['publish_status'] === 'failed' ? " — {$post['publish_error']}" : " → {$post['external_post_id']}")
             . " (slot {$row['scheduled_for']}, {$late} min late)\n";
-        if ($post['publish_status'] !== 'failed') {
+        if (in_array($post['publish_status'], ['published', 'simulated'], true)) {
             $published++;
         }
     } catch (Throwable $e) {

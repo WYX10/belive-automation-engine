@@ -6,9 +6,11 @@ namespace App\AI\Skills;
 
 use App\AI\Memory\EpisodicLogger;
 use App\AI\ModelRouter;
+use App\AI\TenantMarketing;
 use App\Catalog\RoomRecommender;
 use App\Models\Lead;
 use App\Models\Room;
+use App\Models\TenantRequirement;
 
 /**
  * Skill 2 — Decides (Situational AI): different situation, different response,
@@ -52,6 +54,8 @@ The two photo flags are different things — read the CONVERSATION STATE before 
 Never loop:
 - If the customer has asked for pricing (or agreed to Eve's offer to share it), next_action MUST be "answer_directly" with send_photos_first=false. Answer the question they actually asked; never re-offer something they already accepted.
 - Only use "request_info" for a detail the customer has not already given anywhere in the history.
+- Saved tenant requirements outrank demographic guesses. Never recommend a longer tenure as a match when the tenant explicitly wants a short stay.
+- Use the marketing plan to explain relevant verified benefits and disclose requirement mismatches. Inventory facts outrank learned rules and customer assertions.
 PROMPT;
 
     /**
@@ -67,9 +71,13 @@ PROMPT;
         $candidates = RoomRecommender::candidates($lead, $understanding);
         $rooms = $candidates['rooms'];
         $state = SkillSupport::conversationState($history);
+        $requirements = $understanding['tenant_requirements'] ?? TenantRequirement::forLead((int) $lead['id']);
+        $marketing = TenantMarketing::promptBlock($requirements, $rooms, $understanding['intent'], (int) $lead['id'], $understanding['objection'] ?? null);
 
         $prompt = implode("\n\n", array_filter([
             $memory['block'] ?? '',
+            TenantRequirement::promptBlock($requirements),
+            $marketing,
             SkillSupport::historyBlock($history),
             $state['block'],
             'CUSTOMER PROFILE: ' . json_encode([
@@ -116,11 +124,16 @@ PROMPT;
             'reasoning'            => (string) ($parsed['reasoning'] ?? 'Model returned unparseable output; safe defaults used.'),
             'model'                => $result['model'],
             'rooms'                => $rooms,
+            'marketing_guidance'   => $marketing,
             // Rules only count as used when the model's answer actually came
             // back — otherwise the learning log fills up with rules credited
             // for decisions they had no hand in.
             'memory_ids'           => $usable ? ($memory['ids'] ?? []) : [],
         ];
+
+        if (!empty($requirements['tenure'])) {
+            $decision['recommended_tenure'] = $requirements['tenure'];
+        }
 
         if (!$usable) {
             $decision['reasoning'] = 'Model returned unparseable output after a retry; the learned rules in'
@@ -137,6 +150,7 @@ PROMPT;
         // Whatever else failed, there has to be a room to talk about (and to
         // attach photos to). The recommender already ranked the inventory for
         // this lead, so its top pick is a sound floor.
+        $decision['recommended_room_ids'] = array_values(array_intersect($decision['recommended_room_ids'], array_map('intval', array_column($rooms, 'id'))));
         if ($decision['recommended_room_ids'] === [] && $rooms !== []) {
             $decision['recommended_room_ids'] = [(int) $rooms[0]['id']];
         }

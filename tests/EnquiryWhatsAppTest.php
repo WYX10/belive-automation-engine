@@ -56,8 +56,8 @@ $openLeadId = Lead::create([
     'source_channel' => 'whatsapp',
 ]);
 App\Core\Database::run(
-    "INSERT INTO ai_interactions (lead_id, phase, skill, direction, message_in, created_at)
-     VALUES (?, 'conversion', 'understand', 'inbound', 'hi', NOW() - INTERVAL 2 HOUR)",
+    "INSERT INTO ai_interactions (lead_id, phase, skill, model_used, direction, message_in, created_at)
+     VALUES (?, 'conversion', 'understand', 'test-fixture', 'inbound', 'hi', NOW() - INTERVAL 2 HOUR)",
     [$openLeadId]
 );
 

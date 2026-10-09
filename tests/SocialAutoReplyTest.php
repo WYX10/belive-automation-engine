@@ -249,7 +249,9 @@ check('the token still points at the first claimant',
 // Meta ships two, they take different tokens, and sending a Page token to an
 // Instagram-Login app fails outright. Nothing here touches the network: what is
 // asserted is which base URL and token a request WOULD be built with.
-$http = new GuzzleHttp\Client(['timeout' => 5]);
+$http = new GuzzleHttp\Client(['handler' => static fn () => new GuzzleHttp\Promise\FulfilledPromise(
+    new GuzzleHttp\Psr7\Response(200, [], '{"access_token":"page-token-value"}')
+)]);
 
 check('with no credential at all, Instagram is not configured',
     App\Integrations\Meta\InstagramApi::isConfigured() === false);

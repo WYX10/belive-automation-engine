@@ -31,6 +31,7 @@ define('FEEDBACK_SOURCES', [
     'implicit_repeat',     // customer had to ask the same thing twice
     'implicit_dropoff',    // conversation died right after a message type
     'pattern_detection',   // aggregate cron analysis across many leads
+    'system_detection',    // deterministic inventory guard rejected an AI draft
 ]);
 
 // Lead lifecycle.
@@ -79,7 +80,7 @@ define('CONTENT_CAPTION_MAX', 2000);
 // content_posts.publish_status — outcome of the auto-publish attempt.
 // 'simulated' = dry-run (no active credential), clearly badged, never passed
 // off as a real platform post.
-define('CONTENT_PUBLISH_STATUSES', ['published', 'simulated', 'failed']);
+define('CONTENT_PUBLISH_STATUSES', ['published', 'simulated', 'failed', 'publishing', 'uncertain']);
 
 // content_posts.schedule_source — where the publish time came from: a slot the
 // timing advisor suggested, a date the admin typed, or the studio's own default

@@ -31,12 +31,27 @@ $_ENV['MOCK_AI'] = 'true';
 $cfg = require APP_ROOT . '/config/database.php';
 $testDb = $cfg['name'] . '_test';
 
-$server = new PDO(
+if ($cfg['driver'] === 'pgsql') {
+    if (!in_array($cfg['host'], ['127.0.0.1', 'localhost', '::1'], true)) {
+        exit("PostgreSQL tests require a local throwaway database; hosted Supabase is not a test target.\n");
+    }
+    $server = App\Core\Database::connect($cfg);
+    $exists = $server->prepare('SELECT 1 FROM pg_database WHERE datname = ?');
+    $exists->execute([$testDb]);
+    if (!$exists->fetchColumn()) {
+        $server->exec('CREATE DATABASE ' . App\Core\Database::identifier($testDb));
+    }
+    $testCfg = $cfg;
+    $testCfg['name'] = $testDb;
+    $server = App\Core\Database::connect($testCfg);
+} else {
+    $server = new PDO(
     sprintf('mysql:host=%s;port=%d;charset=%s', $cfg['host'], $cfg['port'], $cfg['charset']),
     $cfg['user'],
     $cfg['pass'],
     $cfg['options']
-);
+    );
+}
 /**
  * Empty the test database by dropping its TABLES, never the database itself.
  *
@@ -47,7 +62,14 @@ $server = new PDO(
  * schema). That produced failures in roughly half of all runs, scattered across
  * whichever test first touched a table that never got created.
  */
-$wipe = static function (PDO $pdo, string $db): void {
+$wipe = static function (PDO $pdo, string $db) use ($cfg): void {
+    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
+        if ($pdo->query('SELECT current_database()')->fetchColumn() !== $db || !str_ends_with($db, '_test')) {
+            throw new RuntimeException('Refusing to wipe a non-test PostgreSQL database.');
+        }
+        $pdo->exec('DROP SCHEMA IF EXISTS ' . App\Core\Database::identifier($cfg['schema']) . ' CASCADE');
+        return;
+    }
     $tables = $pdo->query(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = " . $pdo->quote($db)
     )->fetchAll(PDO::FETCH_COLUMN);
@@ -71,7 +93,23 @@ $wipe = static function (PDO $pdo, string $db): void {
  * Either leaves a half-built schema, and the failure then surfaces in whichever
  * test first touches a table that was never created — nowhere near the cause.
  */
-$migrate = static function (PDO $pdo) use ($testDb, $wipe): int {
+$migrate = static function (PDO $pdo) use ($testDb, $wipe, $cfg): int {
+    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
+        $wipe($pdo, $testDb);
+        $pdo->exec('CREATE SCHEMA ' . App\Core\Database::identifier($cfg['schema']));
+        $pdo->exec('SET search_path TO ' . App\Core\Database::identifier($cfg['schema']) . ', pg_catalog');
+        $pdo->beginTransaction();
+        try {
+            foreach (glob(APP_ROOT . '/database/postgres/migrations/*.sql') as $file) {
+                $pdo->exec(file_get_contents($file));
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+        return (int) $pdo->query('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ' . $pdo->quote($cfg['schema']))->fetchColumn();
+    }
     $pdo->exec("CREATE DATABASE IF NOT EXISTS `$testDb` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $pdo->exec("USE `$testDb`");
     $wipe($pdo, $testDb);
@@ -96,7 +134,7 @@ for ($attempt = 1; $attempt <= 3; $attempt++) {
             break;
         }
     } catch (PDOException $e) {
-        if ($attempt === 3) {
+        if ($attempt === 3 || $cfg['driver'] === 'pgsql') {
             throw $e;
         }
         // Force the schema to be rebuilt from nothing before trying again.

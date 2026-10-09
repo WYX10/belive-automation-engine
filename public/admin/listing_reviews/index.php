@@ -36,10 +36,10 @@ $reviews = Database::run(
 
 $counts = Database::run(
     "SELECT
-        SUM($evidenceWhere) AS total,
-        SUM($evidenceWhere AND (vl.ownership_review_status = 'pending' OR vl.gps_review_status = 'pending')) AS pending,
-        SUM($evidenceWhere AND vl.verified_badge = 1) AS approved,
-        SUM($evidenceWhere AND (vl.ownership_review_status = 'rejected' OR vl.gps_review_status = 'rejected')) AS rejected
+        SUM(CASE WHEN $evidenceWhere THEN 1 ELSE 0 END) AS total,
+        SUM(CASE WHEN $evidenceWhere AND (vl.ownership_review_status = 'pending' OR vl.gps_review_status = 'pending') THEN 1 ELSE 0 END) AS pending,
+        SUM(CASE WHEN $evidenceWhere AND vl.verified_badge = 1 THEN 1 ELSE 0 END) AS approved,
+        SUM(CASE WHEN $evidenceWhere AND (vl.ownership_review_status = 'rejected' OR vl.gps_review_status = 'rejected') THEN 1 ELSE 0 END) AS rejected
      FROM verified_listings vl"
 )->fetch() ?: [];
 

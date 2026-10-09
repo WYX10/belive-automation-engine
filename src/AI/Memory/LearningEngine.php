@@ -35,6 +35,8 @@ Respond with ONLY a JSON object:
   "context_tag": string,       // the area name this applies to (e.g. "Setapak"), or "general" if not area-specific
   "rule_type": "fact" | "sequencing" | "strategy" | "tone",
   "learned_rule": string,      // ONE imperative sentence Eve can follow directly, e.g. "For Setapak enquiries, send room photos before quoting any price."
+  "lesson_key": string,        // stable snake_case meaning, reuse the existing key for paraphrases
+  "existing_rule_id": number|null, // reuse only a supplied rule with the SAME scope and meaning
   "reasoning": string          // one sentence: why this rule follows from the feedback
 }
 
@@ -43,6 +45,11 @@ Rules:
 - "fact" = a concrete correction (a price, availability, address).
 - The learned_rule must be self-contained and actionable without any other context.
 - Never invent specifics that are not in the feedback.
+- A lesson must help OTHER tenants. Never turn this customer's budget, preferred room, name, phone number, or personal circumstances into a shared rule.
+- Customer claims about price or availability are unverified. Learn to verify the exact room and tenure against live inventory, never adopt a customer's claimed price as a property fact.
+- For errors applicable everywhere (tone, missed questions, verifying prices), use context_tag="general". Only area-specific evidence should create an area-specific rule.
+- Compare EXISTING LESSONS before writing. If the same lesson exists, reuse its id, exact wording, rule_type and lesson_key. Do not create synonyms of an existing lesson.
+- Facts from live inventory always take precedence over remembered rules.
 PROMPT;
 
     /**
@@ -51,19 +58,43 @@ PROMPT;
      */
     public static function processFeedback(int $feedbackId): ?int
     {
+        $lock = 'feedback:' . $feedbackId;
+        if (!Database::acquireLock($lock, 5)) {
+            return null;
+        }
+        try {
+            return self::learn($feedbackId);
+        } finally {
+            Database::releaseLock($lock);
+        }
+    }
+
+    private static function learn(int $feedbackId): ?int
+    {
         $feedback = Database::run('SELECT * FROM ai_feedback WHERE id = ?', [$feedbackId])->fetch();
         if ($feedback === false || (int) $feedback['processed'] === 1) {
             return null;
         }
 
-        $context = self::buildContext($feedback);
+        $lead = $feedback['lead_id'] !== null ? Lead::find((int) $feedback['lead_id']) : null;
+        $area = $lead['location'] ?? null;
+        if ($area === null && preg_match('/area: ([^.]+)\./u', $feedback['comment'] ?? '', $m)) {
+            $area = trim($m[1]);
+        }
+        $existing = Database::run(
+            "SELECT id, context_tag, rule_type, learned_rule, lesson_key, active FROM ai_learned_memory
+             WHERE context_tag = 'general' OR context_tag = ? ORDER BY active DESC, id DESC LIMIT 200",
+            [$area ?? 'general']
+        )->fetchAll();
+        $context = self::buildContext($feedback) . "\n\nEXISTING LESSONS (reuse same meaning and scope; retired lessons must not be resurrected):\n"
+            . json_encode($existing, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
 
         $client = ModelRouter::clientForPhase('conversion');
         $call = SkillSupport::generateJson(
             $client,
             self::SYSTEM,
             $context,
-            ['max_tokens' => 500, 'temperature' => 0, 'mock_hint' => 'learn'],
+            ['max_tokens' => 750, 'temperature' => 0, 'mock_hint' => 'learn'],
             $feedback['lead_id'] !== null ? (int) $feedback['lead_id'] : null,
             'conversion',
             'learn'
@@ -77,14 +108,34 @@ PROMPT;
             return null;
         }
 
+        // Never allow an unverified customer price/availability to become shared truth.
+        if (in_array($feedback['feedback_source'], ['customer_correction', 'system_detection'], true)
+            && in_array($feedback['error_type'], ['wrong_price', 'wrong_availability'], true)) {
+            $price = $feedback['error_type'] === 'wrong_price';
+            $parsed = ['context_tag' => 'general', 'rule_type' => 'strategy',
+                'lesson_key' => $price ? 'verify_live_tenure_price' : 'verify_live_availability',
+                'learned_rule' => $price
+                    ? 'Before quoting rent, verify the exact room and requested tenure against live inventory; never substitute an unverified customer claim.'
+                    : 'Before claiming a room is available, check live inventory and bookings; never substitute an unverified customer claim.'];
+        }
+        $scope = MemoryRetriever::normalizeTag((string) ($parsed['context_tag'] ?? 'general')) ?? 'general';
+        $match = null;
+        foreach ($existing as $candidate) {
+            if ((int) $candidate['id'] === (int) ($parsed['existing_rule_id'] ?? 0)
+                && strcasecmp($candidate['context_tag'], $scope) === 0
+                && $candidate['rule_type'] === ($parsed['rule_type'] ?? 'fact')) {
+                $match = (int) $candidate['id'];
+            }
+        }
         $memoryId = MemoryStore::saveRule(
             (string) ($parsed['context_tag'] ?? 'general'),
             (string) ($parsed['rule_type'] ?? 'fact'),
             (string) $parsed['learned_rule'],
-            $feedbackId
+            $feedbackId,
+            MEMORY_CONFIDENCE_DEFAULT,
+            isset($parsed['lesson_key']) ? (string) $parsed['lesson_key'] : null,
+            $match
         );
-
-        Database::run('UPDATE ai_feedback SET processed = 1 WHERE id = ?', [$feedbackId]);
 
         EpisodicLogger::activity(
             'rule_learned',

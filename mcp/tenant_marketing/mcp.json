@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "belive-tenant-marketing": {
+      "command": "/workspace/belive-automation-engine/mcp/tenant_marketing/.venv/bin/python",
+      "args": ["/workspace/belive-automation-engine/mcp/tenant_marketing/server.py"]
+    }
+  }
+}

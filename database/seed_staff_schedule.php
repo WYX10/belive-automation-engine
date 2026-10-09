@@ -43,12 +43,7 @@ date_default_timezone_set('Asia/Kuala_Lumpur');
 const BOOKING_TAG = '[staff-demo]';
 
 $cfg = require APP_ROOT . '/config/database.php';
-$pdo = new PDO(
-    sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s', $cfg['host'], $cfg['port'], $cfg['name'], $cfg['charset']),
-    $cfg['user'],
-    $cfg['pass'],
-    $cfg['options']
-);
+$pdo = \App\Core\Database::pdo();
 
 // Weekday numbering matches PHP date('w') and the app: 0 = Sunday … 6 = Saturday.
 $agents = [

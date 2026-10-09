@@ -31,12 +31,13 @@ final class PhotoPostDrafter
 
         $photo = Room::photoUrls($roomId)[0] ?? null;
         // Branding is a bonus, never a gate — an unbrandable photo still posts.
-        $branded = $photo !== null ? BrandedPhotoComposer::brand($photo, $caption['text'], $roomId) : null;
+        $creative = null;
+        $branded = $photo !== null ? BrandedPhotoComposer::brand($photo, $caption['text'], $roomId, $brief, $creative) : null;
 
         Database::run(
-            'INSERT INTO content_posts (platform, media_kind, room_id, caption, status, generated_by_model, generated_via, image_url)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [$platform, 'image', $roomId, $caption['text'], 'draft', $caption['model'], $via, $branded ?? $photo]
+            'INSERT INTO content_posts (platform, media_kind, room_id, caption, status, generated_by_model, generated_via, image_url, creative_meta)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [$platform, 'image', $roomId, $caption['text'], 'draft', $caption['model'], $via, $branded ?? $photo, $creative !== null ? json_encode($creative, JSON_UNESCAPED_UNICODE) : null]
         );
         $postId = (int) Database::pdo()->lastInsertId();
 

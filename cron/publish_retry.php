@@ -25,8 +25,6 @@ Dotenv\Dotenv::createImmutable(APP_ROOT)->safeLoad();
 require APP_ROOT . '/config/constants.php';
 date_default_timezone_set('Asia/Kuala_Lumpur');
 
-use App\Core\Database;
-use App\Integrations\Social\SocialPublishManager;
 
 $max = 10;
 foreach ($argv as $arg) {
@@ -37,28 +35,8 @@ foreach ($argv as $arg) {
 
 echo '[' . date('Y-m-d H:i:s') . "] publish_retry start (max=$max)\n";
 
-// publish_status IS NULL covers legacy rows approved under the old
-// copy-paste flow (also never reviewed_at-stamped, hence the COALESCE).
-$rows = Database::run(
-    "SELECT id, platform, review_version FROM content_posts
-     WHERE status = 'approved' AND (publish_status = 'failed' OR publish_status IS NULL)
-       AND COALESCE(reviewed_at, created_at) < (NOW() - INTERVAL 10 MINUTE)
-     ORDER BY COALESCE(reviewed_at, created_at) ASC
-     LIMIT " . (int) $max
-)->fetchAll();
-
-$published = 0;
-foreach ($rows as $row) {
-    try {
-        $post = SocialPublishManager::retryPublish((int) $row['id'], 'cron', (int) $row['review_version']);
-        echo "post #{$row['id']} ({$row['platform']}): {$post['publish_status']}"
-            . ($post['publish_status'] === 'failed' ? " — {$post['publish_error']}" : " → {$post['external_post_id']}") . "\n";
-        if ($post['publish_status'] !== 'failed') {
-            $published++;
-        }
-    } catch (Throwable $e) {
-        echo "post #{$row['id']} ({$row['platform']}): skipped — {$e->getMessage()}\n";
-    }
-}
-
-echo '[' . date('Y-m-d H:i:s') . '] publish_retry done — ' . count($rows) . " attempted, $published succeeded\n";
+// The shared cycle uses stored UTC deadlines, bounded retries and delivery
+// claims; using the same path prevents cron from bypassing a worker cooldown.
+$result = App\Content\ContentPublishWorker::runDue($max);
+echo '[' . date('Y-m-d H:i:s') . '] delivery ' . json_encode($result) . "\n";
+exit($result['failed'] > 0 ? 1 : 0);

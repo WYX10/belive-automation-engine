@@ -23,6 +23,10 @@ require APP_ROOT . '/vendor/autoload.php';
 Dotenv\Dotenv::createImmutable(APP_ROOT)->safeLoad();
 
 $cfg = require APP_ROOT . '/config/database.php';
+if ($cfg['driver'] === 'pgsql') {
+    require __DIR__ . '/postgres/migrate.php';
+    exit(0);
+}
 $includeBonus = !in_array('--core-only', $argv, true);
 // 39 joins the list because the house level hangs off properties (22).
 $bonusMigrations = [11, 12, 13, 18, 19, 20, 21, 22, 23, 24, 25, 35, 39];

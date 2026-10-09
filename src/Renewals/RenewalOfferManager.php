@@ -104,9 +104,9 @@ final class RenewalOfferManager
 
             $open = Database::run(
                 "SELECT id FROM renewal_offers
-                 WHERE agreement_id = ? AND status = 'offered' AND expires_on >= CURDATE()
+                 WHERE agreement_id = ? AND status = 'offered' AND expires_on >= ?
                  FOR UPDATE",
-                [$agreementId]
+                [$agreementId, date('Y-m-d')]
             )->fetch();
             if ($open !== false) {
                 throw new RuntimeException('This tenant already has an offer waiting for an answer. Withdraw it first to send a different price.');

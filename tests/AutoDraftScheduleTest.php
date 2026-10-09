@@ -142,6 +142,19 @@ check('the abort is what the studio card reports',
     str_starts_with(AutoDrafter::status()['last_result'], 'aborted —'),
     AutoDrafter::status()['last_result']);
 
+Settings::set('content_auto_publish_enabled', '1', $autoBy);
+Settings::set('content_publish_time', '18:00', $autoBy);
+$autoScheduledRun = AutoDrafter::runNow('test-auto-publish', ['platforms' => ['instagram'], 'max' => 1]);
+$autoScheduledPost = Database::run("SELECT * FROM content_posts WHERE reviewed_by = 'daily-automation' ORDER BY id DESC LIMIT 1")->fetch();
+check('daily automation can queue new AI posts for the saved publishing time',
+    $autoScheduledRun['drafted'] === 1 && $autoScheduledPost !== false
+    && $autoScheduledPost['status'] === 'scheduled' && substr($autoScheduledPost['scheduled_for'], 11, 5) === '18:00'
+    && $autoScheduledPost['schedule_source'] === 'auto');
+Settings::set('content_auto_publish_enabled', '0', $autoBy);
+if ($autoScheduledPost !== false) {
+    Database::run('DELETE FROM content_posts WHERE id = ?', [$autoScheduledPost['id']]);
+}
+
 // Leave the schedule as a fresh install would have it, so nothing downstream
 // inherits a settled slot or a stopped schedule from this file.
 AutoDrafter::setEnabled(true, $autoBy);

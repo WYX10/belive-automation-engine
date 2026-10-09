@@ -160,20 +160,13 @@ $totals = $seen;
 // ---------------------------------------------------------------- import
 
 $cfg = require APP_ROOT . '/config/database.php';
-$pdo = new PDO(
-    sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s', $cfg['host'], $cfg['port'], $cfg['name'], $cfg['charset']),
-    $cfg['user'],
-    $cfg['pass'],
-    $cfg['options']
-);
+$pdo = \App\Core\Database::pdo();
 
 $pdo->beginTransaction();
 
-$propertyStmt = $pdo->prepare(
-    'INSERT INTO properties (owner_name, name, location, address)
+$propertyStmt = $pdo->prepare(\App\Core\Database::sql('INSERT INTO properties (owner_name, name, location, address)
      VALUES (:owner, :name, :location, :address)
-     ON DUPLICATE KEY UPDATE address = VALUES(address), id = LAST_INSERT_ID(id)'
-);
+     ON DUPLICATE KEY UPDATE address = VALUES(address), id = LAST_INSERT_ID(id)') . (\App\Core\Database::isPostgres() ? ' RETURNING id' : ''));
 $propertyFind = $pdo->prepare(
     'SELECT id FROM properties WHERE owner_name = ? AND name = ? AND location = ?'
 );
@@ -181,15 +174,12 @@ $propertyFind = $pdo->prepare(
 // The CSV has no unit column, so every imported room lands in the property's
 // default house. Admin splits them into the real units from /admin/rooms —
 // but they are inside the hierarchy from the first import, never dangling.
-$unitStmt = $pdo->prepare(
-    'INSERT INTO property_units (property_id, name, notes)
+$unitStmt = $pdo->prepare(\App\Core\Database::sql('INSERT INTO property_units (property_id, name, notes)
      VALUES (:property_id, :name, :notes)
-     ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)'
-);
+     ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)') . (\App\Core\Database::isPostgres() ? ' RETURNING id' : ''));
 $unitFind = $pdo->prepare('SELECT id FROM property_units WHERE property_id = ? AND name = ?');
 
-$roomStmt = $pdo->prepare(
-    'INSERT INTO rooms (property_id, unit_id, room_code, name, property_name, location, room_type, owner_name, address, description, status)
+$roomStmt = $pdo->prepare(\App\Core\Database::sql('INSERT INTO rooms (property_id, unit_id, room_code, name, property_name, location, room_type, owner_name, address, description, status)
      VALUES (:property_id, :unit_id, :room_code, :name, :property_name, :location, :room_type, :owner, :address, :description, \'available\')
      ON DUPLICATE KEY UPDATE
         property_id   = VALUES(property_id),
@@ -200,14 +190,11 @@ $roomStmt = $pdo->prepare(
         room_type     = VALUES(room_type),
         address       = VALUES(address),
         description   = VALUES(description),
-        id            = LAST_INSERT_ID(id)'
-);
+        id            = LAST_INSERT_ID(id)') . (\App\Core\Database::isPostgres() ? ' RETURNING id' : ''));
 
-$priceStmt = $pdo->prepare(
-    'INSERT INTO room_pricing (room_id, tenure, price, is_best_value)
+$priceStmt = $pdo->prepare(\App\Core\Database::sql('INSERT INTO room_pricing (room_id, tenure, price, is_best_value)
      VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE price = VALUES(price), is_best_value = VALUES(is_best_value)'
-);
+     ON DUPLICATE KEY UPDATE price = VALUES(price), is_best_value = VALUES(is_best_value)'));
 $amenityWipe = $pdo->prepare('DELETE FROM room_amenities WHERE room_id = ?');
 $amenityStmt = $pdo->prepare('INSERT INTO room_amenities (room_id, amenity) VALUES (?, ?)');
 
@@ -235,7 +222,7 @@ foreach ($rows as $i => $row) {
             ':location' => $location,
             ':address'  => $address,
         ]);
-        $propertyId = (int) $pdo->lastInsertId();
+        $propertyId = \App\Core\Database::isPostgres() ? (int) $propertyStmt->fetchColumn() : (int) $pdo->lastInsertId();
         if ($propertyId === 0) {
             $propertyFind->execute([OWNER_NAME, $condo, $location]);
             $propertyId = (int) $propertyFind->fetchColumn();
@@ -249,7 +236,7 @@ foreach ($rows as $i => $row) {
             ':name'        => 'Main house',
             ':notes'       => 'Imported rooms land here — split them into the real units from the admin room page.',
         ]);
-        $unitId = (int) $pdo->lastInsertId();
+        $unitId = \App\Core\Database::isPostgres() ? (int) $unitStmt->fetchColumn() : (int) $pdo->lastInsertId();
         if ($unitId === 0) {
             $unitFind->execute([$properties[$propKey], 'Main house']);
             $unitId = (int) $unitFind->fetchColumn();
@@ -285,7 +272,7 @@ foreach ($rows as $i => $row) {
         ':address'       => $address,
         ':description'   => $description,
     ]);
-    $roomId = (int) $pdo->lastInsertId();
+    $roomId = \App\Core\Database::isPostgres() ? (int) $roomStmt->fetchColumn() : (int) $pdo->lastInsertId();
 
     foreach (pricingLadder($monthly) as [$tenure, $price, $best]) {
         $priceStmt->execute([$roomId, $tenure, $price, $best]);

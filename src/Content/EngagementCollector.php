@@ -451,8 +451,8 @@ final class EngagementCollector
         $where = $platform === null ? '' : ' AND p.platform = ?';
         $row = Database::run(
             "SELECT COUNT(*) AS posted,
-                    SUM(m.source = 'platform') AS measured,
-                    SUM(m.id IS NULL) AS never_checked
+                    SUM(CASE WHEN m.source = 'platform' THEN 1 ELSE 0 END) AS measured,
+                    SUM(CASE WHEN m.id IS NULL THEN 1 ELSE 0 END) AS never_checked
              FROM content_posts p
              LEFT JOIN content_post_metrics m ON m.id = (" . self::LATEST_SNAPSHOT_ID . ")
              WHERE p.status = 'posted'$where",

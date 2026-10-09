@@ -16,7 +16,7 @@ Auth::requireAdmin();
 $leads = Database::run(
     'SELECT l.*, MAX(i.created_at) AS last_message_at, COUNT(i.id) AS message_count
      FROM leads l
-     JOIN ai_interactions i ON i.lead_id = l.id AND i.direction IN ("inbound","outbound")
+     JOIN ai_interactions i ON i.lead_id = l.id AND i.direction IN (\'inbound\',\'outbound\')
      GROUP BY l.id
      ORDER BY last_message_at DESC
      LIMIT 50'

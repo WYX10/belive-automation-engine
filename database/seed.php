@@ -18,12 +18,7 @@ require APP_ROOT . '/vendor/autoload.php';
 Dotenv\Dotenv::createImmutable(APP_ROOT)->safeLoad();
 
 $cfg = require APP_ROOT . '/config/database.php';
-$pdo = new PDO(
-    sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s', $cfg['host'], $cfg['port'], $cfg['name'], $cfg['charset']),
-    $cfg['user'],
-    $cfg['pass'],
-    $cfg['options']
-);
+$pdo = \App\Core\Database::pdo();
 
 $existing = (int) $pdo->query('SELECT (SELECT COUNT(*) FROM rooms) + (SELECT COUNT(*) FROM leads)')->fetchColumn();
 if ($existing > 0 && !in_array('--force', $argv, true)) {
@@ -35,7 +30,7 @@ $sql = preg_replace('/^\s*--.*$/m', '', $sql);
 
 $count = 0;
 foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
-    $pdo->exec($statement);
+    $pdo->exec(\App\Core\Database::sql($statement));
     $count++;
 }
 

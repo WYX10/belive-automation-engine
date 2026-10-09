@@ -108,8 +108,8 @@ final class SocialReply extends BaseModel
     {
         $row = Database::run(
             "SELECT COUNT(*) AS answered,
-                    SUM(private_reply = 'sent') AS delivered,
-                    SUM(claimed_at IS NOT NULL) AS converted
+                    SUM(CASE WHEN private_reply = 'sent' THEN 1 ELSE 0 END) AS delivered,
+                    SUM(CASE WHEN claimed_at IS NOT NULL THEN 1 ELSE 0 END) AS converted
              FROM social_replies"
         )->fetch() ?: [];
 

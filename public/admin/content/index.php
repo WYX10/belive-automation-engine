@@ -18,6 +18,8 @@ use App\Content\AutoDrafter;
 use App\Content\MascotLibrary;
 use App\Content\PhotoPostDrafter;
 use App\Content\PostTimingAdvisor;
+use App\Content\PostingSchedule;
+use App\Content\ContentPublishWorker;
 use App\Content\PromoVideoDrafter;
 use App\Content\RoomVideoComposer;
 use App\Core\Auth;
@@ -81,9 +83,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'settings'
     $platforms = array_values(array_intersect((array) ($_POST['content_auto_platforms'] ?? []), CONTENT_PLATFORMS));
     $brief = trim((string) ($_POST['content_brief'] ?? ''));
     $mediaKind = in_array($_POST['content_auto_media'] ?? '', CONTENT_MEDIA_KINDS, true) ? $_POST['content_auto_media'] : 'image';
+    $postingTime = trim((string) ($_POST['content_publish_time'] ?? '18:00'));
 
     if ($platforms === []) {
         set_flash('danger', 'Pick at least one platform for the daily drafts.');
+    } elseif (!preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/D', $postingTime)) {
+        set_flash('danger', 'Choose a valid posting time between 00:00 and 23:59.');
     } elseif ($mediaKind === 'video' && !RoomVideoComposer::isAvailable()) {
         set_flash('danger', 'Daily reels need ffmpeg on this server — install it (or set FFMPEG_BIN in .env) before scheduling video drafts.');
     } else {
@@ -95,7 +100,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'settings'
         Settings::set('content_brief', mb_substr($brief, 0, 1000), $by);
         Settings::set('content_wa_prefill', mb_substr(trim((string) ($_POST['content_wa_prefill'] ?? '')), 0, 200), $by);
         // What the preview page pre-selects when an admin approves a draft.
-        Settings::set('content_schedule_default', ($_POST['content_schedule_default'] ?? '') === 'now' ? 'now' : 'suggested', $by);
+        Settings::set('content_schedule_default', in_array($_POST['content_schedule_default'] ?? '', ['now', 'fixed', 'suggested'], true) ? $_POST['content_schedule_default'] : 'suggested', $by);
+        Settings::set('content_publish_time', PostingSchedule::validateTime($postingTime), $by);
+        Settings::set('content_auto_publish_enabled', isset($_POST['content_auto_publish_enabled']) ? '1' : '0', $by);
         set_flash('success', "Automation saved — up to $max " . ($mediaKind === 'video' ? 'reel' : 'caption')
             . '(s) a day from ' . sprintf('%02d:00', $hour) . ' across ' . implode(', ', $platforms) . '.');
     }
@@ -138,16 +145,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'generate'
     exit;
 }
 
-// Nothing outside the app calls the cron on App Service (no crontab), so the
-// schedule ticks off traffic: if today's run is owed, this hands it to a
-// detached process — or to the tail of this request, after the page is sent.
+// Traffic can catch up a missed daily creation slot as well as the persistent
+// worker or outside scheduler. AutoDrafter claims each slot only once.
 $tick = Scheduler::tickAutoDraft();
 
 $filter = $_GET['status'] ?? 'all';
 $filterWhere = match ($filter) {
     'draft'     => "WHERE p.status = 'draft'",
     'scheduled' => "WHERE p.status = 'scheduled'",
-    'failed'    => "WHERE p.status = 'approved'",
+    'failed'    => "WHERE p.status = 'approved' AND (p.publish_status IS NULL OR p.publish_status IN ('failed', 'uncertain'))",
     'posted'    => "WHERE p.status = 'posted'",
     'rejected'  => "WHERE p.status = 'rejected'",
     default     => '',
@@ -168,6 +174,9 @@ $counts = SocialPublishManager::counts();
 $autoMax = Settings::getInt('content_auto_max', 3);
 $autoPlatforms = Settings::getList('content_auto_platforms', CONTENT_PLATFORMS);
 $autoMedia = Settings::get('content_auto_media', 'image');
+$postingTime = PostingSchedule::time();
+$autoPublish = Settings::get('content_auto_publish_enabled', '0') === '1';
+$publisherStatus = ContentPublishWorker::status();
 // Read after the tick, so a run this page load just started shows as running.
 $auto = AutoDrafter::status();
 // Rendering is the one thing the studio cannot do on its own — say so up front
@@ -296,8 +305,8 @@ admin_header('Content', 'content');
                 <code>FFMPEG_BIN</code> in <code>.env</code> at the executable, and the option turns on.<br>
             <?php endif; ?>
             <?php if ($mascotReady): ?>
-                🔒 Both post types carry the BeLive mascot — a pose picked to match what the copy says. On a photo post it is
-                stamped onto a <em>copy</em>; the gallery keeps the owner's original untouched.
+                🔒 The mascot hosts the room tour with animated gestures and spoken introductions. On a photo post it is
+                placed into a touched-up campaign copy with ambient lighting and soft shadows. The room gallery keeps the original.
             <?php endif; ?>
             Every caption goes out with <code><?= e(CONTENT_REQUIRED_HASHTAG) ?></code> — added on the way out, so a draft
             can never lose the campaign tag.
@@ -306,13 +315,26 @@ admin_header('Content', 'content');
 </div>
 
 <div class="belive-card" style="margin-bottom:16px">
+    <div class="belive-card-title">🕒 Scheduled publishing</div>
+    <p style="font-size:13px">
+        <?= $publisherStatus['active'] ? '● Publisher has a recent heartbeat. Queued posts are checked by the background scheduler.' : 'Publisher has no recent heartbeat. Start the background scheduler or connect a recurring hosting task before relying on a posting time.' ?>
+        All posting times use <strong>Asia/Kuala_Lumpur (UTC+8)</strong>.
+    </p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap">
+        <?php foreach (CONTENT_PLATFORMS as $platform):
+            $connected = SocialPublishManager::publisherFor($platform)->isConfigured(); ?>
+            <span class="belive-badge <?= $connected ? '' : 'orange' ?>"><?= e(ucfirst($platform)) ?> · <?= $connected ? 'connected' : 'connect account' ?></span>
+        <?php endforeach; ?>
+    </div>
+    <p class="belive-muted" style="font-size:12px; margin-bottom:0">A disconnected account keeps its posts queued until it is connected. Successful delivery records the platform's post ID. <a href="/admin/credentials">Manage accounts</a></p>
+</div>
+
+<div class="belive-card" style="margin-bottom:16px">
     <div class="belive-card-title">⚙️ Daily automation</div>
     <p class="belive-muted" style="font-size:13px; margin-top:-4px">
         Once a day from <strong><?= sprintf('%02d:00', $auto['hour']) ?></strong> the AI drafts up to the limit below —
         currently <strong><?= (int) $autoMax ?> a day ≈ <?= (int) $autoMax * 7 ?> a week</strong>. Drafts still wait for
-        your approval before publishing. The day's run happens by itself: the panel starts it, and so does
-        <code>cron/auto_draft_content.php --if-due</code> or <code>/cron/auto_draft</code> if you point an outside
-        scheduler at it — whichever gets there first, and only ever once a day.
+        your approval unless you enable automatic scheduling below. The background scheduler drafts once per day and delivers queued posts at their selected time, even when nobody opens this page.
     </p>
 
     <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:center; justify-content:space-between;
@@ -390,7 +412,7 @@ admin_header('Content', 'content');
             <input type="number" name="content_auto_max" min="1" max="20" value="<?= (int) $autoMax ?>">
         </div>
         <div class="belive-field" style="flex:0 0 130px; margin-bottom:0">
-            <label>Run from</label>
+            <label>Draft from</label>
             <select name="content_auto_hour">
                 <?php for ($hour = 0; $hour < 24; $hour++): ?>
                     <option value="<?= $hour ?>"<?= $auto['hour'] === $hour ? ' selected' : '' ?>><?= sprintf('%02d:00', $hour) ?></option>
@@ -409,9 +431,22 @@ admin_header('Content', 'content');
             <label>On approval, default to</label>
             <select name="content_schedule_default">
                 <option value="suggested"<?= $scheduleDefault === 'suggested' ? ' selected' : '' ?>>🕒 Scheduling at the best slot</option>
+                <option value="fixed"<?= $scheduleDefault === 'fixed' ? ' selected' : '' ?>>🕒 Daily posting time</option>
                 <option value="now"<?= $scheduleDefault === 'now' ? ' selected' : '' ?>>⚡ Publishing immediately</option>
             </select>
             <div class="hint">Only what the preview page pre-selects — every post still goes out on the choice you confirm there.</div>
+        </div>
+        <div class="belive-field" style="flex:0 0 170px; margin-bottom:0">
+            <label>Daily posting time</label>
+            <input type="time" name="content_publish_time" value="<?= e($postingTime) ?>" required>
+            <div class="hint">Asia/Kuala_Lumpur · UTC+8</div>
+        </div>
+        <div class="belive-field" style="flex:1 1 100%; margin-bottom:0">
+            <label style="display:flex; gap:8px; align-items:center">
+                <input type="checkbox" name="content_auto_publish_enabled" value="1"<?= $autoPublish ? ' checked' : '' ?>>
+                Automatically schedule daily AI posts
+            </label>
+            <div class="hint">New daily drafts are approved for the posting time above. If that time has passed, they are queued for tomorrow. Leave this off to review each draft yourself.</div>
         </div>
         <div class="belive-field" style="flex:1; min-width:200px; margin-bottom:0">
             <label>Platforms</label>
@@ -470,12 +505,12 @@ admin_header('Content', 'content');
                                 <?php $slot = new DateTimeImmutable((string) $post['scheduled_for']); ?>
                                 🕒 <?= e($slot->format('D j M, H:i')) ?>
                                 <div class="belive-muted" style="font-size:11px">
-                                    <?= $slot <= new DateTimeImmutable() ? 'due — next cron run' : 'in ' . e((new DateTimeImmutable())->diff($slot)->format('%ad %hh %im')) ?>
+                                    <?= $slot <= new DateTimeImmutable() ? 'due — next publisher check' : 'in ' . e((new DateTimeImmutable())->diff($slot)->format('%ad %hh %im')) ?>
                                 </div>
                             <?php elseif ($post['posted_at']): ?>
                                 <?= e((new DateTimeImmutable((string) $post['posted_at']))->format('D j M, H:i')) ?>
                                 <?php if ($post['scheduled_for']): ?>
-                                    <div class="belive-muted" style="font-size:11px">on schedule</div>
+                                    <div class="belive-muted" style="font-size:11px">scheduled for <?= e((new DateTimeImmutable((string) $post['scheduled_for']))->format('D j M, H:i')) ?></div>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <span class="belive-muted">—</span>
@@ -484,9 +519,9 @@ admin_header('Content', 'content');
                         <td>
                             <span class="belive-badge <?= match ($post['status']) { 'posted', 'scheduled' => '', 'rejected' => 'danger', default => 'orange' } ?>"><?= e($post['status']) ?></span>
                             <?php if ($post['publish_status']): ?>
-                                <span class="belive-badge <?= match ($post['publish_status']) { 'published' => '', 'simulated' => 'orange', default => 'danger' } ?>" style="font-size:11px"><?= e($post['publish_status']) ?></span>
+                                <span class="belive-badge <?= match ($post['publish_status']) { 'published' => '', 'simulated', 'publishing' => 'orange', default => 'danger' } ?>" style="font-size:11px"><?= e($post['publish_status']) ?></span>
                             <?php endif; ?>
-                            <?php if ($post['publish_status'] === 'failed' && $post['publish_error']): ?>
+                            <?php if ($post['publish_error']): ?>
                                 <div class="belive-muted" style="font-size:11px" title="<?= e($post['publish_error']) ?>"><?= e(mb_substr($post['publish_error'], 0, 60)) ?><?= mb_strlen($post['publish_error']) > 60 ? '…' : '' ?></div>
                             <?php endif; ?>
                         </td>

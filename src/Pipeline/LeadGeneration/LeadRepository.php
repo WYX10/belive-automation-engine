@@ -17,7 +17,7 @@ final class LeadRepository
     {
         $sql = 'SELECT l.*,
                        (SELECT COUNT(*) FROM ai_interactions i
-                         WHERE i.lead_id = l.id AND i.direction IN ("inbound","outbound")) AS message_count,
+                         WHERE i.lead_id = l.id AND i.direction IN (\'inbound\',\'outbound\')) AS message_count,
                        (SELECT COUNT(*) FROM bookings b WHERE b.lead_id = l.id) AS booking_count
                 FROM leads l WHERE 1=1';
         $params = [];

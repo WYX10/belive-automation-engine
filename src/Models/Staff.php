@@ -74,13 +74,11 @@ final class Staff extends BaseModel
             throw new InvalidArgumentException('Unknown staff member.');
         }
 
-        Database::run(
+        return Database::insert(
             'INSERT INTO staff_shifts (staff_id, weekday, starts_at, ends_at) VALUES (?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE ends_at = VALUES(ends_at)',
+             ON DUPLICATE KEY UPDATE ends_at = VALUES(ends_at), id = LAST_INSERT_ID(id)',
             [$staffId, $weekday, $start, $end]
         );
-
-        return (int) Database::pdo()->lastInsertId();
     }
 
     public static function removeShift(int $shiftId): bool
@@ -168,7 +166,7 @@ final class Staff extends BaseModel
         $exclude = $excludeBookingId !== null ? ' AND b.id <> ' . $excludeBookingId : '';
 
         return Database::run(
-            "SELECT s.*,
+            "SELECT duty.* FROM (SELECT s.*,
                     (SELECT COUNT(*) FROM bookings b
                       WHERE b.staff_id = s.id AND b.status IN ('pending','confirmed')
                         AND b.viewing_datetime BETWEEN ? AND ? $exclude) AS booked_today
@@ -191,8 +189,9 @@ final class Staff extends BaseModel
                       $exclude
                )
              GROUP BY s.id
-             HAVING booked_today < s.max_daily_viewings
-             ORDER BY booked_today ASC, s.id ASC",
+             ) duty
+             WHERE duty.booked_today < duty.max_daily_viewings
+             ORDER BY duty.booked_today ASC, duty.id ASC",
             [
                 $dayStart, $dayEnd,
                 (int) date('w', $start),

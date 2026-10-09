@@ -82,7 +82,14 @@ final class Scheduler
             return false;
         }
 
-        $command = escapeshellarg($php) . ' ' . escapeshellarg($path);
+        $command = escapeshellarg($php);
+        // A user-space installation or -c launch has no global php.ini.
+        // Preserve the running app's extensions in detached CLI jobs.
+        $ini = php_ini_loaded_file();
+        if ($ini !== false && is_file($ini)) {
+            $command .= ' -c ' . escapeshellarg($ini);
+        }
+        $command .= ' ' . escapeshellarg($path);
         foreach ($args as $arg) {
             $command .= ' ' . escapeshellarg((string) $arg);
         }

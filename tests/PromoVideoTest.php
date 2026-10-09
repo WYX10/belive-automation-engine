@@ -18,6 +18,7 @@ declare(strict_types=1);
 
 use App\AI\Skills\CreateSkill;
 use App\Content\MascotLibrary;
+use App\Content\MascotNarrator;
 use App\Content\PhotoPostDrafter;
 use App\Content\PromoVideoDrafter;
 use App\Content\RoomVideoComposer;
@@ -118,6 +119,7 @@ check('the same scene always picks the same pose',
     MascotLibrary::forScene(2, 'A quiet corner unit') === MascotLibrary::forScene(2, 'A quiet corner unit'));
 
 // ---- branding a photo post --------------------------------------------------
+$photoOriginalHash = hash_file('sha256', APP_ROOT . '/public/assets/img/rooms/riamas-master-ensuite-1.jpg');
 $photoDraft = PhotoPostDrafter::draft($videoRoom, 'facebook', 'Zero deposit push.');
 $brandedPost = Database::run('SELECT * FROM content_posts WHERE id = ?', [$photoDraft['post_id']])->fetch();
 
@@ -132,10 +134,26 @@ check('the branded copy is a real image of the same shape as the original', (sta
 })());
 check('the owner\'s original photography is left exactly as uploaded',
     Room::photoUrls($videoRoomId)[0] === '/assets/img/rooms/riamas-master-ensuite-1.jpg'
-    && is_file(APP_ROOT . '/public/assets/img/rooms/riamas-master-ensuite-1.jpg'));
+    && hash_file('sha256', APP_ROOT . '/public/assets/img/rooms/riamas-master-ensuite-1.jpg') === $photoOriginalHash);
 check('the photo caption carries the campaign hashtag too',
     str_contains((string) $brandedPost['caption'], CONTENT_REQUIRED_HASHTAG), (string) $brandedPost['caption']);
-@unlink(APP_ROOT . '/public' . $brandedPost['image_url']);
+$photoCreative = json_decode((string) $brandedPost['creative_meta'], true);
+check('campaign photos include measured image correction and integrated host placement',
+    ($photoCreative['style'] ?? '') === 'room_story' && isset($photoCreative['enhancement']['brightness'])
+    && in_array($photoCreative['placement'] ?? '', ['left', 'right'], true));
+check('the corrected campaign copy also changes room pixels clear of the mascot and typography', (static function () use ($brandedPost): bool {
+    $original = imagecreatefromjpeg(APP_ROOT . '/public/assets/img/rooms/riamas-master-ensuite-1.jpg');
+    $result = imagecreatefromjpeg(APP_ROOT . '/public' . $brandedPost['image_url']);
+    $x = (int) (imagesx($original) * 0.5);
+    $y = (int) (imagesy($original) * 0.4);
+    $changed = imagecolorat($original, $x, $y) !== imagecolorat($result, $x, $y);
+    imagedestroy($original);
+    imagedestroy($result);
+    return $changed;
+})());
+if (str_starts_with((string) $brandedPost['image_url'], '/assets/img/uploads/branded/')) {
+    @unlink(APP_ROOT . '/public' . $brandedPost['image_url']);
+}
 
 // A room with no photography has nothing to brand, and that is not a failure.
 check('a photoless room still drafts a caption post', (static function () use ($videoProperty): bool {
@@ -164,6 +182,17 @@ if (RoomVideoComposer::isAvailable()) {
         $post['image_url'] === '/assets/img/rooms/riamas-master-ensuite-1.jpg', (string) $post['image_url']);
 
     $scenes = json_decode((string) $post['video_script'], true);
+    $videoCreative = json_decode((string) $post['creative_meta'], true);
+    check('the rendered video records an animated mascot guided tour', ($videoCreative['style'] ?? '') === 'mascot_guided_tour' && !empty($videoCreative['animated']));
+    check('every tour scene stores the host narration and camera direction', count(array_filter($scenes, static fn (array $s): bool => !empty($s['narration']) && !empty($s['presenter_action']) && !empty($s['camera']))) === count($scenes));
+    if (MascotNarrator::isAvailable()) {
+        exec(escapeshellarg((string) RoomVideoComposer::binary()) . ' -hide_banner -i ' . escapeshellarg($renderedFile)
+            . ' -vn -af volumedetect -f null - 2>&1', $volumeOutput, $volumeCode);
+        preg_match('/max_volume:\s*(-?[\d.]+) dB/', implode(' ', $volumeOutput), $volumeMatch);
+        check('the mascot introduction contains audible speech rather than a silent audio bed',
+            !empty($videoCreative['narrated']) && $volumeCode === 0 && isset($volumeMatch[1]) && (float) $volumeMatch[1] > -40.0,
+            implode(' ', $volumeMatch));
+    }
     check('the shot list is stored with the post so the studio can show it', is_array($scenes) && $scenes !== []);
     check('the studio, not the model, guarantees the closing WhatsApp card',
         !empty($scenes[count($scenes) - 1]['cta'])

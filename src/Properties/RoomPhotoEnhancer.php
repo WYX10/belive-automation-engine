@@ -134,10 +134,9 @@ final class RoomPhotoEnhancer
         }
 
         try {
-            $measurement = self::measure($image);
-            $judgement = self::judge($image, $measurement, $brief, (int) $row['room_id']);
-
-            $enhanced = self::apply($image, $judgement['recipe']);
+            $judgement = self::polish($image, $brief, (int) $row['room_id']);
+            $measurement = $judgement['measurement'];
+            $enhanced = $judgement['image'];
             try {
                 $newPath = self::write($enhanced, (int) $row['room_id'], $sourcePath);
             } finally {
@@ -205,6 +204,30 @@ final class RoomPhotoEnhancer
             'model'         => $judgement['model'],
             'grounded'      => $judgement['grounded'],
         ];
+    }
+
+    /**
+     * Correct a working copy for a campaign without changing room_images.
+     * The caller owns both the input and the returned image (which may be the
+     * same GD object). This shares the listing's image analysis and guardrails.
+     */
+    public static function polish(GdImage $image, ?string $brief, int $roomId): array
+    {
+        $working = self::fitWithin($image, self::MAX_EDGE);
+        try {
+            $measurement = self::measure($working);
+            $judgement = self::judge($working, $measurement, $brief, $roomId);
+            $enhanced = self::apply($working, $judgement['recipe']);
+            if ($enhanced !== $working && $working !== $image) {
+                imagedestroy($working);
+            }
+            return $judgement + ['measurement' => $measurement, 'image' => $enhanced];
+        } catch (\Throwable $e) {
+            if ($working !== $image) {
+                imagedestroy($working);
+            }
+            throw $e;
+        }
     }
 
     /** Put the owner's untouched upload back on the listing. */

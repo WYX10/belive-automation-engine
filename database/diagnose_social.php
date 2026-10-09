@@ -23,12 +23,7 @@ Dotenv\Dotenv::createImmutable(APP_ROOT)->safeLoad();
 require APP_ROOT . '/config/constants.php';
 
 $cfg = require APP_ROOT . '/config/database.php';
-$pdo = new PDO(
-    sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s', $cfg['host'], $cfg['port'], $cfg['name'], $cfg['charset']),
-    $cfg['user'],
-    $cfg['pass'],
-    $cfg['options']
-);
+$pdo = \App\Core\Database::pdo();
 
 $line = static fn (string $s = '') => print($s . "\n");
 $ok = static fn (bool $good) => $good ? '  OK  ' : ' FAIL ';

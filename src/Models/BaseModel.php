@@ -59,9 +59,7 @@ abstract class BaseModel
         $cols = array_keys($data);
         $sql = 'INSERT INTO `' . static::TABLE . '` (`' . implode('`, `', $cols) . '`)'
              . ' VALUES (' . rtrim(str_repeat('?, ', count($cols)), ', ') . ')';
-        Database::run($sql, array_values($data));
-
-        return (int) Database::pdo()->lastInsertId();
+        return Database::insert($sql, array_values($data));
     }
 
     public static function update(int $id, array $data): bool

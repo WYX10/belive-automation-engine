@@ -289,7 +289,7 @@ final class ElectricBill extends BaseModel
                       SELECT MAX(b2.period_start) FROM electric_bills b2 WHERE b2.meter_id = m.id
                   )
              WHERE r.owner_name = ?
-             ORDER BY house_name IS NULL, house_name, r.room_code, r.name',
+             ORDER BY u.name IS NULL, u.name, r.room_code, r.name',
             [$ownerName]
         )->fetchAll();
     }
