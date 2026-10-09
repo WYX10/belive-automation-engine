@@ -139,8 +139,9 @@ if (RoomVideoComposer::isAvailable()) {
     $recoverJob = $insertJob();
     Database::run("UPDATE ai_video_jobs SET status = 'failed', error_code = 'generation' WHERE id = ?", [$recoverJob]);
     $work = APP_ROOT . '/storage/ai_video/job_' . $recoverJob;
-    mkdir($work, 0700);
-    mkdir($work . '/download', 0700);
+    if (!is_dir($work)) mkdir($work, 0700);
+    if (!is_dir($work . '/download')) mkdir($work . '/download', 0700);
+    @unlink($work . '/result.json');
     copy(APP_ROOT . '/public/assets/img/rooms/videos/tour-master.mp4', $work . '/download/generated.mp4');
     file_put_contents($work . '/failure.json', json_encode(['error' => 'generation', 'stage' => 'database', 'exception_type' => 'PDOException']));
     chmod($work . '/failure.json', 0600);
@@ -162,7 +163,7 @@ if (RoomVideoComposer::isAvailable()) {
     $manifestJob = $insertJob();
     Database::run("UPDATE ai_video_jobs SET status = 'failed', error_code = 'database' WHERE id = ?", [$manifestJob]);
     $manifestWork = APP_ROOT . '/storage/ai_video/job_' . $manifestJob;
-    mkdir($manifestWork, 0700);
+    if (!is_dir($manifestWork)) mkdir($manifestWork, 0700);
     copy($work . '/download/generated.mp4', $manifestWork . '/generated.mp4');
     copy($work . '/failure.json', $manifestWork . '/failure.json');
     $longModel = str_repeat('video-model-', 8);
@@ -172,6 +173,41 @@ if (RoomVideoComposer::isAvailable()) {
     $manifestMeta = json_decode($manifestDraft['creative_meta'], true);
     check('saved-result recovery bounds display labels and preserves full model provenance', mb_strlen($manifestDraft['generated_by_model']) === 60
         && $manifestMeta['video_model'] === $longModel && $manifestMeta['script_model'] === $script['model']);
+    $stalledJob = $insertJob();
+    Database::run("UPDATE ai_video_jobs SET status = 'running' WHERE id = ?", [$stalledJob]);
+    $stalledWork = APP_ROOT . '/storage/ai_video/job_' . $stalledJob;
+    if (!is_dir($stalledWork)) mkdir($stalledWork, 0700);
+    @unlink($stalledWork . '/result.json');
+    copy($work . '/download/generated.mp4', $stalledWork . '/generated.mp4');
+    copy($work . '/failure.json', $stalledWork . '/failure.json');
+    $runningRefused = false;
+    try { AiVideoJobs::recover($stalledJob, 'multimodalart/wan-2-2-first-last-frame'); } catch (RuntimeException) { $runningRefused = true; }
+    check('normal recovery never changes a running job', $runningRefused
+        && Database::run('SELECT status FROM ai_video_jobs WHERE id = ?', [$stalledJob])->fetchColumn() === 'running');
+    $lockCfg = require APP_ROOT . '/config/database.php';
+    $lockCfg['name'] = (string) Database::run('SELECT DATABASE()')->fetchColumn();
+    $otherWorker = Database::connect($lockCfg);
+    $held = Database::acquireLock('belive_ai_video_generation', 0, $otherWorker);
+    $activeWorkerRefused = false;
+    try { AiVideoJobs::recover($stalledJob, 'multimodalart/wan-2-2-first-last-frame', true); }
+    catch (RuntimeException $e) { $activeWorkerRefused = str_contains($e->getMessage(), 'busy'); }
+    finally { if ($held) Database::releaseLock('belive_ai_video_generation', $otherWorker); }
+    check('stalled recovery refuses an active worker and preserves its job state', $held && $activeWorkerRefused
+        && Database::run('SELECT status FROM ai_video_jobs WHERE id = ?', [$stalledJob])->fetchColumn() === 'running');
+    $stalledCountBefore = (int) Database::run('SELECT COUNT(*) FROM content_posts')->fetchColumn();
+    $stalledPost = AiVideoJobs::recover($stalledJob, 'multimodalart/wan-2-2-first-last-frame', true);
+    $stalledDraft = Database::run('SELECT * FROM content_posts WHERE id = ?', [$stalledPost])->fetch();
+    check('explicit stalled recovery uses cached footage to complete one draft', $stalledDraft['status'] === 'draft'
+        && Database::run('SELECT status FROM ai_video_jobs WHERE id = ?', [$stalledJob])->fetchColumn() === 'completed');
+    check('repeating stalled recovery creates no duplicate post', AiVideoJobs::recover($stalledJob, null, true) === $stalledPost
+        && (int) Database::run('SELECT COUNT(*) FROM content_posts')->fetchColumn() === $stalledCountBefore + 1);
+    Database::run("UPDATE ai_video_jobs SET status = 'running' WHERE id = ?", [$runtimeJob]);
+    $runningProviderRefused = false;
+    try { AiVideoJobs::recover($runtimeJob, 'multimodalart/wan-2-2-first-last-frame', true); } catch (RuntimeException) { $runningProviderRefused = true; }
+    check('stalled recovery requires local-failure evidence and never resets a provider failure', $runningProviderRefused
+        && Database::run('SELECT status FROM ai_video_jobs WHERE id = ?', [$runtimeJob])->fetchColumn() === 'running');
+    Database::run("UPDATE ai_video_jobs SET status = 'failed' WHERE id = ?", [$runtimeJob]);
+    @unlink(APP_ROOT . '/public' . $stalledDraft['video_url']);
     @unlink(APP_ROOT . '/public' . $recovered['video_url']);
     @unlink(APP_ROOT . '/public' . $manifestDraft['video_url']);
 }

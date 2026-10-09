@@ -152,7 +152,7 @@ final class AiVideoJobs
     }
 
     /** Recover only a completed provider result; this path never invokes a provider or text API. */
-    public static function recover(int $jobId, ?string $legacySpace = null): int
+    public static function recover(int $jobId, ?string $legacySpace = null, bool $recoverStalled = false): int
     {
         $pdo = Database::pdo();
         if (!Database::acquireLock('belive_ai_video_generation', 0, $pdo)) throw new RuntimeException('Video worker is busy. Try recovery after it finishes.');
@@ -163,7 +163,8 @@ final class AiVideoJobs
             if (!$job) throw new RuntimeException('Video job was not found.');
             if ($job['status'] === 'completed' && $job['post_id']) return (int) $job['post_id'];
             $diagnostics = self::diagnostics($jobId);
-            if ($job['status'] !== 'failed' || !in_array($diagnostics['details']['stage'] ?? '', ['render', 'database'], true)) {
+            $eligibleStatus = $job['status'] === 'failed' || ($recoverStalled && $job['status'] === 'running');
+            if (!$eligibleStatus || !in_array($diagnostics['details']['stage'] ?? '', ['render', 'database'], true)) {
                 throw new RuntimeException('Recovery requires a failed local render or database save after generation completed.');
             }
             if (!RoomVideoComposer::isAvailable()) throw new RuntimeException('Install the local media tools before recovery.');
@@ -186,6 +187,13 @@ final class AiVideoJobs
                 }
                 if (count($clips) !== 1) throw new RuntimeException('Recovery requires exactly one cached MP4. Keep the cache and contact IT.');
                 $result = ['video' => $clips[0], 'model' => $models[$legacySpace], 'space' => $legacySpace];
+            }
+            // The generation lock is held: an active worker cannot be interrupted.
+            // Only explicit stalled recovery with saved local-failure evidence reaches this reset.
+            if ($job['status'] === 'running') {
+                if (Database::run("UPDATE ai_video_jobs SET status = 'failed' WHERE id = ? AND status = 'running'", [$jobId])->rowCount() !== 1) {
+                    throw new RuntimeException('Video job changed during recovery.');
+                }
             }
             if (Database::run("UPDATE ai_video_jobs SET status = 'running', error_code = NULL WHERE id = ? AND status = 'failed'", [$jobId])->rowCount() !== 1) {
                 throw new RuntimeException('Video job changed during recovery.');

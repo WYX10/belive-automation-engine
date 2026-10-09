@@ -260,3 +260,15 @@ installed; a Python reinstall is unnecessary for this recovery command.
 Diagnostics now include an optional SQLSTATE for database errors, without raw
 SQL or exception messages. If recovery fails, run the read-only diagnostics
 command for the same job and keep the cached clip for IT investigation.
+
+If the cached clip and saved `render`/`database` failure remain but the job is
+marked `running` after its worker stopped, use explicit stalled recovery:
+
+```bash
+php database/ai_video_recover.php 5 --stalled --legacy-space multimodalart/wan-2-2-first-last-frame
+```
+
+This first acquires the same session lock as the video worker and refuses if
+another worker is active. It requires the saved local-failure evidence and
+cached result before resetting that job's status under the lock. It never
+queues a provider retry. A `running` job without those diagnostics is refused.
