@@ -323,6 +323,21 @@ PROMPT;
             $ms = (int) round((microtime(true) - $started) * 1000);
         }
 
+        return self::finishVideoPromo($room, $platform, $metrics, $whatsappLink, $brief, $result, $ms,
+            $rateLimited ? 'rate_limit' : '');
+    }
+
+    /** Build verified copy locally so hosted video never waits for a text API. */
+    public static function inventoryVideoPromo(array $room, string $platform, ?string $brief = null): array
+    {
+        return self::finishVideoPromo($room, $platform, self::roomMetrics($room, $platform),
+            self::captionWhatsappLink($room, $platform), trim($brief ?? ''),
+            ['text' => '', 'model' => 'inventory-template'], 0, 'inventory');
+    }
+
+    private static function finishVideoPromo(array $room, string $platform, array $metrics, string $whatsappLink,
+        string $brief, array $result, int $ms, string $templateReason): array
+    {
         $parsed = self::parseVideoScript($result['text']);
         $scenes = $parsed['scenes'] !== [] ? $parsed['scenes'] : self::fallbackScenes($metrics);
         foreach ($scenes as $index => &$scene) {
@@ -333,8 +348,11 @@ PROMPT;
             $scene['camera'] ??= $index === 0 ? 'reveal' : ($index % 2 ? 'pan_right' : 'pan_left');
         }
         unset($scene);
-        $model = $rateLimited ? 'inventory-template (text model rate-limited)'
-            : ($parsed['scenes'] !== [] ? $result['model'] : $result['model'] . ' (fallback script)');
+        $model = match ($templateReason) {
+            'rate_limit' => 'inventory-template (text model rate-limited)',
+            'inventory' => 'inventory-template (no text API)',
+            default => $parsed['scenes'] !== [] ? $result['model'] : $result['model'] . ' (fallback script)',
+        };
 
         $caption = self::withCampaignHashtag(self::withWhatsappLink(
             $parsed['caption'] !== '' ? $parsed['caption'] : self::fallbackCaption($metrics),
@@ -354,9 +372,12 @@ PROMPT;
                 array_sum(array_column($scenes, 'seconds')),
                 $platform,
                 (int) $room['id'],
-                $brief !== '' ? ($rateLimited ? ' Custom script brief was not applied to the inventory template.' : ' Admin brief applied.') : '',
-                $rateLimited ? ' Text provider rate-limited (429); inventory template used without retry or provider switch.'
-                    : ($parsed['scenes'] === [] ? ' Model returned no usable scenes — metrics fallback used.' : '')
+                $brief !== '' ? ($templateReason !== '' ? ' Custom script brief was not applied to the inventory template.' : ' Admin brief applied.') : '',
+                match ($templateReason) {
+                    'rate_limit' => ' Text provider rate-limited (429); inventory template used without retry or provider switch.',
+                    'inventory' => ' Inventory template selected for hosted video; no text API requested.',
+                    default => $parsed['scenes'] === [] ? ' Model returned no usable scenes — metrics fallback used.' : '',
+                }
             ),
             'response_ms' => $ms,
         ]);

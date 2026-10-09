@@ -306,6 +306,7 @@ admin_header('Content', 'content');
         <div class="belive-muted" style="flex:1 1 100%; font-size:12.5px">
             <?php if ($aiVideoReady): ?>
                 ✨ Wan generates a moving mascot introduction from the room photo. Generation runs in the background and depends on the free GPU allowance.
+                Wan videos use a script from saved room details; edit custom caption wording in the draft.
                 Review the room layout, mascot and claims before approving the draft.<br>
             <?php else: ?>
                 ✨ Generative AI video needs the hosted Wan client enabled by IT. The animated room tour below uses local rendering.<br>

@@ -83,7 +83,7 @@ final class RoomVideoComposer
      * @param array<string, mixed> $room
      * @param array<int, array{headline:string, sub:string, seconds:float, cta?:bool}> $scenes
      */
-    public static function render(array $room, array $scenes, ?array &$details = null, ?string $brief = null, array $generatedShots = []): string
+    public static function render(array $room, array $scenes, ?array &$details = null, ?string $brief = null, array $generatedShots = [], bool $usePhotoModel = true): string
     {
         $ffmpeg = self::binary()
             ?? throw new RuntimeException('ffmpeg is not installed (or FFMPEG_BIN in .env points nowhere), so a promo video cannot be rendered on this machine.');
@@ -118,7 +118,7 @@ final class RoomVideoComposer
                             throw new RuntimeException('The room photo could not be decoded.');
                         }
                         try {
-                            $result = RoomPhotoEnhancer::polish($photo, $brief, $roomId);
+                            $result = RoomPhotoEnhancer::polish($photo, $brief, $roomId, $usePhotoModel);
                             $copy = $workDir . '/room_' . count($polished) . '.jpg';
                             imagejpeg($result['image'], $copy, 92);
                             if ($result['image'] !== $photo) {

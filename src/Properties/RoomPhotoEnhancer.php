@@ -211,12 +211,18 @@ final class RoomPhotoEnhancer
      * The caller owns both the input and the returned image (which may be the
      * same GD object). This shares the listing's image analysis and guardrails.
      */
-    public static function polish(GdImage $image, ?string $brief, int $roomId): array
+    public static function polish(GdImage $image, ?string $brief, int $roomId, bool $useModel = true): array
     {
         $working = self::fitWithin($image, self::MAX_EDGE);
         try {
             $measurement = self::measure($working);
-            $judgement = self::judge($working, $measurement, $brief, $roomId);
+            $judgement = $useModel ? self::judge($working, $measurement, $brief, $roomId) : [
+                'recipe' => self::measuredRecipe($measurement),
+                'verdict' => self::measuredVerdict($measurement),
+                'issues' => self::measuredIssues($measurement),
+                'model' => 'histogram (no model)',
+                'grounded' => false,
+            ];
             $enhanced = self::apply($working, $judgement['recipe']);
             if ($enhanced !== $working && $working !== $image) {
                 imagedestroy($working);

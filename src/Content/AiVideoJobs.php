@@ -40,7 +40,7 @@ final class AiVideoJobs
         if (!in_array($platform, CONTENT_PLATFORMS, true)) {
             throw new RuntimeException('Unsupported video platform.');
         }
-        $script = CreateSkill::videoPromo($room, $platform, $brief, 1);
+        $script = CreateSkill::inventoryVideoPromo($room, $platform, $brief);
         $frame = self::inputFrame($room, $brief);
         try {
             $id = Database::insert(
@@ -125,7 +125,7 @@ final class AiVideoJobs
             }
             $meta = null;
             $url = RoomVideoComposer::render($room, $scenes, $meta, null,
-                [['kind' => 'clip', 'file' => $clip, 'generated_presenter' => true]]);
+                [['kind' => 'clip', 'file' => $clip, 'generated_presenter' => true]], false);
             $renderedScenes = $meta['scenes'];
             unset($meta['scenes']);
             $meta = array_merge($meta, ['style' => 'generative_mascot_tour', 'ai_generated_footage' => true,
@@ -216,7 +216,7 @@ final class AiVideoJobs
                         throw new RuntimeException('input');
                     }
                 }
-                $polish = \App\Properties\RoomPhotoEnhancer::polish($resized ?? $original, $brief, (int) $room['id']);
+                $polish = \App\Properties\RoomPhotoEnhancer::polish($resized ?? $original, $brief, (int) $room['id'], false);
                 $image = $polish['image'];
                 $height = imagesy($image);
                 MascotLibrary::place($image, 'waving', (int) ($height * 0.35), (int) (imagesx($image) * 0.18), (int) ($height * 0.9));
