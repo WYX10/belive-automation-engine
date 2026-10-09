@@ -199,7 +199,7 @@ review. Do not treat offline fixture footage as a Wan-generated sample.
 
 Connection/schema checks submit no GPU work. They do not prove that a hosted
 model can generate video. Runtime failures now retain fixed error categories,
-the failure stage, exception class and optional HTTP status in a private
+the failure stage, exception class, optional HTTP status and database SQLSTATE in a private
 `storage/ai_video/job_<id>/failure.json`. Messages, prompts, image paths and
 tokens are omitted. The studio distinguishes authentication, hosted runtime,
 GPU capacity, TLS, quota and availability errors.
@@ -222,3 +222,41 @@ Replace `4` with the new failed request ID. Older failures recorded before this
 update have no detailed file; their original provider exception cannot be
 recovered. Do not reset and retry them automatically. Review `stage` and the
 Space's status before submitting another generation.
+
+## Recovering a generated clip after a draft-save failure
+
+A failure with `stage: database` occurs after the provider returned a clip and
+local rendering completed. An earlier worker combined the script and video
+model names into a 69-character label, exceeding the existing 60-character
+`content_posts.generated_by_model` column. The corrected worker stores the
+video label within that limit and keeps both full model names in
+`creative_meta`. No schema migration or re-import is needed for this fix.
+
+Keep `storage/ai_video/job_<id>` intact. New jobs save a private result manifest
+before rendering. After deploying the corrected code, recover locally in Azure
+SSH without submitting another GPU job:
+
+```bash
+cd /home/site/wwwroot
+php database/ai_video_recover.php 5
+```
+
+Older jobs have no result manifest. If the original generation used the
+Wan2.2 first/last-frame Space, explicitly provide that attribution:
+
+```bash
+php database/ai_video_recover.php 5 --legacy-space multimodalart/wan-2-2-first-last-frame
+```
+
+Replace `5` with the actual failed job ID. The legacy command requires exactly
+one cached MP4 within that job's private directory; it refuses missing or
+ambiguous clips. Recovery accepts only failed local render/database jobs,
+uses the worker lock, creates a draft atomically, and returns the existing post
+if already completed. It never invokes the provider, text API or automatic
+publishing. Inspect the draft's mascot motion, room accuracy and disclosure
+before approving it. Local FFmpeg, fonts and PHP image tools must remain
+installed; a Python reinstall is unnecessary for this recovery command.
+
+Diagnostics now include an optional SQLSTATE for database errors, without raw
+SQL or exception messages. If recovery fails, run the read-only diagnostics
+command for the same job and keep the cached clip for IT investigation.

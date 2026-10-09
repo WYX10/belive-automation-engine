@@ -98,19 +98,80 @@ if (RoomVideoComposer::isAvailable()) {
         // A local source clip tests the render boundary, not the model's visual quality.
         $source = APP_ROOT . '/public/assets/img/rooms/videos/tour-master.mp4';
         copy($source, $file);
-        return ['ok' => true, 'video' => $file, 'model' => 'test-fixture', 'space' => 'offline-test'];
+        return ['ok' => true, 'video' => $file, 'model' => 'Wan2.2-I2V-A14B (first/last-frame)', 'space' => 'offline-test'];
     });
     $done = Database::run('SELECT * FROM ai_video_jobs WHERE id = ?', [$successJob])->fetch();
     $post = $done['post_id'] ? Database::run('SELECT * FROM content_posts WHERE id = ?', [$done['post_id']])->fetch() : null;
     $meta = $post ? json_decode($post['creative_meta'], true) : [];
     check('AI generation completion atomically creates a video draft', $result && $done['status'] === 'completed' && $post['status'] === 'draft', json_encode($done));
-    check('generated footage retains its model attribution and review label', !empty($meta['ai_generated_footage']) && !empty($meta['review_required']) && ($meta['video_model'] ?? '') === 'test-fixture');
+    check('generated footage retains its model attribution and review label', !empty($meta['ai_generated_footage']) && !empty($meta['review_required']) && ($meta['video_model'] ?? '') === 'Wan2.2-I2V-A14B (first/last-frame)');
     check('the generated draft includes an AI disclosure', $post && str_contains($post['caption'], 'AI-generated'));
     check('rendering the Wan reel skips additional photo model calls', (int) Database::run("SELECT COUNT(*) FROM ai_interactions WHERE message_kind = 'photo_touchup'")->fetchColumn() === $photoModelCalls);
-    check('Wan draft attributes its local script separately from generated footage', $post && str_contains($post['generated_by_model'], 'inventory-template (no text API) + test-fixture'));
+    check('Wan draft attributes its local script separately from generated footage', $post && $post['generated_by_model'] === 'Wan2.2-I2V-A14B (first/last-frame)' && ($meta['script_model'] ?? '') === 'inventory-template (no text API)');
     $duplicates = 0;
     AiVideoJobs::processNext(static function () use (&$duplicates) { $duplicates++; return ['ok' => true]; });
     check('completed generation is not submitted twice', $duplicates === 0);
     if ($post) @unlink(APP_ROOT . '/public' . $post['video_url']);
     @unlink(APP_ROOT . '/storage/ai_video/job_' . $successJob . '/generated.mp4');
+}
+
+// The production model label previously exceeded content_posts.generated_by_model's limit.
+if (Database::pdo()->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
+    $labelSqlstate = '';
+    $pdo = Database::pdo();
+    $pdo->beginTransaction();
+    try {
+        $pdo->exec('CREATE TEMPORARY TABLE ai_video_label_limit (label VARCHAR(60))');
+        $statement = $pdo->prepare('INSERT INTO ai_video_label_limit (label) VALUES (?)');
+        $statement->execute(['inventory-template (no text API) + Wan2.2-I2V-A14B (first/last-frame)']);
+    } catch (PDOException $e) { $labelSqlstate = (string) $e->getCode(); }
+    finally { $pdo->rollBack(); }
+    check('the old production attribution reproduces PostgreSQL length error 22001', $labelSqlstate === '22001');
+}
+check('diagnostics expose a SQLSTATE without exposing a raw database message', AiVideoJobs::safeFailureDetails([
+    'error' => 'database', 'stage' => 'database', 'exception_type' => 'PDOException', 'sqlstate' => '22001',
+    'message' => 'private query and credentials',
+]) === ['error' => 'database', 'stage' => 'database', 'exception_type' => 'PDOException', 'sqlstate' => '22001']);
+$refusedProviderRecovery = false;
+try { AiVideoJobs::recover($runtimeJob); } catch (RuntimeException) { $refusedProviderRecovery = true; }
+check('recovery refuses failed provider jobs instead of submitting them again', $refusedProviderRecovery);
+if (RoomVideoComposer::isAvailable()) {
+    $recoverJob = $insertJob();
+    Database::run("UPDATE ai_video_jobs SET status = 'failed', error_code = 'generation' WHERE id = ?", [$recoverJob]);
+    $work = APP_ROOT . '/storage/ai_video/job_' . $recoverJob;
+    mkdir($work, 0700);
+    mkdir($work . '/download', 0700);
+    copy(APP_ROOT . '/public/assets/img/rooms/videos/tour-master.mp4', $work . '/download/generated.mp4');
+    file_put_contents($work . '/failure.json', json_encode(['error' => 'generation', 'stage' => 'database', 'exception_type' => 'PDOException']));
+    chmod($work . '/failure.json', 0600);
+    $missingAttributionRefused = false;
+    try { AiVideoJobs::recover($recoverJob); } catch (RuntimeException) { $missingAttributionRefused = true; }
+    check('legacy recovery requires explicit original Space attribution', $missingAttributionRefused
+        && Database::run('SELECT status FROM ai_video_jobs WHERE id = ?', [$recoverJob])->fetchColumn() === 'failed');
+    $countBefore = (int) Database::run('SELECT COUNT(*) FROM content_posts')->fetchColumn();
+    // Offline fixture simulates the production cache; no provider client is called by recovery.
+    $recoveredPost = AiVideoJobs::recover($recoverJob, 'multimodalart/wan-2-2-first-last-frame');
+    $recovered = Database::run('SELECT * FROM content_posts WHERE id = ?', [$recoveredPost])->fetch();
+    check('legacy recovery saves the cached clip as a draft without a configured provider', $recovered['status'] === 'draft'
+        && $recovered['generated_by_model'] === 'Wan2.2-I2V-A14B (first/last-frame)');
+    check('local recovery preserves the cached clip and a private result manifest', is_file($work . '/download/generated.mp4')
+        && is_file($work . '/result.json') && (fileperms($work . '/result.json') & 0777) === 0600);
+    check('repeated recovery returns the same post and creates no duplicate draft', AiVideoJobs::recover($recoverJob) === $recoveredPost
+        && (int) Database::run('SELECT COUNT(*) FROM content_posts')->fetchColumn() === $countBefore + 1);
+    // Test manifest-based recovery, including a future model name longer than the database label.
+    $manifestJob = $insertJob();
+    Database::run("UPDATE ai_video_jobs SET status = 'failed', error_code = 'database' WHERE id = ?", [$manifestJob]);
+    $manifestWork = APP_ROOT . '/storage/ai_video/job_' . $manifestJob;
+    mkdir($manifestWork, 0700);
+    copy($work . '/download/generated.mp4', $manifestWork . '/generated.mp4');
+    copy($work . '/failure.json', $manifestWork . '/failure.json');
+    $longModel = str_repeat('video-model-', 8);
+    file_put_contents($manifestWork . '/result.json', json_encode(['video' => $manifestWork . '/generated.mp4', 'model' => $longModel, 'space' => 'offline-test']));
+    $manifestPost = AiVideoJobs::recover($manifestJob);
+    $manifestDraft = Database::run('SELECT * FROM content_posts WHERE id = ?', [$manifestPost])->fetch();
+    $manifestMeta = json_decode($manifestDraft['creative_meta'], true);
+    check('saved-result recovery bounds display labels and preserves full model provenance', mb_strlen($manifestDraft['generated_by_model']) === 60
+        && $manifestMeta['video_model'] === $longModel && $manifestMeta['script_model'] === $script['model']);
+    @unlink(APP_ROOT . '/public' . $recovered['video_url']);
+    @unlink(APP_ROOT . '/public' . $manifestDraft['video_url']);
 }

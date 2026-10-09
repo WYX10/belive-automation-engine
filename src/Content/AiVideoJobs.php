@@ -14,7 +14,7 @@ use RuntimeException;
 final class AiVideoJobs
 {
     private const ERROR_CODES = ['quota', 'provider', 'provider_runtime', 'provider_unavailable', 'authentication',
-        'gpu_capacity', 'tls', 'paid_account', 'endpoint', 'arguments', 'output', 'input', 'timeout', 'space', 'generation'];
+        'gpu_capacity', 'tls', 'paid_account', 'endpoint', 'arguments', 'output', 'input', 'timeout', 'space', 'generation', 'database'];
 
     public static function safeFailureDetails(array $result): array
     {
@@ -23,6 +23,7 @@ final class AiVideoJobs
         if (in_array($result['stage'] ?? '', ['account', 'input', 'prepare', 'connect', 'schema', 'submit', 'result', 'output', 'render', 'database', 'provider'], true)) $details['stage'] = $result['stage'];
         if (is_string($result['exception_type'] ?? null) && preg_match('/^[A-Za-z][A-Za-z0-9_]{0,63}$/D', $result['exception_type'])) $details['exception_type'] = $result['exception_type'];
         if (is_int($result['http_status'] ?? null) && $result['http_status'] >= 100 && $result['http_status'] <= 599) $details['http_status'] = $result['http_status'];
+        if (is_string($result['sqlstate'] ?? null) && preg_match('/^[A-Z0-9]{5}$/D', $result['sqlstate'])) $details['sqlstate'] = $result['sqlstate'];
         return $details;
     }
 
@@ -138,60 +139,141 @@ final class AiVideoJobs
                 $failureDetails = self::safeFailureDetails($result);
                 throw new RuntimeException($result['error'] ?? 'provider');
             }
-            $stage = 'output';
-            $clip = realpath((string) ($result['video'] ?? ''));
-            if ($clip === false || !str_starts_with($clip, realpath($work) . DIRECTORY_SEPARATOR)
-                || strtolower(pathinfo($clip, PATHINFO_EXTENSION)) !== 'mp4' || filesize($clip) < 1024) {
-                throw new RuntimeException('output');
-            }
-            // A single short generated shot fits a limited free GPU allowance.
-            // The rest of the marketing reel uses verified original room media.
-            $scenes = array_merge(array_slice($payload['scenes'], 0, 2), [PromoVideoDrafter::endCard($room)]);
-            $scenes[0]['seconds'] = min(3.3, RoomVideoComposer::clipDuration($clip));
-            if ($scenes[0]['seconds'] < 2.5) {
-                throw new RuntimeException('output');
-            }
-            $meta = null;
-            $stage = 'render';
-            $url = RoomVideoComposer::render($room, $scenes, $meta, null,
-                [['kind' => 'clip', 'file' => $clip, 'generated_presenter' => true]], false);
-            $renderedScenes = $meta['scenes'];
-            unset($meta['scenes']);
-            $meta = array_merge($meta, ['style' => 'generative_mascot_tour', 'ai_generated_footage' => true,
-                'video_model' => $result['model'], 'video_provider' => 'huggingface_space',
-                'space' => $result['space'], 'generated_shots' => 1, 'review_required' => true]);
-            $stage = 'database';
-            $pdo->beginTransaction();
-            try {
-                $post = Database::insert(
-                    'INSERT INTO content_posts (platform, media_kind, room_id, caption, status, generated_by_model, generated_via, video_url, video_script, creative_meta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    [$job['platform'], 'video', $job['room_id'], $payload['caption'] . "\nAI-generated mascot animation; verify the room against its listing photos.",
-                        'draft', $payload['model'] . ' + ' . $result['model'], 'manual', $url,
-                        json_encode($renderedScenes, JSON_THROW_ON_ERROR), json_encode($meta, JSON_THROW_ON_ERROR)]
-                );
-                Database::run("UPDATE ai_video_jobs SET status = 'completed', post_id = ?, completed_at = UTC_TIMESTAMP() WHERE id = ? AND status = 'running'", [$post, $job['id']]);
-                $pdo->commit();
-            } catch (\Throwable $e) {
-                $pdo->rollBack();
-                @unlink(APP_ROOT . '/public' . $url);
-                throw $e;
-            }
+            self::finishDraft($job, $result, $work, $stage);
             return true;
         } catch (\Throwable $e) {
             if ($job) {
-                $code = in_array($e->getMessage(), self::ERROR_CODES, true) ? $e->getMessage() : 'generation';
-                if (isset($work) && is_dir($work)) {
-                    $details = $failureDetails ?: self::safeFailureDetails(['error' => $code, 'stage' => $stage,
-                        'exception_type' => (new \ReflectionClass($e))->getShortName()]);
-                    @file_put_contents($work . '/failure.json', json_encode($details, JSON_THROW_ON_ERROR));
-                    @chmod($work . '/failure.json', 0600);
-                }
-                Database::run("UPDATE ai_video_jobs SET status = 'failed', error_code = ?, completed_at = UTC_TIMESTAMP() WHERE id = ?", [$code, $job['id']]);
+                self::recordFailure($job, $work ?? null, $stage, $e, $failureDetails);
             }
             return false;
         } finally {
             Database::releaseLock('belive_ai_video_generation', $pdo);
         }
+    }
+
+    /** Recover only a completed provider result; this path never invokes a provider or text API. */
+    public static function recover(int $jobId, ?string $legacySpace = null): int
+    {
+        $pdo = Database::pdo();
+        if (!Database::acquireLock('belive_ai_video_generation', 0, $pdo)) throw new RuntimeException('Video worker is busy. Try recovery after it finishes.');
+        $claimed = false;
+        $stage = 'prepare';
+        try {
+            $job = Database::run('SELECT * FROM ai_video_jobs WHERE id = ?', [$jobId])->fetch();
+            if (!$job) throw new RuntimeException('Video job was not found.');
+            if ($job['status'] === 'completed' && $job['post_id']) return (int) $job['post_id'];
+            $diagnostics = self::diagnostics($jobId);
+            if ($job['status'] !== 'failed' || !in_array($diagnostics['details']['stage'] ?? '', ['render', 'database'], true)) {
+                throw new RuntimeException('Recovery requires a failed local render or database save after generation completed.');
+            }
+            if (!RoomVideoComposer::isAvailable()) throw new RuntimeException('Install the local media tools before recovery.');
+            $work = self::directory() . '/job_' . $jobId;
+            $result = is_file($work . '/result.json') ? json_decode((string) file_get_contents($work . '/result.json'), true) : null;
+            if (!is_array($result)) {
+                // Older workers kept the downloaded MP4 but did not write a result manifest.
+                // Require explicit attribution and exactly one cached clip; never guess or regenerate.
+                $models = [
+                    'multimodalart/wan-2-2-first-last-frame' => 'Wan2.2-I2V-A14B (first/last-frame)',
+                    'multimodalart/wan2-1-fast' => 'Wan2.1-I2V-14B-480P + CausVid LoRA',
+                ];
+                if (!isset($models[$legacySpace ?? '']) || !is_dir($work)) {
+                    throw new RuntimeException('No saved provider result. Supply the original supported Space with --legacy-space.');
+                }
+                $clips = [];
+                $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($work, \FilesystemIterator::SKIP_DOTS));
+                foreach ($files as $file) {
+                    if ($file->isFile() && strtolower($file->getExtension()) === 'mp4') $clips[] = $file->getPathname();
+                }
+                if (count($clips) !== 1) throw new RuntimeException('Recovery requires exactly one cached MP4. Keep the cache and contact IT.');
+                $result = ['video' => $clips[0], 'model' => $models[$legacySpace], 'space' => $legacySpace];
+            }
+            if (Database::run("UPDATE ai_video_jobs SET status = 'running', error_code = NULL WHERE id = ? AND status = 'failed'", [$jobId])->rowCount() !== 1) {
+                throw new RuntimeException('Video job changed during recovery.');
+            }
+            $claimed = true;
+            return self::finishDraft($job, $result, $work, $stage);
+        } catch (\Throwable $e) {
+            if ($claimed) {
+                self::recordFailure($job, $work, $stage, $e);
+                throw new RuntimeException('Local recovery failed. Run ai_video_diagnostics.php for this job; no GPU request was made.');
+            }
+            throw $e;
+        } finally {
+            Database::releaseLock('belive_ai_video_generation', $pdo);
+        }
+    }
+
+    private static function recordFailure(array $job, ?string $work, string $stage, \Throwable $e, array $providerDetails = []): void
+    {
+        $code = $stage === 'database' ? 'database'
+            : (in_array($e->getMessage(), self::ERROR_CODES, true) ? $e->getMessage() : 'generation');
+        $details = $providerDetails ?: self::safeFailureDetails(['error' => $code, 'stage' => $stage,
+            'exception_type' => (new \ReflectionClass($e))->getShortName(),
+            'sqlstate' => $e instanceof \PDOException ? (string) $e->getCode() : null]);
+        if ($work !== null && is_dir($work)) {
+            @file_put_contents($work . '/failure.json', json_encode($details, JSON_THROW_ON_ERROR));
+            @chmod($work . '/failure.json', 0600);
+        }
+        Database::run("UPDATE ai_video_jobs SET status = 'failed', error_code = ?, completed_at = UTC_TIMESTAMP() WHERE id = ?", [$code, $job['id']]);
+    }
+
+    private static function finishDraft(array $job, array $result, string $work, string &$stage): int
+    {
+        $payload = json_decode($job['payload'], true, 512, JSON_THROW_ON_ERROR);
+        $room = Room::find((int) $job['room_id']);
+        if ($room === null) throw new RuntimeException('input');
+        $pdo = Database::pdo();
+        $stage = 'output';
+        $clip = realpath((string) ($result['video'] ?? ''));
+        $cache = realpath($work);
+        if ($cache === false || $clip === false || !str_starts_with($clip, $cache . DIRECTORY_SEPARATOR)
+            || strtolower(pathinfo($clip, PATHINFO_EXTENSION)) !== 'mp4' || filesize($clip) < 1024) {
+            throw new RuntimeException('output');
+        }
+        if (!is_string($result['model'] ?? null) || $result['model'] === '' || !is_string($result['space'] ?? null)) {
+            throw new RuntimeException('output');
+        }
+        // Preserve provider output before local rendering/database work, so recovery never submits a GPU job.
+        $manifest = $work . '/result.json';
+        file_put_contents($manifest . '.tmp', json_encode([
+            'video' => $clip, 'model' => $result['model'], 'space' => $result['space'],
+        ], JSON_THROW_ON_ERROR));
+        chmod($manifest . '.tmp', 0600);
+        if (!rename($manifest . '.tmp', $manifest)) throw new RuntimeException('output');
+        // A single short generated shot fits a limited free GPU allowance.
+        // The rest of the marketing reel uses verified original room media.
+        $scenes = array_merge(array_slice($payload['scenes'], 0, 2), [PromoVideoDrafter::endCard($room)]);
+        $scenes[0]['seconds'] = min(3.3, RoomVideoComposer::clipDuration($clip));
+        if ($scenes[0]['seconds'] < 2.5) {
+            throw new RuntimeException('output');
+        }
+        $meta = null;
+        $stage = 'render';
+        $url = RoomVideoComposer::render($room, $scenes, $meta, null,
+            [['kind' => 'clip', 'file' => $clip, 'generated_presenter' => true]], false);
+        $renderedScenes = $meta['scenes'];
+        unset($meta['scenes']);
+        $meta = array_merge($meta, ['style' => 'generative_mascot_tour', 'ai_generated_footage' => true,
+            'script_model' => $payload['model'], 'video_model' => $result['model'], 'video_provider' => 'huggingface_space',
+            'space' => $result['space'], 'generated_shots' => 1, 'review_required' => true]);
+        $stage = 'database';
+        try {
+            $pdo->beginTransaction();
+            $post = Database::insert(
+                'INSERT INTO content_posts (platform, media_kind, room_id, caption, status, generated_by_model, generated_via, video_url, video_script, creative_meta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [$job['platform'], 'video', $job['room_id'], $payload['caption'] . "\nAI-generated mascot animation; verify the room against its listing photos.",
+                    'draft', mb_substr($result['model'], 0, 60, 'UTF-8'), 'manual', $url,
+                    json_encode($renderedScenes, JSON_THROW_ON_ERROR), json_encode($meta, JSON_THROW_ON_ERROR)]
+            );
+            $saved = Database::run("UPDATE ai_video_jobs SET status = 'completed', post_id = ?, completed_at = UTC_TIMESTAMP() WHERE id = ? AND status = 'running'", [$post, $job['id']])->rowCount();
+            if ($saved !== 1) throw new RuntimeException('database');
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            @unlink(APP_ROOT . '/public' . $url);
+            throw $e;
+        }
+        return (int) $post;
     }
 
     public static function errorMessage(string $code): string
@@ -207,6 +289,7 @@ final class AiVideoJobs
             'endpoint', 'arguments' => 'The Space API has changed. IT must check the image-to-video endpoint before resubmitting.',
             'timeout' => 'Generation timed out. Its remote outcome is unknown; inspect the Space before submitting again.',
             'output' => 'No valid generated video was returned.',
+            'database' => 'The video was generated, but saving its draft failed. IT can recover the cached clip without another GPU request.',
             default => 'AI video generation failed. Check the runtime and Space availability; no alternate paid provider was called.',
         };
     }
