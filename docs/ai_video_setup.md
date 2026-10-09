@@ -1,7 +1,7 @@
 # Generative AI marketing video — hosted Wan setup
 
-This optional integration uses the official
-[Wan2.2-TI2V-5B Space](https://huggingface.co/spaces/Wan-AI/Wan-2.2-5B)
+This optional integration uses the community-hosted
+[Wan2.1 Fast Space](https://huggingface.co/spaces/multimodalart/wan2-1-fast)
 through the official Gradio client. Wan generates **new video frames**, including
 movement of the supplied BeLive mascot, from a polished real room photo. The app
 adds verified copy, narration when available, original room shots and a closing
@@ -22,7 +22,7 @@ Quotas reset 24 hours after first use, not necessarily at local midnight.
 Availability, queues, supported API signatures and quotas can change. A Space
 may be unavailable, and a single generation can exhaust the allowance.
 
-This connector calls only the official Wan Space, requests one short generated
+This connector calls only an explicitly supported Space, requests one short generated
 shot per video and never switches to another provider. It uses explicit
 anonymous access when no token is supplied. Optional tokens are checked against
 account metadata; PRO, organization or unrecognised account plans are rejected
@@ -66,11 +66,21 @@ On Azure, configure these **App settings**:
 
 ```dotenv
 AI_VIDEO_PROVIDER=huggingface
-HF_VIDEO_SPACE=Wan-AI/Wan-2.2-5B
+HF_VIDEO_SPACE=multimodalart/wan2-1-fast
 HF_VIDEO_API_NAME=
 HF_VIDEO_TOKEN=
 MOCK_AI=false
 ```
+
+On 9 October 2026, the previously configured `Wan-AI/Wan-2.2-5B` returned
+HTTP 401 and was absent from the owner's public Space list. The replacement
+Space was running on ZeroGPU, and its live `/generate_video` metadata check
+passed anonymously. It uses `Wan-AI/Wan2.1-I2V-14B-480P-Diffusers` with CausVid
+LoRA, not Wan2.2. The connector requests four steps, 3.3 seconds and a 480×832
+portrait clip. Clear an old `HF_VIDEO_API_NAME` or set it to `/generate_video`.
+No GPU generation was performed as part of that metadata check, so successful
+generation and remaining quota still need validation on Azure. The old Space
+remains explicitly selectable if access returns; no automatic fallback occurs.
 
 Leave the token blank for the anonymous allowance, or enter a free personal
 account's token privately. Do not post it in chat, screenshots, Git or command

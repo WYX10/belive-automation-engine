@@ -11,6 +11,11 @@ import sys
 
 IMAGE_NAMES = {"image", "input_image", "start_image", "start_frame", "first_frame", "init_image"}
 PROMPT_NAMES = {"prompt", "text_prompt", "positive_prompt"}
+DEFAULT_SPACE = "multimodalart/wan2-1-fast"
+SUPPORTED_SPACES = {
+    DEFAULT_SPACE: "Wan2.1-I2V-14B-480P + CausVid LoRA",
+    "Wan-AI/Wan-2.2-5B": "Wan2.2-TI2V-5B",
+}
 
 
 def select_endpoint(info: dict, requested: str = "") -> tuple[str, list[dict]]:
@@ -25,11 +30,15 @@ def select_endpoint(info: dict, requested: str = "") -> tuple[str, list[dict]]:
     return candidates[0]
 
 
-def arguments(params: list[dict], image: object, prompt: str) -> dict:
+def arguments(params: list[dict], image: object, prompt: str, space: str = "Wan-AI/Wan-2.2-5B") -> dict:
     # Use the server's declared defaults, overriding only recognised controls.
     overrides = {"seed": 42, "randomize_seed": False, "num_frames": 81,
                  "frame_num": 81, "num_inference_steps": 20, "steps": 20,
                  "use_prompt_extend": False, "prompt_extend": False}
+    if space == DEFAULT_SPACE:
+        # This distilled model uses four steps. Its two-second API default is
+        # too short for the application's minimum 2.5-second introduction.
+        overrides.update(steps=4, duration_seconds=3.3, height=832, width=480)
     result = {}
     for param in params:
         name = param.get("parameter_name", "")
@@ -78,9 +87,9 @@ def run(payload: dict, factory=None, api=None, file_handler=None) -> dict:
         from gradio_client import Client, handle_file
         from huggingface_hub import HfApi
         factory, api, file_handler = Client, HfApi(), handle_file
-    space = os.environ.get("HF_VIDEO_SPACE", "Wan-AI/Wan-2.2-5B")
-    if space != "Wan-AI/Wan-2.2-5B":
-        raise ValueError("space")  # Only the verified upstream model, no arbitrary paid API routing.
+    space = os.environ.get("HF_VIDEO_SPACE") or DEFAULT_SPACE
+    if space not in SUPPORTED_SPACES:
+        raise ValueError("space")  # Explicit supported hosts only; no automatic provider fallback.
     token = os.environ.get("HF_VIDEO_TOKEN", "")
     check_free_account(token, api)
     image = Path(payload.get("image", "")).resolve()
@@ -91,11 +100,12 @@ def run(payload: dict, factory=None, api=None, file_handler=None) -> dict:
         client = factory(space, token=token if token else False, verbose=False, download_files=str(cache),
                          ssl_verify=True, analytics_enabled=False, httpx_kwargs={"timeout": 30})
         info = client.view_api(return_format="dict", print_info=False)
-        name, params = select_endpoint(info, os.environ.get("HF_VIDEO_API_NAME", ""))
+        requested = os.environ.get("HF_VIDEO_API_NAME", "") or ("/generate_video" if space == DEFAULT_SPACE else "")
+        name, params = select_endpoint(info, requested)
         if payload.get("check"):
-            arguments(params, None, "Metadata check only.")
+            arguments(params, None, "Metadata check only.", space)
             return {"ok": True, "space": space, "api_name": name}
-        values = arguments(params, file_handler(str(image)), str(payload["prompt"]))
+        values = arguments(params, file_handler(str(image)), str(payload["prompt"]), space)
         job = client.submit(api_name=name, **values)
         try:
             result = job.result(timeout=600)
@@ -104,7 +114,7 @@ def run(payload: dict, factory=None, api=None, file_handler=None) -> dict:
             raise ValueError("timeout") from None
     video = find_video(result, cache)
     return {"ok": True, "video": str(video), "space": space,
-            "model": "Wan2.2-TI2V-5B", "api_name": name}
+            "model": SUPPORTED_SPACES[space], "api_name": name}
 
 
 def main():
@@ -118,6 +128,13 @@ def main():
             "quota" if any(word in text for word in ("quota", "daily limit", "gpu limit")) else "provider")
         # Error text may contain tokens/URLs or private paths. Emit only a code.
         result = {"ok": False, "error": code}
+        if "--check" in sys.argv:
+            # Safe diagnostics: never emit exception messages, headers or URLs.
+            result["exception_type"] = type(exc).__name__
+            response = getattr(exc, "response", None)
+            status = getattr(response, "status_code", None)
+            if isinstance(status, int):
+                result["http_status"] = status
     sys.stdout.write(json.dumps(result) + "\n")
     return 0 if result["ok"] else 1
 

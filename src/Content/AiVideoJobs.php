@@ -245,7 +245,7 @@ final class AiVideoJobs
             if ($value !== false) $env[$name] = $value;
         }
         foreach (['HF_VIDEO_SPACE', 'HF_VIDEO_API_NAME', 'HF_VIDEO_TOKEN'] as $name) {
-            $env[$name] = self::setting($name, $name === 'HF_VIDEO_SPACE' ? 'Wan-AI/Wan-2.2-5B' : '');
+            $env[$name] = self::setting($name, $name === 'HF_VIDEO_SPACE' ? 'multimodalart/wan2-1-fast' : '');
         }
         $pipes = [];
         $dir = APP_ROOT . '/ai_video/huggingface';

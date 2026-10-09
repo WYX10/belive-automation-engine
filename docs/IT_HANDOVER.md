@@ -202,7 +202,7 @@ to the application account (for example, owner `root`, group `www-data`, mode
 | `CONTENT_VIDEO_VOICE` | `true` for eSpeak narration, or `false` to disable it |
 | `ESPEAK_BIN` | Blank when eSpeak NG is on PATH, otherwise absolute executable path |
 | `AI_VIDEO_PROVIDER` | `illustrated` initially; `huggingface` after provisioning the optional generative-video client |
-| `HF_VIDEO_SPACE` | `Wan-AI/Wan-2.2-5B`, the supported official image-to-video Space |
+| `HF_VIDEO_SPACE` | `multimodalart/wan2-1-fast`, the supported community Wan2.1 image-to-video Space |
 | `HF_VIDEO_API_NAME` | Blank for unambiguous API discovery, or the inspected image-to-video endpoint |
 | `HF_VIDEO_TOKEN` | Optional free personal account token, transferred privately; paid/unknown plans are blocked |
 

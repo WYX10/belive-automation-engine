@@ -30,6 +30,29 @@ class ClientTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "arguments"):
             client.arguments([parameter("billing_account")], "image", "prompt")
 
+    def test_fast_model_has_short_portrait_profile(self):
+        params = [parameter(n, True) for n in ("steps", "duration_seconds", "height", "width", "randomize_seed")]
+        args = client.arguments(params, "image", "prompt", client.DEFAULT_SPACE)
+        self.assertEqual(args, {"steps": 4, "duration_seconds": 3.3, "height": 832, "width": 480, "randomize_seed": False})
+
+    def test_live_fast_schema_is_accepted_without_gpu_work(self):
+        class Gradio:
+            def __init__(self, *args, **kwargs): pass
+            def view_api(self, **kwargs):
+                return {"named_endpoints": {"/generate_video": {"parameters": [
+                    parameter("input_image"), parameter("prompt", True),
+                    *[parameter(n, True) for n in ("height", "width", "negative_prompt", "duration_seconds", "guidance_scale", "steps", "seed", "randomize_seed")]
+                ]}}}
+            def submit(self, **kwargs): raise AssertionError("GPU submission during metadata check")
+        with patch.dict("os.environ", {"HF_VIDEO_TOKEN": "", "HF_VIDEO_API_NAME": "", "HF_VIDEO_SPACE": client.DEFAULT_SPACE}):
+            result = client.run({"check": True}, factory=Gradio)
+        self.assertEqual(result, {"ok": True, "space": client.DEFAULT_SPACE, "api_name": "/generate_video"})
+
+    def test_arbitrary_space_does_not_trigger_provider_fallback(self):
+        with patch.dict("os.environ", {"HF_VIDEO_SPACE": "unknown/paid-space"}):
+            with self.assertRaisesRegex(ValueError, "space"):
+                client.run({"check": True}, factory=lambda *a, **k: self.fail("Unexpected connection"))
+
     def test_bounds_prompt_and_disables_paid_prompt_extension(self):
         args = client.arguments([parameter("image"), parameter("prompt"), parameter("use_prompt_extend", True),
                                  parameter("num_frames", True)], "input", "x" * 5000)
