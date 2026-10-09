@@ -13,6 +13,29 @@ use RuntimeException;
 /** Hosted generative video jobs; no GPU wait in a browser request. */
 final class AiVideoJobs
 {
+    private const ERROR_CODES = ['quota', 'provider', 'provider_runtime', 'provider_unavailable', 'authentication',
+        'gpu_capacity', 'tls', 'paid_account', 'endpoint', 'arguments', 'output', 'input', 'timeout', 'space', 'generation'];
+
+    public static function safeFailureDetails(array $result): array
+    {
+        $details = [];
+        if (in_array($result['error'] ?? '', self::ERROR_CODES, true)) $details['error'] = $result['error'];
+        if (in_array($result['stage'] ?? '', ['account', 'input', 'prepare', 'connect', 'schema', 'submit', 'result', 'output', 'render', 'database', 'provider'], true)) $details['stage'] = $result['stage'];
+        if (is_string($result['exception_type'] ?? null) && preg_match('/^[A-Za-z][A-Za-z0-9_]{0,63}$/D', $result['exception_type'])) $details['exception_type'] = $result['exception_type'];
+        if (is_int($result['http_status'] ?? null) && $result['http_status'] >= 100 && $result['http_status'] <= 599) $details['http_status'] = $result['http_status'];
+        return $details;
+    }
+
+    /** Read-only diagnostics: no prompt, room image, token or provider message. */
+    public static function diagnostics(int $jobId): array
+    {
+        $job = Database::run('SELECT id, status, error_code FROM ai_video_jobs WHERE id = ?', [$jobId])->fetch();
+        if (!$job) return ['found' => false];
+        $path = APP_ROOT . '/storage/ai_video/job_' . $jobId . '/failure.json';
+        $details = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
+        return ['job' => $job, 'details_available' => is_array($details),
+            'details' => is_array($details) ? self::safeFailureDetails($details) : []];
+    }
     public static function setting(string $name, string $default = ''): string
     {
         $value = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name);
@@ -88,6 +111,8 @@ final class AiVideoJobs
             return false;
         }
         $job = null;
+        $stage = 'prepare';
+        $failureDetails = [];
         try {
             $job = Database::run("SELECT * FROM ai_video_jobs WHERE status = 'queued' ORDER BY id LIMIT 1")->fetch();
             if (!$job) {
@@ -106,11 +131,14 @@ final class AiVideoJobs
                 throw new RuntimeException('input');
             }
             $prompt = self::prompt($payload['scenes']);
+            $stage = 'provider';
             $result = $generate !== null ? $generate($job, $work, $prompt)
                 : self::generate(['image' => $job['input_path'], 'cache' => $work, 'prompt' => $prompt]);
             if (empty($result['ok'])) {
+                $failureDetails = self::safeFailureDetails($result);
                 throw new RuntimeException($result['error'] ?? 'provider');
             }
+            $stage = 'output';
             $clip = realpath((string) ($result['video'] ?? ''));
             if ($clip === false || !str_starts_with($clip, realpath($work) . DIRECTORY_SEPARATOR)
                 || strtolower(pathinfo($clip, PATHINFO_EXTENSION)) !== 'mp4' || filesize($clip) < 1024) {
@@ -124,6 +152,7 @@ final class AiVideoJobs
                 throw new RuntimeException('output');
             }
             $meta = null;
+            $stage = 'render';
             $url = RoomVideoComposer::render($room, $scenes, $meta, null,
                 [['kind' => 'clip', 'file' => $clip, 'generated_presenter' => true]], false);
             $renderedScenes = $meta['scenes'];
@@ -131,6 +160,7 @@ final class AiVideoJobs
             $meta = array_merge($meta, ['style' => 'generative_mascot_tour', 'ai_generated_footage' => true,
                 'video_model' => $result['model'], 'video_provider' => 'huggingface_space',
                 'space' => $result['space'], 'generated_shots' => 1, 'review_required' => true]);
+            $stage = 'database';
             $pdo->beginTransaction();
             try {
                 $post = Database::insert(
@@ -149,8 +179,13 @@ final class AiVideoJobs
             return true;
         } catch (\Throwable $e) {
             if ($job) {
-                $known = ['quota', 'provider', 'paid_account', 'endpoint', 'arguments', 'output', 'input', 'timeout', 'space'];
-                $code = in_array($e->getMessage(), $known, true) ? $e->getMessage() : 'generation';
+                $code = in_array($e->getMessage(), self::ERROR_CODES, true) ? $e->getMessage() : 'generation';
+                if (isset($work) && is_dir($work)) {
+                    $details = $failureDetails ?: self::safeFailureDetails(['error' => $code, 'stage' => $stage,
+                        'exception_type' => (new \ReflectionClass($e))->getShortName()]);
+                    @file_put_contents($work . '/failure.json', json_encode($details, JSON_THROW_ON_ERROR));
+                    @chmod($work . '/failure.json', 0600);
+                }
                 Database::run("UPDATE ai_video_jobs SET status = 'failed', error_code = ?, completed_at = UTC_TIMESTAMP() WHERE id = ?", [$code, $job['id']]);
             }
             return false;
@@ -164,6 +199,11 @@ final class AiVideoJobs
         return match ($code) {
             'quota' => 'The free GPU allowance is exhausted. Try a new request after it resets.',
             'paid_account' => 'Use an anonymous session or a free personal Hugging Face account. Paid or unverified account plans are blocked.',
+            'authentication' => 'The hosted Space rejected authentication. Check the private Hugging Face token and account access.',
+            'provider_runtime' => 'The hosted Wan Space reported a runtime error during generation. IT must check the Space or select a verified alternative.',
+            'provider_unavailable' => 'The hosted Space is temporarily unavailable. Check its status before submitting again.',
+            'gpu_capacity' => 'The hosted Space could not allocate GPU resources. Check its capacity before submitting again.',
+            'tls' => 'The connector could not verify the provider TLS certificate. IT must check the host trust configuration.',
             'endpoint', 'arguments' => 'The Space API has changed. IT must check the image-to-video endpoint before resubmitting.',
             'timeout' => 'Generation timed out. Its remote outcome is unknown; inspect the Space before submitting again.',
             'output' => 'No valid generated video was returned.',
@@ -245,7 +285,7 @@ final class AiVideoJobs
             if ($value !== false) $env[$name] = $value;
         }
         foreach (['HF_VIDEO_SPACE', 'HF_VIDEO_API_NAME', 'HF_VIDEO_TOKEN'] as $name) {
-            $env[$name] = self::setting($name, $name === 'HF_VIDEO_SPACE' ? 'multimodalart/wan2-1-fast' : '');
+            $env[$name] = self::setting($name, $name === 'HF_VIDEO_SPACE' ? 'multimodalart/wan-2-2-first-last-frame' : '');
         }
         $pipes = [];
         $dir = APP_ROOT . '/ai_video/huggingface';

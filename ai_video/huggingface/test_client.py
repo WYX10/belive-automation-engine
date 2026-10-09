@@ -32,7 +32,7 @@ class ClientTest(unittest.TestCase):
 
     def test_fast_model_has_short_portrait_profile(self):
         params = [parameter(n, True) for n in ("steps", "duration_seconds", "height", "width", "randomize_seed")]
-        args = client.arguments(params, "image", "prompt", client.DEFAULT_SPACE)
+        args = client.arguments(params, "image", "prompt", client.FAST_SPACE)
         self.assertEqual(args, {"steps": 4, "duration_seconds": 3.3, "height": 832, "width": 480, "randomize_seed": False})
 
     def test_live_fast_schema_is_accepted_without_gpu_work(self):
@@ -44,9 +44,85 @@ class ClientTest(unittest.TestCase):
                     *[parameter(n, True) for n in ("height", "width", "negative_prompt", "duration_seconds", "guidance_scale", "steps", "seed", "randomize_seed")]
                 ]}}}
             def submit(self, **kwargs): raise AssertionError("GPU submission during metadata check")
-        with patch.dict("os.environ", {"HF_VIDEO_TOKEN": "", "HF_VIDEO_API_NAME": "", "HF_VIDEO_SPACE": client.DEFAULT_SPACE}):
+        with patch.dict("os.environ", {"HF_VIDEO_TOKEN": "", "HF_VIDEO_API_NAME": "", "HF_VIDEO_SPACE": client.FAST_SPACE}):
             result = client.run({"check": True}, factory=Gradio)
-        self.assertEqual(result, {"ok": True, "space": client.DEFAULT_SPACE, "api_name": "/generate_video"})
+        self.assertEqual(result, {"ok": True, "space": client.FAST_SPACE, "api_name": "/generate_video"})
+
+    def test_two_frame_profile_uses_same_anchor_and_eight_steps(self):
+        params = [parameter(n, True) for n in ("start_image_pil", "end_image_pil", "prompt", "steps", "duration_seconds")]
+        anchor = object()
+        args = client.arguments(params, anchor, "Animate", client.DEFAULT_SPACE)
+        self.assertIs(args['start_image_pil'], anchor)
+        self.assertIs(args['end_image_pil'], anchor)
+        self.assertEqual(args['steps'], 8)
+        self.assertEqual(args['duration_seconds'], 3.3)
+
+    def test_two_frame_metadata_never_calls_end_frame_generator(self):
+        class Gradio:
+            def __init__(self, *args, **kwargs): pass
+            def view_api(self, **kwargs):
+                params = [parameter(n) for n in ("start_image_pil", "end_image_pil", "prompt")]
+                return {"named_endpoints": {"/generate_video": {"parameters": params},
+                    "/generate_video_1": {"parameters": params}, "/lambda": {"parameters": [parameter("img")]}}}
+            def submit(self, **kwargs): raise AssertionError("GPU work in metadata check")
+        with patch.dict("os.environ", {"HF_VIDEO_TOKEN": "", "HF_VIDEO_API_NAME": "", "HF_VIDEO_SPACE": client.DEFAULT_SPACE}):
+            result = client.run({'check': True}, factory=Gradio)
+        self.assertEqual(result['api_name'], '/generate_video')
+
+    def test_two_frame_fake_boundary_submits_once_with_model_attribution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); image = root / 'room.png'; image.write_bytes(b'png')
+            cache = root / 'cache'; cache.mkdir()
+            video = cache / 'out.mp4'; video.write_bytes(b'x' * 2048)
+            requests = []
+            class Job:
+                def result(self, timeout): return (str(video), 42)
+            class Gradio:
+                def __init__(self, *args, **kwargs): pass
+                def view_api(self, **kwargs):
+                    return {'named_endpoints': {'/generate_video': {'parameters': [
+                        parameter(n, n in ('steps', 'duration_seconds')) for n in
+                        ('start_image_pil', 'end_image_pil', 'prompt', 'steps', 'duration_seconds')]}}}
+                def submit(self, **kwargs): requests.append(kwargs); return Job()
+            with patch.dict('os.environ', {'HF_VIDEO_TOKEN': '', 'HF_VIDEO_API_NAME': '', 'HF_VIDEO_SPACE': client.DEFAULT_SPACE}):
+                result = client.run({'image': str(image), 'cache': str(cache), 'prompt': 'Wave gently'},
+                    factory=Gradio, file_handler=lambda path: {'path': path})
+            self.assertEqual(len(requests), 1)
+            self.assertIs(requests[0]['start_image_pil'], requests[0]['end_image_pil'])
+            self.assertTrue(requests[0]['prompt'].startswith('Start and finish'))
+            self.assertEqual(result['model'], 'Wan2.2-I2V-A14B (first/last-frame)')
+
+    def test_provider_runtime_diagnostic_does_not_leak_messages(self):
+        class AppError(ValueError): pass
+        exc = client.ProviderFailure('result', AppError('RuntimeError hf_PRIVATE /private/room.png'))
+        result = client.failure_result(exc)
+        self.assertEqual(result, {'ok': False, 'error': 'provider_runtime', 'stage': 'result', 'exception_type': 'AppError'})
+        self.assertNotIn('PRIVATE', str(result))
+        self.assertNotIn('room.png', str(result))
+
+    def test_quota_and_http_auth_are_distinct_from_runtime_errors(self):
+        class AppError(ValueError): pass
+        self.assertEqual(client.failure_result(client.ProviderFailure('result', AppError('You have exceeded your ZeroGPU quota')))['error'], 'quota')
+        class HTTPError(Exception): pass
+        exc = HTTPError('private provider error')
+        from types import SimpleNamespace
+        exc.response = SimpleNamespace(status_code=401)
+        result = client.failure_result(client.ProviderFailure('submit', exc))
+        self.assertEqual(result['error'], 'authentication')
+        self.assertEqual(result['stage'], 'submit')
+        self.assertEqual(result['http_status'], 401)
+
+    def test_connection_failure_records_stage_without_submission(self):
+        def factory(*args, **kwargs): raise ConnectionError('hf_PRIVATE provider connection failed')
+        with patch.dict("os.environ", {"HF_VIDEO_TOKEN": "", "HF_VIDEO_SPACE": client.DEFAULT_SPACE}):
+            try:
+                client.run({'check': True}, factory=factory)
+                self.fail('Connection unexpectedly passed')
+            except client.ProviderFailure as exc:
+                result = client.failure_result(exc)
+        self.assertEqual(result['stage'], 'connect')
+        self.assertEqual(result['exception_type'], 'ConnectionError')
+        self.assertNotIn('PRIVATE', str(result))
 
     def test_arbitrary_space_does_not_trigger_provider_fallback(self):
         with patch.dict("os.environ", {"HF_VIDEO_SPACE": "unknown/paid-space"}):

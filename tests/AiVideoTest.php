@@ -63,6 +63,23 @@ $failed = Database::run('SELECT * FROM ai_video_jobs WHERE id = ?', [$failureJob
 check('GPU quota failure is preserved as a failed job', $failed['status'] === 'failed' && $failed['error_code'] === 'quota');
 AiVideoJobs::processNext(static function () use (&$called) { $called++; return ['ok' => true]; });
 check('failed AI requests are not automatically retried', $called === 1);
+$runtimeJob = $insertJob();
+AiVideoJobs::processNext(static fn () => ['ok' => false, 'error' => 'provider_runtime', 'stage' => 'result',
+    'exception_type' => 'AppError', 'message' => 'hf_PRIVATE room details', 'image' => '/private/room.png']);
+$runtimeDetails = AiVideoJobs::diagnostics($runtimeJob);
+check('hosted runtime failure retains a distinct error code', $runtimeDetails['job']['error_code'] === 'provider_runtime'
+    && $runtimeDetails['job']['status'] === 'failed');
+check('read-only diagnostics retain failure stage and exception type', $runtimeDetails['details_available']
+    && $runtimeDetails['details'] === ['error' => 'provider_runtime', 'stage' => 'result', 'exception_type' => 'AppError']);
+check('provider diagnostics omit messages, tokens and image paths', !str_contains(json_encode($runtimeDetails), 'PRIVATE')
+    && !str_contains(json_encode($runtimeDetails), 'room.png'));
+check('diagnostic file has private permissions', PHP_OS_FAMILY === 'Windows'
+    || (fileperms(APP_ROOT . '/storage/ai_video/job_' . $runtimeJob . '/failure.json') & 0777) === 0600);
+check('studio distinguishes provider runtime errors from authentication errors', AiVideoJobs::errorMessage('provider_runtime')
+    !== AiVideoJobs::errorMessage('authentication') && str_contains(AiVideoJobs::errorMessage('provider_runtime'), 'runtime error'));
+check('diagnostics discard unsupported categories and malformed details', AiVideoJobs::safeFailureDetails([
+    'error' => 'hf_PRIVATE', 'stage' => '/private/path', 'exception_type' => 'contains private path!', 'http_status' => '401',
+]) === []);
 $previousVideoProvider = $_ENV['AI_VIDEO_PROVIDER'] ?? null;
 $_ENV['AI_VIDEO_PROVIDER'] = 'huggingface';
 check('mock mode cannot dispatch hosted GPU generation', !AiVideoJobs::available());

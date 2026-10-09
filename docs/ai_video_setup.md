@@ -1,7 +1,7 @@
 # Generative AI marketing video — hosted Wan setup
 
 This optional integration uses the community-hosted
-[Wan2.1 Fast Space](https://huggingface.co/spaces/multimodalart/wan2-1-fast)
+[Wan2.2 first/last-frame Space](https://huggingface.co/spaces/multimodalart/wan-2-2-first-last-frame)
 through the official Gradio client. Wan generates **new video frames**, including
 movement of the supplied BeLive mascot, from a polished real room photo. The app
 adds inventory-based copy, narration when available, original room shots and a closing
@@ -66,7 +66,7 @@ On Azure, configure these **App settings**:
 
 ```dotenv
 AI_VIDEO_PROVIDER=huggingface
-HF_VIDEO_SPACE=multimodalart/wan2-1-fast
+HF_VIDEO_SPACE=multimodalart/wan-2-2-first-last-frame
 HF_VIDEO_API_NAME=
 HF_VIDEO_TOKEN=
 MOCK_AI=false
@@ -77,10 +77,19 @@ HTTP 401 and was absent from the owner's public Space list. The replacement
 Space was running on ZeroGPU, and its live `/generate_video` metadata check
 passed anonymously. It uses `Wan-AI/Wan2.1-I2V-14B-480P-Diffusers` with CausVid
 LoRA, not Wan2.2. The connector requests four steps, 3.3 seconds and a 480×832
-portrait clip. Clear an old `HF_VIDEO_API_NAME` or set it to `/generate_video`.
-No GPU generation was performed as part of that metadata check, so successful
-generation and remaining quota still need validation on Azure. The old Space
-remains explicitly selectable if access returns; no automatic fallback occurs.
+portrait clip. Actual anonymous generation subsequently returned a hosted
+`RuntimeError`, and the user's authenticated Azure request also failed.
+
+The recommended alternative is now `multimodalart/wan-2-2-first-last-frame`.
+Its live `/generate_video` schema passed the connector check. It uses Wan2.2
+I2V A14B transformers, eight steps and a 3.3-second loop, with the same prepared
+room/mascot image anchoring both ends. No extra end-frame image model is called.
+An anonymous generation test reached a ZeroGPU quota error (180 seconds requested
+versus 173 remaining), so authenticated generation and visual quality remain
+unverified. Use a free personal token and respect the actual available quota;
+do not repeatedly submit after a quota failure. Clear an old `HF_VIDEO_API_NAME`
+or set it to `/generate_video`. Older supported Spaces remain explicitly
+selectable; no automatic fallback occurs.
 
 Leave the token blank for the anonymous allowance, or enter a free personal
 account's token privately. Do not post it in chat, screenshots, Git or command
@@ -182,6 +191,34 @@ generative model's visual quality. Run database suites only against local
 throwaway databases, as described in the IT guide.
 
 The replacement Space's live metadata check passed both in the development
-cloud and in Azure SSH. A live model-generated sample still requires generation
-on Azure and visual review. Do not treat offline fixture footage as a
-Wan-generated sample.
+cloud and in Azure SSH for Wan2.1; the newer Wan2.2 schema passed in development.
+A live model-generated sample still requires generation on Azure and visual
+review. Do not treat offline fixture footage as a Wan-generated sample.
+
+## Diagnosing generation failures
+
+Connection/schema checks submit no GPU work. They do not prove that a hosted
+model can generate video. Runtime failures now retain fixed error categories,
+the failure stage, exception class and optional HTTP status in a private
+`storage/ai_video/job_<id>/failure.json`. Messages, prompts, image paths and
+tokens are omitted. The studio distinguishes authentication, hosted runtime,
+GPU capacity, TLS, quota and availability errors.
+
+Read a failed job without retrying or consuming GPU quota:
+
+```bash
+php database/ai_video_diagnostics.php 4
+```
+
+Check the connector using the app's own settings without submitting a GPU job:
+
+```bash
+php database/ai_video_diagnostics.php --check
+```
+
+This reports token presence and safe metadata results, never the token value.
+
+Replace `4` with the new failed request ID. Older failures recorded before this
+update have no detailed file; their original provider exception cannot be
+recovered. Do not reset and retry them automatically. Review `stage` and the
+Space's status before submitting another generation.
